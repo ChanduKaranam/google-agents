@@ -516,15 +516,32 @@ Request quota **before** launch, sized to cohort × 2 req/min × 1.5.
 
 ### 8.3 Deployment smoke test
 
-Because local and deployed are different code paths (§2.1), one manual pass
-after first deploy: register, ask a question as two different Gemini
-Enterprise users, and confirm (a) `user_id` is not `default-user-id`, (b) an
-application tracked in one session is visible in the next, and (c)
-`google_search` returns results from the deployed region.
+Automated as `scripts/smoke_test.py`, which calls the deployed agent through
+`streaming_agent_run_with_events` with the resume as an artifact plus GE's
+empty marker parts — the production path, which `adk web` never exercises.
 
-Item (b) is the §2.1 risk. Note that with resumes ephemeral (§4.1), it now
-tests Memory Bank rather than session state — the profile is *expected* not to
-survive, so only application history is checked.
+**Run 2026-07-22 against `reasoningEngines/1858334629883281408`: all passed.**
+
+| Check | Result |
+|---|---|
+| `load_artifacts` called | PASS |
+| Resume *actually* read | PASS — reply contained `SemanticShelf`, `NIT Warangal`, `900ms to 120ms`, `F1 from 0.71 to 0.86`, verbatim from the PDF |
+| `profile` persisted to session state | PASS — `state keys: ['companies', 'profile']` after turn 2 |
+| `company_agent` search ran from `us-central1` | PASS — returned real live openings |
+| Non-empty replies, both turns | PASS |
+| Identity guard did not fire for a real user | PASS |
+
+The "actually read" check is deliberately two-sided: asserting only that
+`load_artifacts` was *called* would pass even if the model received an empty
+document and invented a plausible profile — the exact failure §4.1 warns about.
+The synthetic resume carries distinctive strings that fabrication will not
+accidentally reproduce.
+
+Turn 2 deliberately re-uploads nothing. Its success closes §2.1's residual
+risk: session state does survive between turns in production.
+
+**Not covered:** Memory Bank. Cross-session application history needs a second
+session under the same `user_id` and is checked separately.
 
 ### 8.4 Deployment environment (verified 2026-07-22)
 
@@ -562,5 +579,12 @@ Project `supadha-dev`, region `us-central1`, deploying account
    is not on our path and intra-session `output_key` memory works. Residual:
    session *state* persistence is implied, not proven — confirm on the real
    agent's first deploy (§8.3).
-4. **Search region binding** (§3.5) — does the global-region restriction on
-   Grounding with Google Search apply to a deployed ADK agent?
+4. ~~**Search region binding**~~ — **CLOSED 2026-07-22.** `company_agent` ran
+   `google_search` from a `us-central1`-deployed agent and returned real live
+   job openings. The global-region restriction documented for Gemini Enterprise
+   features does **not** bind `google_search` called from inside a deployed ADK
+   agent.
+
+**All four open items are now closed.** Remaining unverified behaviour is
+Memory Bank cross-session persistence (§8.3), which needs a second session
+under the same `user_id`.
