@@ -22,7 +22,7 @@ from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.load_artifacts_tool import load_artifacts_tool
 from google.adk.tools.preload_memory_tool import preload_memory_tool
 
-from .callbacks import require_real_user
+from .callbacks import remember_session, require_real_user
 from .tools import list_applications, track_application
 
 MODEL = "gemini-2.5-flash"
@@ -209,6 +209,12 @@ tracker_agent = Agent(
         "Use track_application to record a new application or move an existing"
         " one forward, and list_applications to report what is already"
         " tracked.\n\n"
+        "list_applications only sees this conversation. If the orchestrator's"
+        " request includes applications recalled from the student's earlier"
+        " visits, treat those as real and fold them into your answer, but"
+        " trust list_applications where the two disagree -- it holds exact"
+        " records and the recollections may be stale. Never tell a student"
+        " they have no applications when the request itself mentions some.\n\n"
         "Status must be exactly one of: Applied, OA Scheduled, Interview,"
         " Referral Requested, Offer, Rejected. Map whatever the student says"
         " onto the closest one -- 'got the online assessment' is OA Scheduled."
@@ -287,6 +293,16 @@ root_agent = Agent(
         " matching_agent. Beyond that, run only what the student's request"
         " needs. Someone asking 'what's missing for this JD' wants the gap"
         " analysis, not the full pipeline.\n\n"
+        "PAST VISITS. You alone can recall the student's earlier"
+        " conversations -- they arrive as a PAST_CONVERSATIONS block in your"
+        " context. Specialists cannot see it: each runs with a fresh, empty"
+        " memory. So whenever you delegate something that depends on history,"
+        " restate the relevant facts inside the request you send. In"
+        " particular, when calling tracker_agent about what the student has"
+        " applied to, list any applications you recall from past conversations"
+        " in the request itself. If you skip this, the tracker will report"
+        " that the student has never applied to anything, which is both wrong"
+        " and discouraging.\n\n"
         "ALWAYS REPLY IN TEXT. After calling specialists, write the answer"
         " yourself. Never end a turn with an empty message -- the student sees"
         " a blank screen and assumes you are broken.\n\n"
@@ -300,4 +316,5 @@ root_agent = Agent(
         *[AgentTool(agent=a) for a in SPECIALISTS],
     ],
     before_agent_callback=require_real_user,
+    after_agent_callback=remember_session,
 )

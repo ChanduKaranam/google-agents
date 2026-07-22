@@ -102,7 +102,8 @@ def test_track_application_appends_then_updates():
     assert ctx.state["applications"][0]["company"] == "Google"
 
     track_application("Atlassian", "Backend Intern", "Applied", "", ctx)
-    assert list_applications(ctx)["total"] == 2
+    listed = list_applications(ctx)
+    assert listed["total"] == 2
 
     # Same company + role must update in place, not duplicate -- otherwise the
     # coach agent double-counts the pipeline.

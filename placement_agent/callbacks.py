@@ -1,4 +1,4 @@
-"""Identity guard.
+"""Identity guard, and persistence of the conversation to Memory Bank.
 
 Gemini Enterprise sends the end user's email as `user_id` (verified 2026-07-22
 against the live app). If that field is ever absent, the Agent Engine template
@@ -10,8 +10,12 @@ reading another's applications.
 Refusing the turn converts that silent data leak into a loud failure.
 """
 
+import logging
+
 from google.adk.agents.callback_context import CallbackContext
 from google.genai import types
+
+logger = logging.getLogger(__name__)
 
 _DEFAULT_USER_ID = "default-user-id"
 
@@ -32,4 +36,24 @@ def require_real_user(callback_context: CallbackContext) -> types.Content | None
                 )
             ],
         )
+    return None
+
+
+async def remember_session(callback_context: CallbackContext) -> None:
+    """Persist this conversation to Memory Bank so it survives the session.
+
+    Nothing in the production path does this for us: Gemini Enterprise calls
+    the agent and walks away, and session state dies with the session. Without
+    this, a student's application history is gone the moment they close the
+    chat. `Context.add_session_to_memory` docstring names an after-agent
+    callback as the intended place for it.
+
+    Never let a memory failure break the student's turn -- they came here for
+    an answer, and losing it because a write failed is a worse outcome than
+    losing the memory.
+    """
+    try:
+        await callback_context.add_session_to_memory()
+    except Exception:  # noqa: BLE001 - memory is best-effort, the answer is not
+        logger.warning("Could not persist session to memory", exc_info=True)
     return None

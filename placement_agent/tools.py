@@ -66,6 +66,29 @@ def track_application(
 
 
 def list_applications(tool_context: ToolContext) -> dict:
-    """List every application recorded for this student in this session."""
+    """List the applications tracked in the current conversation.
+
+    This is deliberately session-scoped. It cannot see previous visits, and it
+    must not pretend to: an agent that reports "you have no applications" when
+    the student has ten would be worse than one that says "this conversation".
+
+    Why it cannot reach further: this tool runs inside a specialist invoked
+    through `AgentTool`, and `agent_tool.py:253` gives every sub-agent a fresh
+    empty `InMemoryMemoryService()` rather than forwarding the real one. So
+    `search_memory` here always returns nothing, whatever the deployment. (It
+    does forward session state in both directions -- `state=state_dict` at
+    :269 and the state_delta forwarding at :283 -- which is why `{key?}`
+    templating works fine.)
+
+    Cross-session history reaches the student through the root agent instead,
+    which holds the real memory service and `PreloadMemoryTool`.
+    """
     apps = tool_context.state.get("applications") or []
-    return {"applications": apps, "total": len(apps)}
+    return {
+        "applications_this_conversation": apps,
+        "total": len(apps),
+        "note": (
+            "Session-scoped only. Applications from the student's earlier"
+            " visits are supplied by the orchestrator, not by this tool."
+        ),
+    }
