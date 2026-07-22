@@ -27,6 +27,15 @@ from .tools import list_applications, track_application
 
 MODEL = "gemini-2.5-flash"
 
+# The orchestrator runs on a stronger model than the specialists. Measured
+# 2026-07-22 on a full eight-module walkthrough with flash as root: after a
+# tool response it frequently ended the turn with an empty string or with no
+# content parts at all (blank screen for the student), and twice it answered
+# from its own context instead of delegating. The specialists themselves were
+# fine -- the failure is multi-step orchestration, which is exactly what the
+# root does and the specialists do not.
+ROOT_MODEL = "gemini-2.5-pro"
+
 # Repeated in every search agent. Fabricated alumni are the highest-harm
 # failure in this system: a student may email a person who does not exist, or
 # worse, a real person misdescribed as an alum of their college.
@@ -35,6 +44,28 @@ NO_INVENTION = (
     " person, company, role, or link. If you find nothing, say so plainly --"
     " an honest empty result is far more useful here than a plausible guess,"
     " because the student will act on what you tell them."
+)
+
+# Alumni results describe real, named people the student may contact in public.
+# Getting this wrong is not a bad recommendation, it is a real person receiving
+# a message built on a false claim about them.
+REAL_PEOPLE_RULES = (
+    "\n\nRULES ABOUT NAMED PEOPLE -- these are real individuals, not"
+    " suggestions:\n"
+    "- NEVER list a person without a working public profile link you actually"
+    " found in the search results. No link means you do not list them, no"
+    " matter how confident you feel. A name with no link cannot be verified by"
+    " the student and must not be acted on.\n"
+    "- State only what a source actually says. Do not upgrade 'works at"
+    " Stripe' into 'NIT Warangal alum at Stripe' because it would be more"
+    " useful.\n"
+    "- Never guess anyone's gender. Use their name or 'they' -- never 'he' or"
+    " 'she' unless the source itself states it.\n"
+    "- Do not pad the list. Three verifiable contacts beat ten where seven are"
+    " guesses. If the only real link is a weak one, say the connection is"
+    " weak.\n"
+    "- If you find nobody verifiable, say exactly that and suggest what would"
+    " work better, such as the college's own alumni directory."
 )
 
 
@@ -99,13 +130,15 @@ alumni_agent = Agent(
         "Search public sources for people at the requested company who share"
         " something concrete with this student -- ideally the same college,"
         " otherwise the same degree, branch, or technology stack.\n\n"
-        "For each person report: name, current role, company, college and"
-        " graduation year if stated publicly, location, and the public profile"
-        " link you found them through. Also state, in one phrase, what they"
-        " share with the student.\n\n"
+        "For each person report, on separate lines: name, current role,"
+        " company, college and graduation year if stated publicly, location,"
+        " the public profile LINK you found them through, and one phrase"
+        " naming what they share with the student.\n\n"
         "Use only public professional information. Do not scrape LinkedIn; use"
-        " what public search surfaces. Skip anyone whose connection to the"
-        " student you cannot actually evidence. " + NO_INVENTION
+        " what public search surfaces.\n\n"
+        "Then state plainly how many verifiable contacts you found. If that"
+        " number is zero, say so -- do not soften it by listing people you"
+        " could not verify. " + NO_INVENTION + REAL_PEOPLE_RULES
     ),
     tools=[google_search],
     output_key="alumni",
@@ -132,7 +165,11 @@ matching_agent = Agent(
         " score from 0 to 100, a referral-likelihood of High, Medium or Low,"
         " and one sentence naming the strongest specific thing they share."
         " That sentence is what makes the outreach message land, so make it"
-        " concrete rather than generic."
+        " concrete rather than generic.\n\n"
+        "Carry each person's profile link through into your ranking -- a"
+        " ranked contact the student cannot look up is useless. Drop anyone"
+        " who arrived without one. Never guess anyone's gender; use their name"
+        " or 'they'."
     ),
     output_key="matches",
 )
@@ -193,7 +230,13 @@ outreach_agent = Agent(
         " buzzwords.\n"
         "- Claim nothing the profile does not support.\n\n"
         "Give a subject line for emails. If you lack a real shared detail, say"
-        " so and ask for one rather than padding with generic praise."
+        " so and ask for one rather than padding with generic praise.\n\n"
+        "You are writing to a real person. Do not assert anything about the"
+        " recipient that the ranked-contact data does not state -- not their"
+        " college, not their team, not their gender. Address them by name and"
+        " use 'they' if you must refer to them otherwise. A message that"
+        " claims a shared college the recipient never attended is worse than"
+        " no message at all."
     ),
 )
 
@@ -209,12 +252,16 @@ tracker_agent = Agent(
         "Use track_application to record a new application or move an existing"
         " one forward, and list_applications to report what is already"
         " tracked.\n\n"
-        "list_applications only sees this conversation. If the orchestrator's"
-        " request includes applications recalled from the student's earlier"
-        " visits, treat those as real and fold them into your answer, but"
-        " trust list_applications where the two disagree -- it holds exact"
-        " records and the recollections may be stale. Never tell a student"
-        " they have no applications when the request itself mentions some.\n\n"
+        "Call track_application ONLY for an application the student is"
+        " reporting now, or a status they are updating now. If the request"
+        " carries a 'RECALLED HISTORY' block, that is already recorded --"
+        " report it back to the student, but never pass it to"
+        " track_application. Re-recording it can move a status backwards.\n\n"
+        "list_applications only sees this conversation, so combine its output"
+        " with any RECALLED HISTORY in the request. Where the two disagree,"
+        " trust list_applications -- it holds exact records while"
+        " recollections may be stale. Never tell a student they have no"
+        " applications when the request itself mentions some.\n\n"
         "Status must be exactly one of: Applied, OA Scheduled, Interview,"
         " Referral Requested, Offer, Rejected. Map whatever the student says"
         " onto the closest one -- 'got the online assessment' is OA Scheduled."
@@ -266,7 +313,7 @@ SPECIALISTS = [
 
 
 root_agent = Agent(
-    model=MODEL,
+    model=ROOT_MODEL,
     name="placement_intelligence_agent",
     description=(
         "AI career strategist for students: reads their resume, finds matching"
@@ -300,12 +347,21 @@ root_agent = Agent(
         " restate the relevant facts inside the request you send. In"
         " particular, when calling tracker_agent about what the student has"
         " applied to, list any applications you recall from past conversations"
-        " in the request itself. If you skip this, the tracker will report"
-        " that the student has never applied to anything, which is both wrong"
-        " and discouraging.\n\n"
-        "ALWAYS REPLY IN TEXT. After calling specialists, write the answer"
-        " yourself. Never end a turn with an empty message -- the student sees"
-        " a blank screen and assumes you are broken.\n\n"
+        " in the request itself, prefixed with 'RECALLED HISTORY (already"
+        " recorded, do not record again):'. That prefix matters -- without it"
+        " the tracker treats a recollection as a fresh application and"
+        " re-records it, which can silently drag a status backwards from"
+        " Interview to Applied on the student's next visit. If you skip the"
+        " history entirely, the tracker instead reports that the student has"
+        " never applied to anything, which is both wrong and discouraging.\n\n"
+        "ALWAYS DELEGATE, THEN ALWAYS REPLY IN TEXT. Never answer a question a"
+        " specialist owns using your own knowledge, even when you think you"
+        " already know -- ranking contacts is matching_agent's job, drafting a"
+        " message is outreach_agent's job. And every single turn must end with"
+        " text you wrote for the student. A turn that calls a specialist and"
+        " then stops is a blank screen: the student assumes you are broken and"
+        " leaves. If a specialist returns nothing useful, say that in words"
+        " rather than returning nothing.\n\n"
         "Be direct about weak results. If the search found no alumni, say so"
         " and suggest another company rather than presenting thin findings as"
         " if they were strong. The student is making real decisions from this."
