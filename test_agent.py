@@ -19,6 +19,7 @@ EXPECTED_OUTPUT_KEYS = {
     "company_agent": "companies",
     "alumni_agent": "alumni",
     "matching_agent": "matches",
+    "verification_agent": None,
     "resume_gap_agent": "gaps",
     "outreach_agent": None,
     "tracker_agent": None,

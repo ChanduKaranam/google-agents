@@ -24,6 +24,7 @@ from google.adk.tools.preload_memory_tool import preload_memory_tool
 
 from .callbacks import remember_session, require_real_user
 from .tools import list_applications, track_application
+from .verify import verify_links
 
 MODEL = "gemini-2.5-flash"
 
@@ -142,6 +143,32 @@ alumni_agent = Agent(
     ),
     tools=[google_search],
     output_key="alumni",
+)
+
+
+verification_agent = Agent(
+    model=MODEL,
+    name="verification_agent",
+    description=(
+        "Checks that profile links for named people actually exist and back"
+        " the claims made about them. MUST be called on alumni_agent's output"
+        " before any person is shown to the student."
+    ),
+    instruction=(
+        "You verify citations about real people before a student acts on"
+        " them.\n\n"
+        "Extract every profile URL from the request and call verify_links with"
+        " them, passing the company and college being claimed as"
+        " must_mention.\n\n"
+        "Then report, for each person: VERIFIED, UNSUPPORTED (page exists but"
+        " does not mention the claimed company or college), or DEAD (link does"
+        " not load -- the URL was almost certainly invented).\n\n"
+        "State the counts plainly. Do not soften a bad result and do not"
+        " speculate that a dead link 'might still be real' -- your entire"
+        " purpose is to be the check that cannot be talked around. If every"
+        " link is dead, say so clearly."
+    ),
+    tools=[verify_links],
 )
 
 
@@ -304,6 +331,7 @@ SPECIALISTS = [
     profile_agent,
     company_agent,
     alumni_agent,
+    verification_agent,
     matching_agent,
     resume_gap_agent,
     outreach_agent,
@@ -336,10 +364,20 @@ root_agent = Agent(
         " not already established.\n\n"
         "ORDER OF WORK. profile_agent must run before company_agent,"
         " alumni_agent, matching_agent, resume_gap_agent or outreach_agent --"
-        " they all read the profile it produces. alumni_agent must run before"
-        " matching_agent. Beyond that, run only what the student's request"
-        " needs. Someone asking 'what's missing for this JD' wants the gap"
-        " analysis, not the full pipeline.\n\n"
+        " they all read the profile it produces. Beyond that, run only what"
+        " the student's request needs. Someone asking 'what's missing for this"
+        " JD' wants the gap analysis, not the full pipeline.\n\n"
+        "NAMED PEOPLE MUST BE VERIFIED. Whenever alumni_agent returns people,"
+        " you MUST then call verification_agent with their names and profile"
+        " links before showing any of them to the student, and before calling"
+        " matching_agent or outreach_agent. Present only the people"
+        " verification_agent marks VERIFIED. Say how many were dropped and"
+        " why. This is not optional and no amount of confidence in a result"
+        " replaces it -- a fabricated profile link has already happened here,"
+        " and acting on one means a student contacts a stranger with a false"
+        " claim about them. If nothing verifies, tell the student the search"
+        " found no confirmable contacts and suggest their placement cell's"
+        " alumni directory instead.\n\n"
         "PAST VISITS. You alone can recall the student's earlier"
         " conversations -- they arrive as a PAST_CONVERSATIONS block in your"
         " context. Specialists cannot see it: each runs with a fresh, empty"
