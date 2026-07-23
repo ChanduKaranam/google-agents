@@ -1,4 +1,4 @@
-"""Placement Intelligence Agent.
+"""Job Helper Agent.
 
 Eight specialists under one orchestrator, wired with `AgentTool`. See
 docs/superpowers/specs/2026-07-22-placement-intelligence-agent-design.md.
@@ -108,22 +108,33 @@ company_agent = Agent(
         " strength and their region -- not a list of famous names.\n\n"
         "Student profile:\n{profile?}\n\n"
         "If the profile above is empty, say the profile is missing and stop.\n\n"
-        "FIRST, judge the student's level honestly from the profile: the depth"
-        " and difficulty of their projects, internships, the substance behind"
-        " their skills, any measurable results. Sort them roughly into:\n"
-        "- STRONG: hard projects with real outcomes, relevant internships,"
-        " deep skills. Big product companies and competitive roles are"
-        " realistic -- recommend them, WITH the live openings you actually"
-        " find.\n"
-        "- MID: solid basics, some projects, limited experience. Recommend"
-        " growing mid-size companies, funded startups, and strong service"
-        " companies -- places where they will be hired AND will grow. A"
-        " long-shot at a top lab wastes their time.\n"
-        "- EARLY: thin or generic profile. Recommend early-stage startups,"
-        " smaller firms, and internships that will actually take them, and be"
-        " kind and concrete about it -- everyone starts somewhere.\n"
-        "Telling an average student they are a 95% fit for a top lab is not"
-        " encouragement, it is a lie that costs them a placement season.\n\n"
+        "MOST OF YOUR LIST MUST BE REALISTIC, ATTAINABLE COMPANIES. This is the"
+        " most important rule. Even a strong fresher has a low chance at a big"
+        " brand-name company -- they get thousands of applicants and take few"
+        " freshers. A student needs a WIDE set of options they can actually"
+        " land, not a short list of long shots. So aim for roughly:\n"
+        "- 60-70%: small and mid-size companies, funded startups, product"
+        " companies most people haven't heard of, and strong service/IT"
+        " companies -- ones ACTIVELY hiring freshers or new grads right now."
+        " These are the bulk of the list and where the student will most"
+        " likely get hired.\n"
+        "- 20-30%: solid mid-tier and well-known-but-reachable companies.\n"
+        "- AT MOST a couple: big brand-name 'stretch' companies, clearly"
+        " labelled Stretch, only if the profile genuinely supports a shot.\n\n"
+        "Bias hard toward companies that hire freshers in volume: campus"
+        " programmes, graduate-trainee schemes, early-career roles, and"
+        " startups scaling their teams. A student with ten reachable options"
+        " is far better served than one with five famous names they will"
+        " almost certainly be rejected from.\n\n"
+        "Still tune the MIX to the student's level -- a stronger profile earns"
+        " more and better mid-tier options and a real stretch pick or two; a"
+        " weaker profile leans further toward startups, smaller firms and"
+        " fresher-heavy service companies. But NEVER let the list become mostly"
+        " big names, whatever the level. Telling any fresher that famous"
+        " companies are their main route is a lie that costs them a placement"
+        " season.\n\n"
+        "Give at least 8-10 companies when you can find them, weighted as"
+        " above, so the student leaves with a real pipeline.\n\n"
         "REGION. Recommend jobs the student can realistically take. Default to"
         " the student's own country, inferred from their college, location, or"
         " stated preference -- an Indian student should get roles in India"
@@ -385,7 +396,7 @@ SPECIALISTS = [
 
 root_agent = Agent(
     model=ROOT_MODEL,
-    name="placement_intelligence_agent",
+    name="job_helper_agent",
     description=(
         "AI career strategist for students: reads their resume, finds matching"
         " companies and alumni, ranks referral opportunities, analyses resume"

@@ -1,11 +1,11 @@
-# Placement Intelligence Agent — Design
+# Job Helper Agent — Design
 
 **Date:** 2026-07-22
 **Status:** Spike 0 closed; ready for implementation planning. Every
 architecturally load-bearing assumption has been measured against the live
 Gemini Enterprise + Agent Runtime stack, not inferred from docs — see §4.1,
 §2.1, §3.5.
-**Scope:** MVP slice of the Placement Intelligence Agent PRD v1.0
+**Scope:** MVP slice of the Job Helper Agent PRD v1.0
 **End goal:** deployed to Agent Runtime, registered as a custom agent in a
 Gemini Enterprise app, used by students.
 
