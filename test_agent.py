@@ -56,7 +56,8 @@ def test_root_has_all_specialists_plus_infrastructure_tools():
     # application history never comes back.
     assert "load_artifacts" in names, "root cannot read uploaded resumes"
     assert "preload_memory" in names, "root cannot recall application history"
-    assert len(root_agent.tools) == len(SPECIALISTS) + 2
+    assert "alumni_search_links" in names, "no fallback when alumni search is empty"
+    assert len(root_agent.tools) == len(SPECIALISTS) + 3
 
 
 def test_output_keys_match_the_spec():
@@ -65,6 +66,20 @@ def test_output_keys_match_the_spec():
         assert agent.output_key == expected, (
             f"{agent.name} output_key is {agent.output_key!r}, expected"
             f" {expected!r} -- downstream agents read this via {{key?}}"
+        )
+
+
+def test_no_agent_can_fetch_linkedin():
+    """url_context would fetch any URL a student pasted, including LinkedIn.
+
+    robots.txt is `User-agent: * / Disallow: /`, so that would be prohibited
+    automated access originating from our production agent. Job descriptions
+    now go through fetch_job_description, which blocklists such domains in
+    code -- instructions alone have already failed us twice.
+    """
+    for agent in [root_agent, *SPECIALISTS]:
+        assert "url_context" not in [_tool_name(t) for t in (agent.tools or [])], (
+            f"{agent.name} holds url_context, which will fetch any URL given to it"
         )
 
 

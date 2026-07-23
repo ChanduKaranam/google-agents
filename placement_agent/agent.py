@@ -17,12 +17,14 @@ Two structural rules this file obeys, both learned the hard way:
 """
 
 from google.adk.agents.llm_agent import Agent
-from google.adk.tools import google_search, url_context
+from google.adk.tools import google_search
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.load_artifacts_tool import load_artifacts_tool
 from google.adk.tools.preload_memory_tool import preload_memory_tool
 
 from .callbacks import remember_session, require_real_user
+from .fetch import fetch_job_description
+from .links import alumni_search_links
 from .tools import list_applications, track_application
 from .verify import verify_links
 
@@ -128,9 +130,21 @@ alumni_agent = Agent(
     instruction=(
         "You find people who could plausibly refer this student.\n\n"
         "Student profile:\n{profile?}\n\n"
-        "Search public sources for people at the requested company who share"
-        " something concrete with this student -- ideally the same college,"
-        " otherwise the same degree, branch, or technology stack.\n\n"
+        "Search hard before giving up. Public search is weak at this, so try"
+        " several angles rather than one query, and use the college's short"
+        " form as well as its full name (for example 'NIT Warangal', 'NITW'"
+        " and 'National Institute of Technology Warangal' are the same"
+        " place):\n"
+        "- the college name together with the company name\n"
+        "- the company's engineering blog, which often names authors\n"
+        "- conference talks, meetup listings and podcast guests from the"
+        " company\n"
+        "- public GitHub profiles whose bio names the company\n"
+        "- the company's own team or leadership pages\n"
+        "- news, funding and hiring announcements that name individuals\n\n"
+        "Look for people who share something concrete with this student --"
+        " ideally the same college, otherwise the same degree, branch, or"
+        " technology stack.\n\n"
         "For each person report, on separate lines: name, current role,"
         " company, college and graduation year if stated publicly, location,"
         " the public profile LINK you found them through, and one phrase"
@@ -150,19 +164,22 @@ verification_agent = Agent(
     model=MODEL,
     name="verification_agent",
     description=(
-        "Checks that profile links for named people actually exist and back"
-        " the claims made about them. MUST be called on alumni_agent's output"
-        " before any person is shown to the student."
+        "Checks that links actually exist and back the claims made about them."
+        " MUST be called on alumni_agent's people before any of them is shown"
+        " to the student, and on company_agent's job-opening links."
     ),
     instruction=(
-        "You verify citations about real people before a student acts on"
-        " them.\n\n"
-        "Extract every profile URL from the request and call verify_links with"
-        " them, passing the company and college being claimed as"
-        " must_mention.\n\n"
-        "Then report, for each person: VERIFIED, UNSUPPORTED (page exists but"
-        " does not mention the claimed company or college), or DEAD (link does"
-        " not load -- the URL was almost certainly invented).\n\n"
+        "You check links before a student acts on them.\n\n"
+        "Extract every URL from the request and call verify_links, passing as"
+        " must_mention whatever is being claimed -- the company and college"
+        " for a person, or the company and role for a job opening.\n\n"
+        "Then report, for each link: VERIFIED, UNSUPPORTED (page exists but"
+        " does not mention what was claimed), or DEAD (link does not load --"
+        " the URL was almost certainly invented).\n\n"
+        "A dead job link and a dead profile link are the same bug with"
+        " different costs: the first wastes the student an afternoon, the"
+        " second has them contact a stranger on a false premise. Report both"
+        " the same way.\n\n"
         "State the counts plainly. Do not soften a bad result and do not"
         " speculate that a dead link 'might still be real' -- your entire"
         " purpose is to be the check that cannot be talked around. If every"
@@ -212,10 +229,11 @@ resume_gap_agent = Agent(
     instruction=(
         "You compare a student against a specific job description.\n\n"
         "Student profile:\n{profile?}\n\n"
-        "If you were given a URL, fetch it to read the job description. If you"
-        " were given text, use it directly. If a URL will not load, say so and"
-        " ask for the text to be pasted instead -- do not guess at what the"
-        " role requires.\n\n"
+        "If you were given a URL, call fetch_job_description on it. If you were"
+        " given text, use it directly. If the fetch fails or is refused, say"
+        " why in one line and ask the student to paste the text -- never guess"
+        " at what the role requires, and never try to work around a refused"
+        " domain.\n\n"
         "Report: required skills the student is missing, missing tools or"
         " certifications, projects or bullet points that are too weak or too"
         " vague for this role, and any ATS problems (missing keywords the JD"
@@ -226,7 +244,7 @@ resume_gap_agent = Agent(
         " clearly if the student is already a strong fit -- inventing gaps to"
         " seem useful wastes their time."
     ),
-    tools=[url_context],
+    tools=[fetch_job_description],
     output_key="gaps",
 )
 
@@ -367,6 +385,14 @@ root_agent = Agent(
         " they all read the profile it produces. Beyond that, run only what"
         " the student's request needs. Someone asking 'what's missing for this"
         " JD' wants the gap analysis, not the full pipeline.\n\n"
+        "LINKS MUST BE VERIFIED BEFORE THE STUDENT SEES THEM. This applies to"
+        " job-opening links from company_agent as well as to people. After"
+        " company_agent returns openings, call verification_agent with those"
+        " links and the company and role claimed. Present verified openings"
+        " normally; for any that come back DEAD, drop the link and say the"
+        " posting could not be confirmed rather than sending the student to a"
+        " 404. Keep recommending the company itself -- a dead link means the"
+        " posting moved, not that the company is a bad fit.\n\n"
         "NAMED PEOPLE MUST BE VERIFIED. Whenever alumni_agent returns people,"
         " you MUST then call verification_agent with their names and profile"
         " links before showing any of them to the student, and before calling"
@@ -376,8 +402,15 @@ root_agent = Agent(
         " replaces it -- a fabricated profile link has already happened here,"
         " and acting on one means a student contacts a stranger with a false"
         " claim about them. If nothing verifies, tell the student the search"
-        " found no confirmable contacts and suggest their placement cell's"
-        " alumni directory instead.\n\n"
+        " found no confirmable contacts -- and then ALWAYS call"
+        " alumni_search_links with their college and the target company and"
+        " give them those links. Never end an alumni request with 'I found"
+        " nobody' and nothing else: public search genuinely cannot see most of"
+        " this, but the student's own LinkedIn account can, and one click gets"
+        " them a real current list. Tell them to send you a few facts about"
+        " anyone they find -- name, role, batch, what they share -- and you"
+        " will rank them and draft the outreach. Do not ask for a whole"
+        " profile, and never try to open a LinkedIn link yourself.\n\n"
         "PAST VISITS. You alone can recall the student's earlier"
         " conversations -- they arrive as a PAST_CONVERSATIONS block in your"
         " context. Specialists cannot see it: each runs with a fresh, empty"
@@ -407,6 +440,7 @@ root_agent = Agent(
     tools=[
         load_artifacts_tool,
         preload_memory_tool,
+        alumni_search_links,
         *[AgentTool(agent=a) for a in SPECIALISTS],
     ],
     before_agent_callback=require_real_user,

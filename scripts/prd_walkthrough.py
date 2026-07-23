@@ -19,7 +19,7 @@ import sys
 import vertexai
 from vertexai import agent_engines
 
-USER = "prd-walkthrough2@tilicho.in"
+USER = "prd-final@tilicho.in"
 PAUSE = 20  # seconds between turns; 90 QPM is shared and fan-out is expensive
 
 JD = """Machine Learning Engineer, New Grad - Stripe

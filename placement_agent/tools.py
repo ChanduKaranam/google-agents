@@ -29,7 +29,7 @@ def track_application(
     """Record or update a job application for this student.
 
     Args:
-      company: Company name, e.g. "Google".
+      company: Company name, e.g. "Freshworks" or "Google".
       role: Role applied for, e.g. "Software Engineer Intern".
       status: One of Applied, OA Scheduled, Interview, Referral Requested,
         Offer, Rejected.
