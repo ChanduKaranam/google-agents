@@ -71,7 +71,7 @@ code-reviewer
 
 ## Available skills
 
-grilling · testing-patterns
+grilling · testing-patterns · gemini-enterprise-agents · deploying-ge-demo-generator
 
 ## Slash commands
 
