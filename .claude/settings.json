@@ -1,0 +1,101 @@
+{
+  "extraKnownMarketplaces": {
+    "claude-plugins-official": {
+      "source": { "source": "github", "repo": "anthropics/claude-plugins-official" }
+    },
+    "ponytail": {
+      "source": { "source": "github", "repo": "DietrichGebert/ponytail" }
+    }
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "ponytail@ponytail": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git branch*)",
+      "Bash(pip *)",
+      "Bash(.venv/bin/python *)",
+      "Bash(python -m pytest*)",
+      "Bash(adk *)",
+      "Bash(gcloud auth list*)",
+      "Bash(gcloud config get-value*)",
+      "Bash(npx *)",
+      "Bash(node *)",
+      "Bash(jq *)"
+    ],
+    "deny": [
+      "Bash(curl * | bash)",
+      "Bash(wget * | sh)",
+      "Bash(rm -rf /)"
+    ],
+    "defaultMode": "acceptEdits"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/block-protected-branch.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Task|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/context-budget-nag.sh",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[$(date -u +%Y-%m-%dT%H:%M:%SZ)] CHANGED: $(echo $CLAUDE_TOOL_INPUT | jq -r '.path // .file_path // \"unknown\"')\" >> docs/sessions/changes.log 2>/dev/null || true",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/post-session-snapshot.sh 2>/dev/null || true",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/session-end-rollup.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"\nJob Helper Agent Session Started\nBranch: $(git branch --show-current)\nLast commit: $(git log --oneline -1)\n\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -8,8 +8,8 @@ from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.function_tool import FunctionTool
 
-from placement_agent.agent import SPECIALISTS, root_agent
-from placement_agent.tools import list_applications, track_application
+from Job_Helper_agent.agent import SPECIALISTS, root_agent
+from Job_Helper_agent.tools import list_applications, track_application
 
 # Built-in Gemini tools, which cannot share an agent with function tools.
 BUILT_IN_NAMES = {"google_search", "url_context", "code_execution", "computer_use"}
