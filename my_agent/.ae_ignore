@@ -1,0 +1,16 @@
+# Deploy-only excludes (read by `adk deploy`, alongside .gitignore).
+# Keeps the Agent Engine payload under the 8 MiB request limit.
+
+# Source PDFs — already ingested into the Vertex AI RAG corpus, the deployed
+# agent reads them through retrieve_exam_material, never from disk.
+knowledge
+
+# Local adk session/artifact storage
+.adk
+
+# Local-only scripts and caches
+__pycache__
+upload_to_rag.py
+test_deployed_agent.py
+test_loader.py
+test_search.py

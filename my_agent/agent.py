@@ -1,3 +1,4 @@
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -6,6 +7,8 @@ from google.adk.tools.retrieval.vertex_ai_rag_retrieval import VertexAiRagRetrie
 from vertexai.preview import rag
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 rag_corpus = os.getenv("RAG_CORPUS")
 if not rag_corpus:
@@ -23,8 +26,12 @@ Always use this tool before answering academic questions.
             rag_corpus=rag_corpus
         )
     ],
-    similarity_top_k=5,
-    vector_distance_threshold=0.6,
+    # A 5-chunk / 0.6-distance window was too narrow for this corpus: a "deadlock"
+    # query returned 5 chunks, none of which mentioned deadlocks, so the tutor
+    # correctly reported the topic was missing when it is actually present.
+    # Measured 2026-07-24: at 20 / 0.8 the same query reaches the deadlock chunks.
+    similarity_top_k=20,
+    vector_distance_threshold=0.8,
 )
 
 async def retrieve_exam_material(query: str) -> str:
@@ -33,9 +40,104 @@ async def retrieve_exam_material(query: str) -> str:
     notes, syllabus and study material.
     Always use this tool before answering academic questions.
     """
-    return await _vertex_rag_tool.run_async(args={"query": query}, tool_context=None)
+    try:
+        result = await _vertex_rag_tool.run_async(
+            args={"query": query}, tool_context=None
+        )
+    except Exception as exc:  # noqa: BLE001 - a raised tool error blanks the whole turn
+        # An exception escaping a tool aborts the invocation and Gemini Enterprise
+        # renders an empty reply. Return the failure as text so the model can tell
+        # the user what went wrong instead of showing a blank screen.
+        logger.exception("retrieve_exam_material failed for query %r", query)
+        return (
+            "RETRIEVAL_FAILED: the document search could not be completed. "
+            f"Reason: {type(exc).__name__}: {exc}"
+        )
+
+    if not result:
+        return "NO_RESULTS: no matching content was found in the uploaded academic materials."
+    return str(result)
 
 rag_tool = retrieve_exam_material
+
+# Appended to every agent's instruction. A turn that ends without any text is a
+# blank screen in Gemini Enterprise, so the failure modes below must always
+# produce a visible reply.
+TOOL_ERROR_RULES = """
+
+## Always reply with text
+Every turn MUST end with a written reply to the user. Never finish a turn with
+only a tool call and no text.
+
+If `retrieve_exam_material` returns a string starting with `RETRIEVAL_FAILED:`,
+do not retry it more than once and do not stay silent. Tell the user plainly
+that the study materials could not be searched right now, and include the
+reason from the tool output.
+
+If it returns a string starting with `NO_RESULTS:`, treat it as "the documents
+do not cover this" and follow the fallback rules below.
+"""
+
+# Appended last, after TOOL_ERROR_RULES, so it is the final thing every agent
+# reads. It deliberately supersedes the stricter "never use outside knowledge"
+# lines inside the individual specialist instructions above — that avoids having
+# to keep the same exception in sync across 15 separate instruction blocks.
+GROUNDING_RULES = """
+
+## When the uploaded materials do not have the answer
+The uploaded documents are always the primary source. Never skip
+`retrieve_exam_material` — retrieve first, every time, before deciding anything.
+
+If the retrieved material answers the question, answer from it and say the
+answer comes from the uploaded materials.
+
+If the retrieved material does NOT answer the question, you may then answer from
+your own general academic knowledge — but you MUST label it. Put this heading
+immediately above that part of the answer:
+
+**Not from your uploaded materials — general knowledge**
+
+and say plainly which part the documents did not cover. Never blend unlabelled
+outside knowledge into text presented as coming from the documents. If the
+documents cover part of the question, answer that part from them first, then add
+the labelled section for the rest.
+
+### What counts as outside knowledge
+Anything you did not read in the retrieved text. This is wider than it sounds
+and you must apply it strictly — measured 2026-07-24, the most common mistake
+is adding an illustration to retrieved content and treating the whole answer as
+grounded. The following ALWAYS require the label, even when they illustrate a
+concept the documents do explain:
+- analogies and real-world comparisons
+- worked examples, sample data and scenarios you made up
+- definitions, formulas, algorithm names or steps not in the retrieved text
+- extra detail you know but did not read in the retrieved text
+
+Before you send an answer, check it sentence by sentence: if any sentence is not
+supported by the retrieved text, it belongs under the label. An answer that
+mixes both MUST contain the heading exactly once, before the unsupported part.
+
+This rule supersedes any instruction above that tells you to refuse outright, or
+to never use outside information, when the documents do not cover something.
+
+## Never fall back for course-specific facts
+Outside knowledge is allowed ONLY for general academic concepts, explanations,
+definitions, worked examples and analogies. It is NEVER allowed for facts
+specific to this student's course or exam. If the documents do not contain
+these, say so and stop — do not guess and do not substitute general knowledge:
+- previous year questions, and their marks distribution
+- syllabus, unit lists and topic breakdowns
+- exam timetables, assignment deadlines and academic calendars
+- the officially prescribed textbooks for this course
+"""
+
+# gemini-2.5-flash under-complies with the labelling rule in GROUNDING_RULES:
+# measured 2026-07-24 over 16 runs of "explain deadlocks with a real-world
+# analogy", it produced the analogy every time but labelled it as outside
+# knowledge in only 13. The four agents that actually explain concepts — and so
+# are the ones that reach the fallback path — run pro instead. The rest stay on
+# flash; quiz/schedule/tracking work rarely leaves the retrieved text.
+EXPLAINER_MODEL = "gemini-2.5-pro"
 
 quiz_agent = Agent(
     name="quiz_generator_agent",
@@ -96,7 +198,7 @@ Never hallucinate topics outside the uploaded syllabus.
 
 notes_summarizer_agent = Agent(
     name="notes_summarizer_agent",
-    model="gemini-2.5-flash",
+    model=EXPLAINER_MODEL,
     description="Call this sub-agent whenever the user wants to summarize notes, create revision sheets, or extract key points, definitions, formulas, or important concepts.",
     instruction="""
 You are an AI-powered Notes Summarizer Agent. Your job is to summarize uploaded notes, textbooks, and PDFs into concise, highly effective revision materials.
@@ -123,7 +225,7 @@ You are an AI-powered Notes Summarizer Agent. Your job is to summarize uploaded 
 
 concept_tutor_agent = Agent(
     name="concept_tutor_agent",
-    model="gemini-2.5-flash",
+    model=EXPLAINER_MODEL,
     description="Call this sub-agent whenever the user wants a concept explained, tutored, or asks for analogies, examples, and detailed academic explanations.",
     instruction="""
 You are an AI-powered Concept Tutor Agent. Your job is to explain academic concepts clearly and effectively using the uploaded learning materials.
@@ -213,7 +315,7 @@ You are an AI-powered Question Paper Analyzer Agent. Your job is to analyze uplo
 
 doubt_resolution_agent = Agent(
     name="doubt_resolution_agent",
-    model="gemini-2.5-flash",
+    model=EXPLAINER_MODEL,
     description="Call this sub-agent whenever the user has a specific academic doubt, question, or needs clarification on a topic.",
     instruction="""
 You are an AI-powered Doubt Resolution Agent. Your job is to answer students' academic questions accurately and reliably using ONLY the uploaded study materials.
@@ -255,7 +357,7 @@ You are an AI-powered Syllabus Navigator Agent. Your job is to help students exp
 
 research_assistant_agent = Agent(
     name="research_assistant_agent",
-    model="gemini-2.5-flash",
+    model=EXPLAINER_MODEL,
     description="Call this sub-agent for detailed academic queries requiring searching through textbooks, research papers, lecture notes, and reference materials.",
     instruction="""
 You are an AI-powered Research Assistant Agent. Your job is to answer detailed academic queries using the uploaded references.
@@ -334,6 +436,22 @@ You are an AI-powered Viva & Interview Preparation Agent. Your job is to conduct
 )
 
 
+SPECIALISTS = [
+    quiz_agent,
+    study_planner_agent,
+    notes_summarizer_agent,
+    concept_tutor_agent,
+    assignment_assistant_agent,
+    performance_analyzer_agent,
+    paper_analyzer_agent,
+    doubt_resolution_agent,
+    syllabus_navigator_agent,
+    research_assistant_agent,
+    faculty_assistant_agent,
+    book_recommendation_agent,
+    exam_schedule_agent,
+    viva_prep_agent,
+]
 
 
 root_agent = Agent(
@@ -344,8 +462,19 @@ root_agent = Agent(
     instruction="""
 You are an AI-powered Exam Preparation Assistant.
 
+## Scope
+You only help with the student's uploaded academic materials and their exam
+preparation. If the user asks about anything outside that — sports, news,
+politics, celebrities, general trivia, or any other non-academic topic — do NOT
+answer it, do NOT call the retrieval tool, and do NOT delegate it to a
+sub-agent. Say plainly that you are an exam preparation assistant and can only
+help with their study materials, then remind them what you can do. This applies
+even when you already know the answer.
+
 ## Primary Rule
 Always call the retrieval tool first before answering any academic question.
+Do NOT call the retrieval tool for greetings, small talk, or questions about
+what you can do — answer those directly from this instruction.
 If the user asks to generate a quiz, take a test, or practice questions, YOU MUST delegate the task to the `quiz_generator_agent`.
 If the user asks to create or modify a study plan or schedule, YOU MUST delegate the task to the `study_planner_agent`.
 If the user asks to summarize notes, create revision sheets, or extract key points, YOU MUST delegate the task to the `notes_summarizer_agent`.
@@ -386,10 +515,10 @@ If the user wants to practice for a viva, technical interview, or mock interview
    - Explain the retrieved concepts in simple language.
    - You may expand the explanation, but do not contradict the retrieved content.
 
-5. If no relevant material is found:
-   Reply exactly:
-
-   "I could not find this information in the uploaded academic materials."
+5. If no relevant material is found, say so, then follow the fallback rules at
+   the end of this instruction — for general academic concepts you may answer
+   from your own knowledge provided you label it as not coming from the
+   uploaded materials.
 
 6. Never fabricate:
    - Previous year questions
@@ -401,5 +530,8 @@ If the user wants to practice for a viva, technical interview, or mock interview
 """,
 
     tools=[rag_tool],
-    sub_agents=[quiz_agent, study_planner_agent, notes_summarizer_agent, concept_tutor_agent, assignment_assistant_agent, performance_analyzer_agent, paper_analyzer_agent, doubt_resolution_agent, syllabus_navigator_agent, research_assistant_agent, faculty_assistant_agent, book_recommendation_agent, exam_schedule_agent, viva_prep_agent],
+    sub_agents=SPECIALISTS,
 )
+
+for _agent in (*SPECIALISTS, root_agent):
+    _agent.instruction += TOOL_ERROR_RULES + GROUNDING_RULES

@@ -29,10 +29,14 @@ else:
     for pdf in pdf_files:
         print(f"Uploading {pdf.name}...")
         try:
-            # Upload a single local file directly to Vertex AI RAG Corpus
+            # Upload a single local file directly to Vertex AI RAG Corpus.
+            # Without display_name Vertex invents one ("vertex-<timestamp>-<hash>"),
+            # which leaves retrieved chunks with an empty source_display_name and
+            # makes the agents' "cite the source document" instructions unusable.
             response = rag.upload_file(
                 corpus_name=RAG_CORPUS,
-                path=str(pdf)
+                path=str(pdf),
+                display_name=pdf.name,
             )
             print(f"  -> Success! File registered in cloud as: {response.name}")
         except Exception as e:
