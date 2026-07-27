@@ -4,12 +4,17 @@ No network, no LLM calls. Run with: .venv/bin/python -m pytest test_agent.py
 or just: .venv/bin/python test_agent.py
 """
 
+import os
+
+from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
+from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.function_tool import FunctionTool
 
 from Job_Helper_agent.agent import SPECIALISTS, root_agent
 from Job_Helper_agent.callbacks import require_real_user
+from Job_Helper_agent.runtime import REQUIRED_ENV, build_runner
 from Job_Helper_agent.tools import list_applications, track_application
 
 # Built-in Gemini tools, which cannot share an agent with function tools.
@@ -155,6 +160,45 @@ def test_track_application_rejects_unknown_status():
     result = track_application("Google", "SWE", "Ghosted", "", ctx)
     assert "error" in result
     assert ctx.state.get("applications") in (None, [])
+
+
+def test_build_runner_refuses_to_start_without_backing_store_config():
+    # Fail loudly at boot rather than silently serving from memory: an
+    # in-memory session service on Cloud Run loses a student's tracked
+    # applications the moment the instance recycles.
+    saved = {k: os.environ.pop(k, None) for k in REQUIRED_ENV}
+    try:
+        raised = None
+        try:
+            build_runner()
+        except RuntimeError as e:
+            raised = e
+        assert raised is not None, "build_runner started with no configuration"
+        assert "AGENT_ENGINE_ID" in str(raised)
+    finally:
+        for k, v in saved.items():
+            if v is not None:
+                os.environ[k] = v
+
+
+def test_build_runner_uses_persistent_services_not_in_memory_defaults():
+    saved = {k: os.environ.get(k) for k in REQUIRED_ENV}
+    os.environ["GOOGLE_CLOUD_PROJECT"] = "test-project"
+    os.environ["GOOGLE_CLOUD_LOCATION"] = "us-central1"
+    os.environ["AGENT_ENGINE_ID"] = "1234567890"
+    try:
+        runner = build_runner()
+        # These three are the regression guard for the migration. Each default
+        # is a silent data-loss path, not a performance nicety.
+        assert not isinstance(runner.session_service, InMemorySessionService)
+        assert not isinstance(runner.memory_service, InMemoryMemoryService)
+        assert runner.agent is not None
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
 
 if __name__ == "__main__":
