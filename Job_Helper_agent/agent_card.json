@@ -3,6 +3,7 @@
   "name": "job-helper-agent",
   "description": "Turns a student's resume into a company shortlist, alumni contacts, and a tracked application pipeline.",
   "version": "1.0.0",
+  "url": "http://localhost:8080/",
   "defaultInputModes": ["text/plain"],
   "defaultOutputModes": ["text/plain"],
   "skills": [],

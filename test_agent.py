@@ -203,6 +203,30 @@ def test_build_runner_uses_persistent_services_not_in_memory_defaults():
                 os.environ[k] = v
 
 
+def test_a2a_extra_is_installed():
+    # main_a2a.py imports this. Without the [a2a] extra it raises
+    # ModuleNotFoundError, and the container dies on startup rather than at
+    # any point a test would otherwise notice.
+    import google.adk.a2a.utils.agent_to_a2a  # noqa: F401
+
+
+def test_agent_card_is_schema_valid_and_names_an_endpoint():
+    from a2a.types import AgentCard
+
+    from Job_Helper_agent.main_a2a import CARD_PATH, load_agent_card
+
+    # Parses as a real AgentCard, not just as JSON. A card that fails schema
+    # validation takes the whole server down at import.
+    raw = json.loads(CARD_PATH.read_text())
+    AgentCard(**raw)
+
+    # The url is what Gemini Enterprise calls back on. Passing a static card to
+    # to_a2a() means ADK never fills this in (agent_to_a2a.py:203-205), so an
+    # unresolved url is a silently unreachable agent.
+    card = load_agent_card("job-helper-a2a-xyz.a.run.app", "https")
+    assert card.url == "https://job-helper-a2a-xyz.a.run.app/"
+
+
 def test_agent_card_declares_a2ui_and_streaming():
     card = json.loads(
         (pathlib.Path(__file__).parent / "Job_Helper_agent" / "agent_card.json").read_text()
