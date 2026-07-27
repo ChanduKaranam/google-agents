@@ -1,0 +1,12 @@
+# Placement Assistant Agent — Dependencies
+# Install with: pip install -r requirements.txt
+
+# Google ADK (Agent Development Kit)
+google-adk>=1.0.0
+
+# Resume parsing
+pdfplumber>=0.11.0        # PDF text extraction
+python-docx>=1.1.0        # DOCX text extraction
+
+# Google Cloud / Vertex AI (required by .env config)
+google-cloud-aiplatform>=1.60.0
