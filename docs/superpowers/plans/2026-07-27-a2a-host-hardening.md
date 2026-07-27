@@ -576,8 +576,8 @@ git commit -m "feat: A2A entrypoint with explicit runner and A2UI-capable agent 
 ### Task 4: Containerise
 
 **Files:**
-- Create: `Job_Helper_agent/Dockerfile`
-- Create: `.dockerignore`
+- Create: `Dockerfile` (repo root)
+- Create: `.dockerignore` (repo root)
 
 **Interfaces:**
 - Consumes: `main_a2a.py:app` from Task 3.
@@ -590,12 +590,20 @@ not the agent directory. `my_agent/Dockerfile` copies a flat directory and uses
 `main_a2a:app` — do not copy that pattern here, it will fail on the relative
 imports.
 
+**The Dockerfile lives at the repo root, not in `Job_Helper_agent/`.** Task 5
+deploys with `gcloud run deploy --source .`, and gcloud only uses a Dockerfile
+"present in the source code directory" — the root of `--source`. A Dockerfile
+nested one level down is not found, and the deploy silently falls through to
+Cloud Native Buildpacks, never using any of this. `gcloud run deploy` has no
+flag to point at a nested Dockerfile.
+
 `Job_Helper_agent/requirements.txt` was already set to its final contents in
 Task 3 Step 0 — do not edit it again here.
 
 - [ ] **Step 1: Write the Dockerfile**
 
-Create `Job_Helper_agent/Dockerfile`:
+Create `Dockerfile` at the repo root. Its `COPY` paths are already repo-root
+relative, so the contents are unchanged by the move:
 
 ```dockerfile
 FROM python:3.12-slim
@@ -624,16 +632,34 @@ docs/
 my_agent/
 doubt_solver/
 faculty_agent/
+.env
+*.env
+!*.env.example
 ```
+
+The `.env` entries are not decoration. `Job_Helper_agent/.env` exists on disk
+and is git-ignored precisely because it holds project config and later secrets.
+`COPY Job_Helper_agent/ ./Job_Helper_agent/` would otherwise bake it into an
+image layer and push it to Artifact Registry — the leak `.gitignore` already
+guards against for git, reintroduced through the container.
 
 - [ ] **Step 2: Verify the image builds and boots**
 
 ```bash
 cd "/mnt/c/Users/PurnaChandraRao/Documents/Google GECX"
-docker build -f Job_Helper_agent/Dockerfile -t job-helper-a2a .
+docker build -t job-helper-a2a .
 ```
 
 Expected: build succeeds.
+
+Then confirm `.env` did not make it into the image:
+
+```bash
+docker run --rm --entrypoint sh job-helper-a2a -c "ls -a Job_Helper_agent/ | grep -c '^\.env$' || true"
+```
+
+Expected: `0`. Anything else means the `.dockerignore` entries are not taking
+effect and secrets are in the image layer.
 
 Then confirm the boot guard from Task 2 actually fires:
 
@@ -649,7 +675,7 @@ happily here would mean it is serving from memory.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Job_Helper_agent/Dockerfile .dockerignore
+git add Dockerfile .dockerignore
 git commit -m "build: container image for the Cloud Run A2A host"
 ```
 
@@ -676,6 +702,11 @@ gcloud run deploy job-helper-a2a \
   --min-instances 1 \
   --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT,GOOGLE_CLOUD_LOCATION=us-central1,AGENT_ENGINE_ID=<existing-engine-id>,PUBLIC_HOST=<service-host>,GOOGLE_GENAI_USE_VERTEXAI=1"
 ```
+
+`--source .` picks up the repo-root `Dockerfile` from Task 4. Confirm the build
+log says it used the Dockerfile — if it mentions Buildpacks instead, the
+Dockerfile is not where gcloud expects it and none of Task 4's import-path or
+boot-guard work is in the image.
 
 `--min-instances 1` avoids a cold start in front of a `gemini-2.5-pro` first
 turn. `--no-allow-unauthenticated` is required: GE calls with a service-agent
