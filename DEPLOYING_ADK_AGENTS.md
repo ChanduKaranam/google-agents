@@ -263,8 +263,33 @@ REST endpoint.
 ### 5. Uploaded files arrive as artifacts, not as text
 When a user attaches a file in Gemini Enterprise, your agent gets a marker like
 `<start_of_user_uploaded_file: resume.pdf>` with **no content between the markers** — the
-bytes are held aside. Give the root the `load_artifacts` tool and instruct it to call it,
-or it will see a filename it can't read and may invent the contents.
+bytes are held aside in the artifact service. An agent that only knows how to open a
+*file path* can never read the upload: there is no such path in the container. The failure
+is silent and nasty — the model sees a filename it can't open and **invents** the contents.
+
+Two ways to actually read it:
+
+- **`load_artifacts` tool** — hands the raw file to the model. Fine when the model itself
+  should read the document.
+- **Your own function tool** taking `tool_context: ToolContext`, calling
+  `await tool_context.load_artifact(name)` and extracting text from
+  `part.inline_data.data`. Prefer this when the bytes must feed *other* function tools —
+  it is deterministic, and nothing round-trips through the model.
+
+`placement_agent/resume_parser.py::parse_resume` is the second shape. Points that cost
+time: the model passes the whole marker as the filename (strip it), artifacts persist for
+the **whole session** so a later turn needs no re-upload, and a DOCX laid out in tables
+gives up nothing through `doc.paragraphs` — read `doc.tables` too.
+
+⚠️ **Set `--artifact_service_uri` when your agent reads uploads.** The deployed default is
+`InMemoryArtifactService` (`vertexai/agent_engines/templates/adk.py:1007`, verified on the
+installed SDK) — process-local memory, so an upload is only reliably there for the instance
+that received it. Back it with GCS:
+
+```bash
+adk deploy agent_engine --project=P --region=us-central1 --agent_engine_id=ID \
+  --display_name="X" --artifact_service_uri="gs://YOUR_BUCKET" my_agent
+```
 
 ### 6. Verify with CODE, not just instructions
 If your agent produces links or facts users act on, "the model promised not to make things
