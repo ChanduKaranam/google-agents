@@ -213,7 +213,9 @@ def test_a2a_extra_is_installed():
 def test_agent_card_is_schema_valid_and_names_an_endpoint():
     from a2a.types import AgentCard
 
-    from Job_Helper_agent.main_a2a import CARD_PATH, load_agent_card
+    # Imported from card.py, never from main_a2a: importing main_a2a would
+    # call build_runner() and take the whole offline suite down.
+    from Job_Helper_agent.card import CARD_PATH, load_agent_card
 
     # Parses as a real AgentCard, not just as JSON. A card that fails schema
     # validation takes the whole server down at import.
