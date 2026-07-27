@@ -632,9 +632,8 @@ docs/
 my_agent/
 doubt_solver/
 faculty_agent/
-.env
-*.env
-!*.env.example
+**/.env
+**/*.env
 ```
 
 The `.env` entries are not decoration. `Job_Helper_agent/.env` exists on disk
@@ -642,6 +641,18 @@ and is git-ignored precisely because it holds project config and later secrets.
 `COPY Job_Helper_agent/ ./Job_Helper_agent/` would otherwise bake it into an
 image layer and push it to Artifact Registry — the leak `.gitignore` already
 guards against for git, reintroduced through the container.
+
+**The `**/` prefix is required, not stylistic.** `.dockerignore` patterns are
+**root-anchored**, unlike `.gitignore`: a bare `.env` matches only a `.env` at
+the top of the build context, and the file that needs excluding is one level
+down at `Job_Helper_agent/.env`. Writing `.env` here looks correct, changes
+nothing, and ships the secret. The entries above the `.env` lines
+(`my_agent/`, `docs/`, `.git/` …) work only because those targets genuinely sit
+at the build-context root — that is coincidence, not a pattern to copy.
+
+No `!*.env.example` negation: `*.env` requires a name ending in `.env`, so it
+never matches `.env.example` in the first place, and the running app has no use
+for a template file anyway.
 
 - [ ] **Step 2: Verify the image builds and boots**
 
