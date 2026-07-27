@@ -6,6 +6,5 @@ docs/
 my_agent/
 doubt_solver/
 faculty_agent/
-.env
-*.env
-!*.env.example
+**/.env
+**/*.env
