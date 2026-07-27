@@ -4,7 +4,9 @@ No network, no LLM calls. Run with: .venv/bin/python -m pytest test_agent.py
 or just: .venv/bin/python test_agent.py
 """
 
+import json
 import os
+import pathlib
 
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
@@ -199,6 +201,27 @@ def test_build_runner_uses_persistent_services_not_in_memory_defaults():
                 os.environ.pop(k, None)
             else:
                 os.environ[k] = v
+
+
+def test_agent_card_declares_a2ui_and_streaming():
+    card = json.loads(
+        (pathlib.Path(__file__).parent / "Job_Helper_agent" / "agent_card.json").read_text()
+    )
+    caps = card["capabilities"]
+    # Without streaming, progress updates cannot be painted incrementally.
+    assert caps["streaming"] is True
+
+    exts = caps["extensions"]
+    a2ui = [e for e in exts if "a2ui" in e["uri"]]
+    assert len(a2ui) == 1, "agent card must declare exactly one A2UI extension"
+
+    # Gemini Enterprise supports A2UI v0.8 only. A version bump here silently
+    # stops rendering in GE.
+    assert a2ui[0]["uri"] == "https://a2ui.org/a2a-extension/a2ui/v0.8"
+
+    # Must stay false: it is what lets the agent fall back to plain text for
+    # any client that does not negotiate A2UI.
+    assert a2ui[0]["required"] is False
 
 
 if __name__ == "__main__":
