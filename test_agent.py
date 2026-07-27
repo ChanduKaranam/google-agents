@@ -9,6 +9,7 @@ from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.function_tool import FunctionTool
 
 from Job_Helper_agent.agent import SPECIALISTS, root_agent
+from Job_Helper_agent.callbacks import require_real_user
 from Job_Helper_agent.tools import list_applications, track_application
 
 # Built-in Gemini tools, which cannot share an agent with function tools.
@@ -101,6 +102,25 @@ def test_no_agent_mixes_builtin_and_function_tools():
             f" {[_tool_name(t) for t in tools if not _is_built_in(t)]}."
             " Gemini rejects this at request time."
         )
+
+
+class _FakeCallbackContext:
+    def __init__(self, user_id):
+        self.user_id = user_id
+
+
+def test_identity_guard_rejects_untrustworthy_user_ids():
+    # Agent Engine's silent fallback.
+    assert require_real_user(_FakeCallbackContext("default-user-id")) is not None
+
+    # ADK's A2A fallback when auth is off. Per-conversation, not per-student:
+    # letting this through means Memory Bank scopes history to a single chat
+    # and the privacy guard is effectively disabled.
+    assert require_real_user(_FakeCallbackContext("A2A_USER_ctx-abc123")) is not None
+    assert require_real_user(_FakeCallbackContext("A2A_USER_")) is not None
+
+    # A real signed-in student must still get through.
+    assert require_real_user(_FakeCallbackContext("student@example.com")) is None
 
 
 class _FakeContext:

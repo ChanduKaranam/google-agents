@@ -19,24 +19,36 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_USER_ID = "default-user-id"
 
+# ADK's A2A server synthesises this when no authenticated caller is present
+# (`google/adk/a2a/converters/request_converter.py:66-77`). It is scoped to one
+# conversation, not one student, so treating it as an identity would silently
+# reset a returning student's history and collapse the Memory Bank scope.
+_A2A_ANONYMOUS_PREFIX = "A2A_USER_"
+
+
+def _is_real_user(user_id: str | None) -> bool:
+    if not user_id or user_id == _DEFAULT_USER_ID:
+        return False
+    return not user_id.startswith(_A2A_ANONYMOUS_PREFIX)
+
 
 def require_real_user(callback_context: CallbackContext) -> types.Content | None:
     """Block the turn unless the caller supplied a real user identity."""
-    if callback_context.user_id == _DEFAULT_USER_ID:
-        return types.Content(
-            role="model",
-            parts=[
-                types.Part(
-                    text=(
-                        "I can't continue: this request arrived without a user"
-                        " identity, so I have no safe way to keep your data"
-                        " separate from anyone else's. Please open me from"
-                        " Gemini Enterprise while signed in."
-                    )
+    if _is_real_user(callback_context.user_id):
+        return None
+    return types.Content(
+        role="model",
+        parts=[
+            types.Part(
+                text=(
+                    "I can't continue: this request arrived without a user"
+                    " identity, so I have no safe way to keep your data"
+                    " separate from anyone else's. Please open me from"
+                    " Gemini Enterprise while signed in."
                 )
-            ],
-        )
-    return None
+            )
+        ],
+    )
 
 
 async def remember_session(callback_context: CallbackContext) -> None:
