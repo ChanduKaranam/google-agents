@@ -8,8 +8,8 @@ import json
 import os
 import pathlib
 
-from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
-from google.adk.sessions.in_memory_session_service import InMemorySessionService
+from google.adk.memory.vertex_ai_memory_bank_service import VertexAiMemoryBankService
+from google.adk.sessions.vertex_ai_session_service import VertexAiSessionService
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.function_tool import FunctionTool
@@ -177,7 +177,23 @@ def test_build_runner_refuses_to_start_without_backing_store_config():
             raised = e
         assert raised is not None, "build_runner started with no configuration"
         assert "AGENT_ENGINE_ID" in str(raised)
+
+        # Partial config is the likelier deploy mistake than none at all, and
+        # the message has to name everything still missing or the operator
+        # fixes one variable per redeploy.
+        os.environ["GOOGLE_CLOUD_PROJECT"] = "test-project"
+        raised = None
+        try:
+            build_runner()
+        except RuntimeError as e:
+            raised = e
+        assert raised is not None, "build_runner started with partial configuration"
+        assert "GOOGLE_CLOUD_LOCATION" in str(raised)
+        assert "AGENT_ENGINE_ID" in str(raised)
+        assert "GOOGLE_CLOUD_PROJECT" not in str(raised)
     finally:
+        for k in REQUIRED_ENV:
+            os.environ.pop(k, None)
         for k, v in saved.items():
             if v is not None:
                 os.environ[k] = v
@@ -192,9 +208,13 @@ def test_build_runner_uses_persistent_services_not_in_memory_defaults():
         runner = build_runner()
         # These three are the regression guard for the migration. Each default
         # is a silent data-loss path, not a performance nicety.
-        assert not isinstance(runner.session_service, InMemorySessionService)
-        assert not isinstance(runner.memory_service, InMemoryMemoryService)
+        assert isinstance(runner.session_service, VertexAiSessionService)
+        assert isinstance(runner.memory_service, VertexAiMemoryBankService)
         assert runner.agent is not None
+        # app_name is the Memory Bank retrieval scope. The Agent Engine
+        # template this replaces scoped memories to the engine id, so anything
+        # else here orphans every memory already written.
+        assert runner.app_name == os.environ["AGENT_ENGINE_ID"]
     finally:
         for k, v in saved.items():
             if v is None:
@@ -248,6 +268,108 @@ def test_agent_card_declares_a2ui_and_streaming():
     # Must stay false: it is what lets the agent fall back to plain text for
     # any client that does not negotiate A2UI.
     assert a2ui[0]["required"] is False
+
+
+def test_extract_user_id_reads_every_candidate_header_case_insensitively():
+    # WHICH header Gemini Enterprise actually sends is UNCONFIRMED and must be
+    # verified against a live GE call. Until then the lookup is deliberately
+    # tolerant of several plausible names, and refuses rather than guessing
+    # when none of them match -- see the module docstring in identity.py.
+    from Job_Helper_agent.identity import IDENTITY_HEADERS, extract_user_id
+
+    for header in IDENTITY_HEADERS:
+        assert extract_user_id({header: "student@example.edu"}) == "student@example.edu"
+        assert extract_user_id({header.upper(): "student@example.edu"}) == (
+            "student@example.edu"
+        )
+        assert extract_user_id({header.title(): "student@example.edu"}) == (
+            "student@example.edu"
+        )
+
+
+def test_extract_user_id_strips_the_google_issuer_prefix():
+    # Google identity headers carry the issuer inline. Left on, it becomes part
+    # of the user_id and silently forks every session and memory scope.
+    from Job_Helper_agent.identity import extract_user_id
+
+    assert (
+        extract_user_id(
+            {"x-goog-authenticated-user-email": "accounts.google.com:student@example.edu"}
+        )
+        == "student@example.edu"
+    )
+
+
+def test_extract_user_id_returns_none_rather_than_guessing():
+    from Job_Helper_agent.identity import extract_user_id
+
+    assert extract_user_id({}) is None
+    assert extract_user_id({"x-user-email": ""}) is None
+    assert extract_user_id({"x-user-email": "   "}) is None
+    assert extract_user_id({"x-goog-authenticated-user-email": "accounts.google.com:"}) is None
+    assert extract_user_id({"user-agent": "curl/8.0", "host": "example.com"}) is None
+
+
+def test_request_converter_only_overrides_user_id_on_a_real_find():
+    # No identity in the headers must leave the A2A_USER_* sentinel in place so
+    # require_real_user still refuses the turn. Falling back to anything else
+    # would hand one student's session to whoever calls next.
+    from Job_Helper_agent.callbacks import require_real_user
+    from Job_Helper_agent.identity import build_request_converter
+
+    convert = build_request_converter()
+
+    class _FakeRunRequest:
+        user_id = "A2A_USER_ctx-abc123"
+
+    class _FakeCallContext:
+        def __init__(self, headers):
+            self.state = {"headers": headers}
+
+    class _FakeRequest:
+        def __init__(self, headers):
+            self.call_context = _FakeCallContext(headers)
+
+    import Job_Helper_agent.identity as identity_module
+
+    original = identity_module.convert_a2a_request_to_agent_run_request
+    try:
+        identity_module.convert_a2a_request_to_agent_run_request = (
+            lambda request, part_converter: _FakeRunRequest()
+        )
+
+        found = convert(_FakeRequest({"x-user-email": "student@example.edu"}))
+        assert found.user_id == "student@example.edu"
+        assert require_real_user(_FakeCallbackContext("student@example.edu")) is None
+
+        missing = convert(_FakeRequest({"user-agent": "curl/8.0"}))
+        assert missing.user_id == "A2A_USER_ctx-abc123"
+        assert require_real_user(_FakeCallbackContext(missing.user_id)) is not None
+    finally:
+        identity_module.convert_a2a_request_to_agent_run_request = original
+
+
+def test_require_public_host_refuses_the_localhost_default_on_cloud_run():
+    # A deploy that forgets PUBLIC_HOST otherwise boots green while serving a
+    # card pointing at https://localhost:8080/ -- a dead agent that looks
+    # healthy. Cloud Run always sets K_SERVICE.
+    from Job_Helper_agent.card import LOCAL_HOST_DEFAULT, require_public_host
+
+    raised = None
+    try:
+        require_public_host(None, "job-helper-a2a")
+    except RuntimeError as e:
+        raised = e
+    assert raised is not None, "boot succeeded on Cloud Run with no PUBLIC_HOST"
+    assert "PUBLIC_HOST" in str(raised)
+
+    assert (
+        require_public_host("job-helper-a2a-xyz.a.run.app", "job-helper-a2a")
+        == "job-helper-a2a-xyz.a.run.app"
+    )
+
+    # Local development keeps working with no environment at all.
+    assert require_public_host(None, None) == LOCAL_HOST_DEFAULT
 
 
 if __name__ == "__main__":
