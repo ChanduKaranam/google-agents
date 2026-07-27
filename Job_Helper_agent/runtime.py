@@ -12,10 +12,14 @@ Sessions and memory stay backed by the existing Agent Engine instance. Only
 request serving moves to Cloud Run.
 """
 
+import logging
 import os
 
 from google.adk.artifacts.gcs_artifact_service import GcsArtifactService
 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
+from google.adk.auth.credential_service.in_memory_credential_service import (
+    InMemoryCredentialService,
+)
 from google.adk.memory.vertex_ai_memory_bank_service import VertexAiMemoryBankService
 from google.adk.runners import Runner
 from google.adk.sessions.vertex_ai_session_service import VertexAiSessionService
@@ -24,7 +28,7 @@ from .agent import root_agent
 
 REQUIRED_ENV = ("GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_LOCATION", "AGENT_ENGINE_ID")
 
-APP_NAME = "job_helper_agent"
+logger = logging.getLogger(__name__)
 
 
 def _require_env() -> tuple[str, str, str]:
@@ -34,7 +38,11 @@ def _require_env() -> tuple[str, str, str]:
             "Refusing to start without persistent session and memory storage."
             f" Missing environment: {', '.join(missing)}."
         )
-    return tuple(os.environ[name] for name in REQUIRED_ENV)
+    return (
+        os.environ["GOOGLE_CLOUD_PROJECT"],
+        os.environ["GOOGLE_CLOUD_LOCATION"],
+        os.environ["AGENT_ENGINE_ID"],
+    )
 
 
 def build_runner() -> Runner:
@@ -49,8 +57,22 @@ def build_runner() -> Runner:
         GcsArtifactService(bucket_name=bucket) if bucket else InMemoryArtifactService()
     )
 
+    logger.info(
+        "Binding runner: project=%s location=%s agent_engine_id=%s app_name=%s",
+        project,
+        location,
+        agent_engine_id,
+        agent_engine_id,
+    )
+
+    # app_name is the Memory Bank retrieval scope, not a label. The Agent
+    # Engine template this replaces defaulted app_name to the engine id
+    # (vertexai/agent_engines/templates/adk.py:995-1001, from
+    # GOOGLE_CLOUD_AGENT_ENGINE_ID), so every memory already written lives
+    # under the numeric id. Any other value here makes preload_memory query an
+    # empty scope and silently return nothing.
     return Runner(
-        app_name=APP_NAME,
+        app_name=agent_engine_id,
         agent=root_agent,
         session_service=VertexAiSessionService(
             project=project, location=location, agent_engine_id=agent_engine_id
@@ -59,4 +81,6 @@ def build_runner() -> Runner:
             project=project, location=location, agent_engine_id=agent_engine_id
         ),
         artifact_service=artifact_service,
+        # Parity: both replaced code paths supplied a credential service.
+        credential_service=InMemoryCredentialService(),
     )
