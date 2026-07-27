@@ -319,21 +319,69 @@ git commit -m "feat: persistent session and memory services for the A2A host"
 **Files:**
 - Create: `Job_Helper_agent/main_a2a.py`
 - Create: `Job_Helper_agent/agent_card.json`
+- Modify: `Job_Helper_agent/requirements.txt`
 - Test: `test_agent.py`
 
 **Interfaces:**
 - Consumes: `build_runner()` from Task 2.
-- Produces: `Job_Helper_agent/main_a2a.py:app`, a Starlette application; and
-  `agent_card.json` declaring the A2UI v0.8 extension with `streaming: true`.
+- Produces: `Job_Helper_agent/main_a2a.py:app`, a Starlette application;
+  `main_a2a.py:load_agent_card()` returning an `a2a.types.AgentCard` with its
+  `url` resolved from the environment; and `agent_card.json` declaring the A2UI
+  v0.8 extension with `streaming: true`.
+
+**Two corrections to an earlier draft of this plan, both confirmed against the
+installed ADK — do not revert to the simpler-looking version:**
+
+1. The `[a2a]` extra must be installed *here*, not in Task 4. Without it,
+   `from google.adk.a2a.utils.agent_to_a2a import to_a2a` raises
+   `ModuleNotFoundError: No module named 'a2a'` and `main_a2a.py` cannot load
+   at all.
+2. **Passing `agent_card` as a file path makes `host`/`port`/`protocol` dead
+   arguments.** In `agent_to_a2a.py:203-205`, a provided card is used verbatim
+   and the `rpc_url` built from those arguments is only ever consumed by the
+   `AgentCardBuilder` that runs when *no* card is supplied. A static card with
+   no `url` field therefore advertises no endpoint for Gemini Enterprise to
+   call. The card must be built in code with `url` injected from the
+   environment.
 
 The agent card declares A2UI now, in this ticket, even though nothing emits
 A2UI yet. `required: false` means a client that negotiates the extension still
 receives plain text, so declaring it early is harmless — and it means Ticket 2
 needs no re-registration in Gemini Enterprise.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 0: Install the a2a extra**
 
-Add to `test_agent.py`, with this import at the top:
+Set `Job_Helper_agent/requirements.txt` to:
+
+```
+google-adk[a2a]==2.4.0
+google-cloud-aiplatform
+uvicorn
+```
+
+The `[a2a]` extra is what pulls in `a2a-sdk`, which provides the `a2a.*`
+modules `google.adk.a2a` imports. The version is pinned because `to_a2a` is
+decorated `@a2a_experimental` in this release — an unpinned upgrade can change
+its signature without a major version bump.
+
+Install it into the venv. This venv is uv-managed and has **no `pip`**:
+
+```bash
+uv pip install --python .venv/bin/python 'google-adk[a2a]==2.4.0'
+```
+
+Verify:
+
+```bash
+.venv/bin/python -c "import google.adk.a2a.utils.agent_to_a2a; print('ok')"
+```
+
+Expected: `ok`. If this prints `ModuleNotFoundError: No module named 'a2a'`,
+stop — every later step in this task depends on it.
+
+- [ ] **Step 1: Write the failing tests**
+
+Add to `test_agent.py`, with these imports at the top:
 
 ```python
 import json
@@ -341,6 +389,30 @@ import pathlib
 ```
 
 ```python
+def test_a2a_extra_is_installed():
+    # main_a2a.py imports this. Without the [a2a] extra it raises
+    # ModuleNotFoundError, and the container dies on startup rather than at
+    # any point a test would otherwise notice.
+    import google.adk.a2a.utils.agent_to_a2a  # noqa: F401
+
+
+def test_agent_card_is_schema_valid_and_names_an_endpoint():
+    from a2a.types import AgentCard
+
+    from Job_Helper_agent.main_a2a import CARD_PATH, load_agent_card
+
+    # Parses as a real AgentCard, not just as JSON. A card that fails schema
+    # validation takes the whole server down at import.
+    raw = json.loads(CARD_PATH.read_text())
+    AgentCard(**raw)
+
+    # The url is what Gemini Enterprise calls back on. Passing a static card to
+    # to_a2a() means ADK never fills this in (agent_to_a2a.py:203-205), so an
+    # unresolved url is a silently unreachable agent.
+    card = load_agent_card("job-helper-a2a-xyz.a.run.app", "https")
+    assert card.url == "https://job-helper-a2a-xyz.a.run.app/"
+
+
 def test_agent_card_declares_a2ui_and_streaming():
     card = json.loads(
         (pathlib.Path(__file__).parent / "Job_Helper_agent" / "agent_card.json").read_text()
@@ -365,7 +437,11 @@ def test_agent_card_declares_a2ui_and_streaming():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/bin/python test_agent.py`
-Expected: FAIL — `FileNotFoundError` for `agent_card.json`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'Job_Helper_agent.main_a2a'`
+(from `test_agent_card_is_schema_valid_and_names_an_endpoint`). Note
+`test_a2a_extra_is_installed` should already PASS at this point, because Step 0
+installed the extra — it is a guard against the dependency being dropped later,
+not a red-first test.
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -377,6 +453,7 @@ Create `Job_Helper_agent/agent_card.json`:
   "name": "job-helper-agent",
   "description": "Turns a student's resume into a company shortlist, alumni contacts, and a tracked application pipeline.",
   "version": "1.0.0",
+  "url": "http://localhost:8080/",
   "defaultInputModes": ["text/plain"],
   "defaultOutputModes": ["text/plain"],
   "skills": [],
@@ -402,34 +479,50 @@ Create `Job_Helper_agent/main_a2a.py`:
 ```python
 """Cloud Run entrypoint. Serves the agent over A2A for Gemini Enterprise.
 
+Two things here are load-bearing and look redundant:
+
 `to_a2a` is passed an explicit runner. Letting it build its own would silently
 swap persistent sessions and Memory Bank for in-memory stand-ins -- see
 `runtime.py` for why that loses student data.
+
+The agent card is built here rather than handed over as a file path. When
+`to_a2a` receives a card it uses it verbatim and never fills anything in
+(`agent_to_a2a.py:203-205`) -- its `host`/`port`/`protocol` arguments only feed
+the builder that runs when no card is supplied. So the `url` Gemini Enterprise
+calls back on has to be injected before the card is passed, or the agent
+advertises no endpoint at all.
 """
 
+import json
 import os
 import pathlib
 
 import uvicorn
+from a2a.types import AgentCard
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
 
 from .agent import root_agent
 from .runtime import build_runner
 
 PORT = int(os.environ.get("PORT", 8080))
-# Cloud Run terminates TLS and gives the public https URL; the agent card must
-# advertise that URL, not the container's http listener.
-PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "localhost")
+# Cloud Run terminates TLS and routes by hostname, so the card must advertise
+# the public https origin -- not the container's internal http listener.
+PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "localhost:8080")
 PROTOCOL = os.environ.get("PUBLIC_PROTOCOL", "https")
 
-AGENT_CARD = pathlib.Path(__file__).parent / "agent_card.json"
+CARD_PATH = pathlib.Path(__file__).parent / "agent_card.json"
+
+
+def load_agent_card(public_host: str, protocol: str) -> AgentCard:
+    """Load the static card and resolve its url for this deployment."""
+    raw = json.loads(CARD_PATH.read_text())
+    raw["url"] = f"{protocol}://{public_host}/"
+    return AgentCard(**raw)
+
 
 app = to_a2a(
     root_agent,
-    host=PUBLIC_HOST,
-    port=PORT,
-    protocol=PROTOCOL,
-    agent_card=str(AGENT_CARD),
+    agent_card=load_agent_card(PUBLIC_HOST, PROTOCOL),
     runner=build_runner(),
 )
 
@@ -440,12 +533,13 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/bin/python test_agent.py`
-Expected: PASS — 10 checks.
+Expected: PASS — 12 checks.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Job_Helper_agent/main_a2a.py Job_Helper_agent/agent_card.json test_agent.py
+git add Job_Helper_agent/main_a2a.py Job_Helper_agent/agent_card.json \
+        Job_Helper_agent/requirements.txt test_agent.py
 git commit -m "feat: A2A entrypoint with explicit runner and A2UI-capable agent card"
 ```
 
@@ -456,7 +550,6 @@ git commit -m "feat: A2A entrypoint with explicit runner and A2UI-capable agent 
 **Files:**
 - Create: `Job_Helper_agent/Dockerfile`
 - Create: `.dockerignore`
-- Modify: `Job_Helper_agent/requirements.txt`
 
 **Interfaces:**
 - Consumes: `main_a2a.py:app` from Task 3.
@@ -469,22 +562,10 @@ not the agent directory. `my_agent/Dockerfile` copies a flat directory and uses
 `main_a2a:app` — do not copy that pattern here, it will fail on the relative
 imports.
 
-- [ ] **Step 1: Pin the dependencies**
+`Job_Helper_agent/requirements.txt` was already set to its final contents in
+Task 3 Step 0 — do not edit it again here.
 
-Set `Job_Helper_agent/requirements.txt` to:
-
-```
-google-adk[a2a]==2.4.0
-google-cloud-aiplatform
-uvicorn
-```
-
-The `[a2a]` extra is what provides `google.adk.a2a` and the `a2a-sdk`
-dependency. The version is pinned because `to_a2a` is decorated
-`@a2a_experimental` in this release — an unpinned upgrade can change its
-signature without a major version bump.
-
-- [ ] **Step 2: Write the Dockerfile**
+- [ ] **Step 1: Write the Dockerfile**
 
 Create `Job_Helper_agent/Dockerfile`:
 
@@ -517,7 +598,7 @@ doubt_solver/
 faculty_agent/
 ```
 
-- [ ] **Step 3: Verify the image builds and boots**
+- [ ] **Step 2: Verify the image builds and boots**
 
 ```bash
 cd "/mnt/c/Users/PurnaChandraRao/Documents/Google GECX"
@@ -537,10 +618,10 @@ Expected: the container **exits** with
 That is the correct result — it proves the guard works. A container that boots
 happily here would mean it is serving from memory.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add Job_Helper_agent/Dockerfile Job_Helper_agent/requirements.txt .dockerignore
+git add Job_Helper_agent/Dockerfile .dockerignore
 git commit -m "build: container image for the Cloud Run A2A host"
 ```
 
