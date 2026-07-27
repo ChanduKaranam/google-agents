@@ -26,6 +26,10 @@ uvicorn, Cloud Run, Vertex AI Agent Engine (sessions + Memory Bank).
 - A Gemini built-in tool never shares an `Agent` with a custom function tool.
   The existing structural assertion must stay green.
 - Tests are structural and offline: no network, no LLM calls, no GCP calls.
+- The suite must pass with **no environment variables set at all**. Verify with
+  `env -u GOOGLE_CLOUD_PROJECT -u GOOGLE_CLOUD_LOCATION -u AGENT_ENGINE_ID .venv/bin/python test_agent.py`.
+  `CLAUDE.md` documents the bare command as this project's baseline check; a
+  suite that needs GCP configuration to start has stopped being that check.
 - Test harness is plain functions run by `.venv/bin/python test_agent.py` —
   **not pytest**. Every new test is a module-level `test_*` function using bare
   `assert`.
@@ -318,16 +322,25 @@ git commit -m "feat: persistent session and memory services for the A2A host"
 
 **Files:**
 - Create: `Job_Helper_agent/main_a2a.py`
+- Create: `Job_Helper_agent/card.py`
 - Create: `Job_Helper_agent/agent_card.json`
 - Modify: `Job_Helper_agent/requirements.txt`
 - Test: `test_agent.py`
 
 **Interfaces:**
 - Consumes: `build_runner()` from Task 2.
-- Produces: `Job_Helper_agent/main_a2a.py:app`, a Starlette application;
-  `main_a2a.py:load_agent_card()` returning an `a2a.types.AgentCard` with its
-  `url` resolved from the environment; and `agent_card.json` declaring the A2UI
-  v0.8 extension with `streaming: true`.
+- Produces: `Job_Helper_agent/card.py` exporting `CARD_PATH` and
+  `load_agent_card(public_host, protocol) -> a2a.types.AgentCard`;
+  `Job_Helper_agent/main_a2a.py:app`, a Starlette application; and
+  `agent_card.json` declaring the A2UI v0.8 extension with `streaming: true`.
+
+**Why the card lives in its own module.** `main_a2a.py` calls `build_runner()`
+in its module body — deliberately, so a misconfigured container dies at boot
+rather than quietly serving from memory. That makes `main_a2a` unimportable
+without GCP configuration, so the offline test suite must never import it.
+Keeping `load_agent_card` in `card.py` lets the tests exercise the card without
+dragging in the runner. Do not move it back into `main_a2a.py`, and do not make
+`build_runner()` lazy to work around this — the eager call is the guard.
 
 **Two corrections to an earlier draft of this plan, both confirmed against the
 installed ADK — do not revert to the simpler-looking version:**
@@ -399,7 +412,9 @@ def test_a2a_extra_is_installed():
 def test_agent_card_is_schema_valid_and_names_an_endpoint():
     from a2a.types import AgentCard
 
-    from Job_Helper_agent.main_a2a import CARD_PATH, load_agent_card
+    # Imported from card.py, never from main_a2a: importing main_a2a would
+    # call build_runner() and take the whole offline suite down.
+    from Job_Helper_agent.card import CARD_PATH, load_agent_card
 
     # Parses as a real AgentCard, not just as JSON. A card that fails schema
     # validation takes the whole server down at import.
@@ -476,39 +491,27 @@ Create `Job_Helper_agent/agent_card.json`:
 
 Create `Job_Helper_agent/main_a2a.py`:
 
+Create `Job_Helper_agent/card.py`:
+
 ```python
-"""Cloud Run entrypoint. Serves the agent over A2A for Gemini Enterprise.
+"""The agent card Gemini Enterprise reads to discover this agent.
 
-Two things here are load-bearing and look redundant:
+Separate from `main_a2a` on purpose. `main_a2a` builds the runner at import
+time, so it cannot be imported without GCP configuration -- and the offline
+test suite still needs to check the card.
 
-`to_a2a` is passed an explicit runner. Letting it build its own would silently
-swap persistent sessions and Memory Bank for in-memory stand-ins -- see
-`runtime.py` for why that loses student data.
-
-The agent card is built here rather than handed over as a file path. When
+The card is built in code rather than handed to `to_a2a` as a file path. When
 `to_a2a` receives a card it uses it verbatim and never fills anything in
 (`agent_to_a2a.py:203-205`) -- its `host`/`port`/`protocol` arguments only feed
-the builder that runs when no card is supplied. So the `url` Gemini Enterprise
-calls back on has to be injected before the card is passed, or the agent
-advertises no endpoint at all.
+the builder that runs when no card is supplied. So the `url` that Gemini
+Enterprise calls back on has to be injected before the card is passed, or the
+agent advertises no endpoint at all.
 """
 
 import json
-import os
 import pathlib
 
-import uvicorn
 from a2a.types import AgentCard
-from google.adk.a2a.utils.agent_to_a2a import to_a2a
-
-from .agent import root_agent
-from .runtime import build_runner
-
-PORT = int(os.environ.get("PORT", 8080))
-# Cloud Run terminates TLS and routes by hostname, so the card must advertise
-# the public https origin -- not the container's internal http listener.
-PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "localhost:8080")
-PROTOCOL = os.environ.get("PUBLIC_PROTOCOL", "https")
 
 CARD_PATH = pathlib.Path(__file__).parent / "agent_card.json"
 
@@ -518,7 +521,32 @@ def load_agent_card(public_host: str, protocol: str) -> AgentCard:
     raw = json.loads(CARD_PATH.read_text())
     raw["url"] = f"{protocol}://{public_host}/"
     return AgentCard(**raw)
+```
 
+Create `Job_Helper_agent/main_a2a.py`:
+
+```python
+"""Cloud Run entrypoint. Serves the agent over A2A for Gemini Enterprise.
+
+`to_a2a` is passed an explicit runner. Letting it build its own would silently
+swap persistent sessions and Memory Bank for in-memory stand-ins -- see
+`runtime.py` for why that loses student data.
+"""
+
+import os
+
+import uvicorn
+from google.adk.a2a.utils.agent_to_a2a import to_a2a
+
+from .agent import root_agent
+from .card import load_agent_card
+from .runtime import build_runner
+
+PORT = int(os.environ.get("PORT", 8080))
+# Cloud Run terminates TLS and routes by hostname, so the card must advertise
+# the public https origin -- not the container's internal http listener.
+PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "localhost:8080")
+PROTOCOL = os.environ.get("PUBLIC_PROTOCOL", "https")
 
 app = to_a2a(
     root_agent,
@@ -538,8 +566,8 @@ Expected: PASS — 12 checks.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Job_Helper_agent/main_a2a.py Job_Helper_agent/agent_card.json \
-        Job_Helper_agent/requirements.txt test_agent.py
+git add Job_Helper_agent/main_a2a.py Job_Helper_agent/card.py \
+        Job_Helper_agent/agent_card.json Job_Helper_agent/requirements.txt test_agent.py
 git commit -m "feat: A2A entrypoint with explicit runner and A2UI-capable agent card"
 ```
 
