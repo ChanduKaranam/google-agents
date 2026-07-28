@@ -1,5 +1,21 @@
 import importlib
 
+def _components(messages):
+    return [c for m in messages if "surfaceUpdate" in m
+            for c in m["surfaceUpdate"]["components"]]
+
+def _literals(messages):
+    out = []
+    for c in _components(messages):
+        spec = c["component"].get("Text")
+        if spec:
+            out.append(spec["text"]["literalString"])
+    return out
+
+def _action_names(messages):
+    return [c["component"]["Button"]["action"]["name"]
+            for c in _components(messages) if "Button" in c["component"]]
+
 def test_root_agent_exists():
     mod = importlib.import_module("ambassador_agent")
     assert mod.root_agent.name == "ambassador_agent"
@@ -133,6 +149,31 @@ def test_mark_sent_is_idempotent():
     assert state["sent"] == ["pn"]
     ids = [s["studentId"] for s in get_stragglers(state)["data"]]
     assert "pn" not in ids and len(ids) == 5
+
+def test_cohort_card_carries_the_certified_label_and_both_numbers():
+    from ambassador_agent.surfaces import cohort_summary
+    strings = _literals(cohort_summary({}))
+    assert "EEE SEM 3 · SEC B — CERTIFIED" in strings
+    assert "43 / 59" in strings
+    assert "72.9%" in strings
+    assert any("2 more activations clear your 75% milestone." in s
+               for s in strings)
+    assert "Show the 6 who need me" in strings
+    assert "How is my rank calculated?" in strings
+
+def test_cohort_card_button_names_are_routable():
+    from ambassador_agent.surfaces import cohort_summary
+    names = _action_names(cohort_summary({}))
+    assert "show_stragglers" in names
+
+def test_cohort_card_with_no_pending_shows_roster_cta():
+    from ambassador_agent.surfaces import cohort_summary
+    messages = cohort_summary({"phase": "complete"})
+    strings = _literals(messages)
+    names = _action_names(messages)
+    assert "Show my cohort" in strings
+    assert "show_roster" in names
+    assert "show_stragglers" not in names
 
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
