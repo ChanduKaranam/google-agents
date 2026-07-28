@@ -312,6 +312,32 @@ def test_meter_stays_the_right_width_at_the_edges():
     assert meter(0) == "░" * METER_WIDTH
     assert meter(100) == "█" * METER_WIDTH
 
+
+def test_each_card_binds_both_buttons_to_its_own_student():
+    """Pin name -> id, not list order.
+
+    Task 8 routes every per-student action on this context value. An id that
+    is wrong-but-consistently-ordered would satisfy an order-based assertion
+    and still send Priya's message to Rahul.
+    """
+    from ambassador_agent.surfaces import straggler_list
+
+    components = _components(straggler_list({}))
+    by_id = {c["id"]: c for c in components}
+    expected = {
+        "pn": "Priya Nandakumar", "sk": "Suresh Kumar", "ar": "Anjali Rao",
+        "vm": "Vikram Mehta", "dg": "Deepa Gowda", "rt": "Rahul Tiwari",
+    }
+    for sid, name in expected.items():
+        shown = by_id[f"strag-{sid}-name"]["component"]["Text"]["text"]
+        assert shown["literalString"] == name, (sid, shown)
+        for suffix, action in (("send", "send_whatsapp"), ("edit", "open_edit")):
+            spec = by_id[f"strag-{sid}-{suffix}"]["component"]["Button"]["action"]
+            assert spec["name"] == action, (sid, suffix, spec)
+            carried = {c["key"]: c["value"]["literalString"]
+                       for c in spec["context"]}
+            assert carried == {"student_id": sid}, (sid, suffix, carried)
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
