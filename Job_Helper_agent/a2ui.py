@@ -335,12 +335,10 @@ def upload_prompt(state: dict) -> list[dict] | None:
 def build_a2ui_messages(state: dict) -> list[dict]:
     """Render whatever the session state supports. Empty list renders nothing.
 
-    Only `applications` is here because only `applications` is structured: it is
-    written by `tools.track_application`. The other state keys (`companies`,
-    `alumni`, `matches`, `gaps`) hold the specialists' prose, since they come
-    from `output_key` on an LlmAgent -- there is no reliable structure to draw
-    cards from. Rendering those needs those specialists to emit structured
-    output first; see the ticket-2 notes in the design spec.
+    Reads the structured keys, not the prose ones: `companies` and `alumni`
+    hold what the search agents wrote in prose, while `companies_data` and
+    `alumni_data` are the reformatted records their structuring counterparts
+    produce. `matches` and `gaps` are still prose and so are not drawn.
     """
     # Take the mapping by `.get` rather than converting it. ADK hands callbacks
     # a `State`, and `dict(State)` raises `KeyError: 0` -- dict() finds no
@@ -353,8 +351,8 @@ def build_a2ui_messages(state: dict) -> list[dict]:
     messages: list[dict] = []
     for surface in (
         upload_prompt(state),
-        company_shortlist(getter("companies") or {}),
-        alumni_cards(getter("alumni") or {}),
+        company_shortlist(getter("companies_data") or {}),
+        alumni_cards(getter("alumni_data") or {}),
         pipeline_board(getter("applications") or []),
     ):
         if surface:

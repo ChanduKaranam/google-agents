@@ -24,8 +24,9 @@ BUILT_IN_NAMES = {"google_search", "url_context", "code_execution", "computer_us
 
 EXPECTED_OUTPUT_KEYS = {
     "profile_agent": "profile",
-    "company_agent": "companies",
-    "alumni_agent": "alumni",
+    # SequentialAgent wrappers: the output_key lives on their sub-agents.
+    "company_agent": None,
+    "alumni_agent": None,
     "matching_agent": "matches",
     "verification_agent": None,
     "resume_gap_agent": "gaps",
@@ -33,6 +34,22 @@ EXPECTED_OUTPUT_KEYS = {
     "tracker_agent": None,
     "coach_agent": None,
 }
+
+
+def _leaf_agents(agents):
+    """Flatten SequentialAgent wrappers to the agents that actually hold tools.
+
+    company_agent and alumni_agent are two-step pipelines (search, then
+    structure), so the tool-safety checks must reach inside them.
+    """
+    out = []
+    for agent in agents:
+        subs = getattr(agent, "sub_agents", None)
+        if subs:
+            out.extend(_leaf_agents(subs))
+        else:
+            out.append(agent)
+    return out
 
 
 def _tool_name(tool) -> str:
@@ -71,10 +88,43 @@ def test_root_has_all_specialists_plus_infrastructure_tools():
 def test_output_keys_match_the_spec():
     for agent in SPECIALISTS:
         expected = EXPECTED_OUTPUT_KEYS[agent.name]
+        if getattr(agent, "sub_agents", None):
+            # A SequentialAgent has no output_key of its own; its sub-agents
+            # carry them. Checked separately below.
+            assert getattr(agent, "output_key", None) is None
+            continue
         assert agent.output_key == expected, (
             f"{agent.name} output_key is {agent.output_key!r}, expected"
             f" {expected!r} -- downstream agents read this via {{key?}}"
         )
+
+
+def test_sequential_specialists_keep_their_state_contract():
+    """The wrappers hide output_key, so assert it on the halves that have it.
+
+    The search half still writes the prose key downstream agents read via
+    {key?}; the structure half writes the *_data key the A2UI renderer draws.
+    """
+    from Job_Helper_agent.agent import (
+        alumni_search_agent,
+        alumni_structure_agent,
+        company_search_agent,
+        company_structure_agent,
+    )
+
+    assert company_search_agent.output_key == "companies"
+    assert company_structure_agent.output_key == "companies_data"
+    assert alumni_search_agent.output_key == "alumni"
+    assert alumni_structure_agent.output_key == "alumni_data"
+
+    # Controlled generation and the Search tool cannot coexist -- Gemini
+    # returns 400 INVALID_ARGUMENT. That is why structuring is a second agent
+    # rather than an output_schema on the search agent, and why the search
+    # halves must never acquire one.
+    assert company_search_agent.output_schema is None
+    assert alumni_search_agent.output_schema is None
+    assert not (company_structure_agent.tools or [])
+    assert not (alumni_structure_agent.tools or [])
 
 
 def test_no_agent_can_fetch_linkedin():
@@ -85,7 +135,7 @@ def test_no_agent_can_fetch_linkedin():
     now go through fetch_job_description, which blocklists such domains in
     code -- instructions alone have already failed us twice.
     """
-    for agent in [root_agent, *SPECIALISTS]:
+    for agent in [root_agent, *_leaf_agents(SPECIALISTS)]:
         assert "url_context" not in [_tool_name(t) for t in (agent.tools or [])], (
             f"{agent.name} holds url_context, which will fetch any URL given to it"
         )
@@ -99,8 +149,8 @@ def test_no_agent_mixes_builtin_and_function_tools():
     auto-wrap workaround defaults to off, so this fails at the Gemini API --
     potentially only once deployed.
     """
-    for agent in [root_agent, *SPECIALISTS]:
-        tools = list(agent.tools or [])
+    for agent in [root_agent, *_leaf_agents(SPECIALISTS)]:
+        tools = list(getattr(agent, "tools", None) or [])
         built_ins = [t for t in tools if _is_built_in(t)]
         if not built_ins:
             continue
@@ -390,14 +440,18 @@ def test_specialists_emit_structured_data_for_rendering():
     schema only on the final output, so the built-in still runs during the
     thought loop and the one-built-in-per-agent rule is untouched.
     """
-    from Job_Helper_agent.agent import alumni_agent, company_agent
+    from Job_Helper_agent.agent import (
+        alumni_structure_agent,
+        company_structure_agent,
+    )
 
-    for agent in (company_agent, alumni_agent):
+    for agent in (company_structure_agent, company_structure_agent):
         assert agent.output_schema is not None, f"{agent.name} has no output_schema"
         # Rule 5: plain dict schemas, no Pydantic.
         assert isinstance(agent.output_schema, dict), f"{agent.name} schema is not a dict"
 
-    alumni_props = alumni_agent.output_schema["properties"]["alumni"]["items"]
+    assert alumni_structure_agent.output_schema is not None
+    alumni_props = alumni_structure_agent.output_schema["properties"]["alumni"]["items"]
     # NO_INVENTION, structurally: a person without a found link is not a person
     # we may name, so the schema itself refuses to describe one.
     assert "profile_url" in alumni_props["required"]
@@ -408,7 +462,7 @@ def test_company_and_alumni_surfaces_render_from_structured_state():
     from Job_Helper_agent.a2ui import build_a2ui_messages
 
     state = {
-        "companies": {
+        "companies_data": {
             "companies": [
                 {"name": "Zerodha", "why_it_fits": "Python + backend", "fit": "Strong",
                  "industry": "Fintech", "size_or_stage": "Mid-size",
@@ -416,7 +470,7 @@ def test_company_and_alumni_surfaces_render_from_structured_state():
                  "opening_url": "https://zerodha.com/careers/backend-intern"},
             ]
         },
-        "alumni": {
+        "alumni_data": {
             "alumni": [
                 {"name": "A. Rao", "role": "SDE", "company": "Zerodha",
                  "profile_url": "https://example.com/a-rao", "shared_context": "NITW 2019"},
@@ -442,7 +496,7 @@ def test_alumni_surface_falls_back_to_linkedin_search_links():
     from Job_Helper_agent.a2ui import build_a2ui_messages
 
     state = {
-        "alumni": {
+        "alumni_data": {
             "alumni": [],
             "search_links": {
                 "people_search": "https://www.linkedin.com/search/results/people/?keywords=NITW+Stripe",

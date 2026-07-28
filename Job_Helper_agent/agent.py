@@ -17,6 +17,7 @@ Two structural rules this file obeys, both learned the hard way:
 """
 
 from google.adk.agents.llm_agent import Agent
+from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.tools import google_search
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.load_artifacts_tool import load_artifacts_tool
@@ -191,9 +192,9 @@ ALUMNI_SCHEMA = {
 }
 
 
-company_agent = Agent(
+company_search_agent = Agent(
     model=MODEL,
-    name="company_agent",
+    name="company_search_agent",
     description=(
         "Recommends companies that fit the student's profile and finds current"
         " openings. Call after the profile exists."
@@ -247,14 +248,13 @@ company_agent = Agent(
         " openings you actually found, with links.\n\n" + NO_INVENTION
     ),
     tools=[google_search],
-    output_schema=COMPANIES_SCHEMA,
     output_key="companies",
 )
 
 
-alumni_agent = Agent(
+alumni_search_agent = Agent(
     model=MODEL,
-    name="alumni_agent",
+    name="alumni_search_agent",
     description=(
         "Finds alumni and professionals at a target company who could plausibly"
         " give a referral. Call with the target company name."
@@ -288,8 +288,75 @@ alumni_agent = Agent(
         " could not verify. " + NO_INVENTION + REAL_PEOPLE_RULES
     ),
     tools=[google_search],
-    output_schema=ALUMNI_SCHEMA,
     output_key="alumni",
+)
+
+
+# Structuring runs as a second step, not as a schema on the search agent:
+# Gemini rejects controlled generation together with the Search tool outright
+# ("400 INVALID_ARGUMENT: controlled generation is not supported with Search
+# tool"), whatever ADK's output_schema docstring implies. So the search half
+# keeps google_search and writes prose, and this half -- which holds no tools
+# at all -- turns that prose into the structure the A2UI renderer draws from.
+company_structure_agent = Agent(
+    model=MODEL,
+    name="company_structure_agent",
+    description="Turns the company shortlist prose into structured records.",
+    instruction=(
+        "Convert the company shortlist below into the required JSON.\n\n"
+        "Shortlist:\n{companies?}\n\n"
+        "Copy only what the shortlist already says. You are reformatting, not"
+        " researching: add no company, no opening, and no link that does not"
+        " appear above, and never repair a partial URL into a plausible one."
+        " Omit `opening_url` entirely when no real link was given. If the"
+        " shortlist is empty or says the profile is missing, return an empty"
+        " companies list and put the explanation in `note`."
+    ),
+    output_schema=COMPANIES_SCHEMA,
+    output_key="companies_data",
+)
+
+
+company_agent = SequentialAgent(
+    name="company_agent",
+    description=(
+        "Recommends companies that fit the student's profile and finds current"
+        " openings. Call after the profile exists."
+    ),
+    sub_agents=[company_search_agent, company_structure_agent],
+)
+
+
+alumni_structure_agent = Agent(
+    model=MODEL,
+    name="alumni_structure_agent",
+    description="Turns the alumni findings into structured records.",
+    instruction=(
+        "Convert the alumni findings below into the required JSON.\n\n"
+        "Findings:\n{alumni?}\n\n"
+        "Copy only what the findings already say -- you are reformatting, not"
+        " researching.\n\n"
+        "A person WITHOUT a real profile link found in the findings must be"
+        " left out entirely. Do not invent a link, do not guess a LinkedIn URL"
+        " from someone's name, and do not pad the list to make it look fuller."
+        " An empty alumni list is a normal, correct answer: public search"
+        " genuinely cannot tell who from a college works at a company.\n\n"
+        "Whenever the findings include LinkedIn search links, copy them into"
+        " `search_links` -- that is how the student checks for themselves when"
+        " we found nobody. Put any caveat in `note`."
+    ),
+    output_schema=ALUMNI_SCHEMA,
+    output_key="alumni_data",
+)
+
+
+alumni_agent = SequentialAgent(
+    name="alumni_agent",
+    description=(
+        "Finds alumni and professionals at a target company who could plausibly"
+        " give a referral. Call with the target company name."
+    ),
+    sub_agents=[alumni_search_agent, alumni_structure_agent],
 )
 
 
