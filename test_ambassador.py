@@ -423,6 +423,51 @@ def test_roster_shows_six_of_fiftynine():
     assert "Showing 6 of 59" in strings
 
 
+
+def test_every_list_surface_keeps_its_shape_in_every_phase():
+    """Phase coverage for the surfaces layer, not just the data layer.
+
+    The rewards fix turns on every tier keeping its "at N%" prefix in EVERY
+    phase -- including `complete`, where all four are earned and an earlier
+    build dropped the threshold entirely. Nothing pinned that beyond `live`.
+    """
+    from ambassador_agent.surfaces import leaderboard, rewards, roster
+
+    for phase in ("live", "target", "complete"):
+        state = {"phase": phase}
+
+        tiers = [s for s in _literals(rewards(state)) if s.startswith("at ")]
+        assert len(tiers) == 4, (phase, tiers)
+        for at in ("at 25%", "at 50%", "at 75%", "at 100%"):
+            assert any(s.startswith(at + " —") for s in tiers), (phase, at)
+        assert not any(s.endswith("— 0 more") for s in tiers), (phase, tiers)
+
+        # Select by id, not by content: the ranking-basis caption also
+        # contains "·" and "%", and a content heuristic silently swept it in.
+        rows = [c["component"]["Text"]["text"]["literalString"]
+                for c in _components(leaderboard(state))
+                if c["id"].startswith("board-r") and c["id"].endswith("-detail")]
+        assert len(rows) == 4, (phase, rows)
+        for row in rows:                      # % and count never separated
+            assert "%" in row and "/" in row, (phase, row)
+
+        assert "Showing 6 of 59" in _literals(roster(state)), phase
+
+
+def test_prototype_copy_reference_is_committed():
+    """Copy fidelity must be checkable by someone who only has this repo.
+
+    The prototypes ship as compiled bundles; a reviewer cannot grep them, so
+    an unsourced word can look like a correction and a real correction can
+    look unsourced. Both happened.
+    """
+    import pathlib
+
+    here = pathlib.Path(__file__).parent / "docs" / "reference"
+    cockpit = (here / "prototype-cockpit-copy.md").read_text(encoding="utf-8")
+    assert ("Ranked on % of section activated · under-30 sections pooled"
+            " · verified activations only") in cockpit
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

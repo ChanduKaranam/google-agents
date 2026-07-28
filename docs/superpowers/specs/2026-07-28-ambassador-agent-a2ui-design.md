@@ -134,7 +134,7 @@ a grid. A2UI has no column widths and no per-cell alignment, so an emulated grid
 misaligns and reads as broken rather than plain.
 
 The fairness rule survives, which is what matters: **% and count always shown
-together**, plus the ranking basis ("% of section activated · under-30 pooled ·
+together**, plus the ranking basis ("% of section activated · under-30 sections pooled ·
 verified activations only"). Sneha's own row is marked in its text, not by color.
 
 ### Only Button dispatches actions
