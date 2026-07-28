@@ -138,12 +138,16 @@ def route(state, action: dict) -> tuple[str, list[dict]]:
             student_id, (state.get("angles", {}) or {}).get(
                 student_id, "Exam panic"))
         data.mark_sent(state, student_id)
-        link = data.wa_link(student_id)
+        body = f"{message}\n{data.wa_link(student_id)}"
+        deeplink = data.whatsapp_deeplink(student_id, body)
         # The link goes in prose, not the card: A2UI v0.8 Text excludes links
-        # and Button dispatches an action rather than navigating.
+        # and Button dispatches an action rather than navigating. This wa.me
+        # url is what actually keeps the promise that Sethu pre-fills and she
+        # sends -- without it she would retype the message herself.
         return (f"Opened WhatsApp with the message for {first}. Once that"
                 " sign-in lands, the activation is credited to you — usually"
-                f" within the hour.\n\n{message}\n{link}"), []
+                f" within the hour.\n\nTap to send it:\n{deeplink}\n\n"
+                f"{body}"), []
 
     if name == "show_leaderboard":
         return "", surfaces.leaderboard(state)

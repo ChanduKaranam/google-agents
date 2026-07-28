@@ -59,12 +59,24 @@ def handle_click(callback_context: CallbackContext) -> types.Content | None:
     any failure instead of raising or answering with an error.
     """
     try:
-        action = parse_user_action(_incoming_text(callback_context))
-        if action is None:
-            return None
+        incoming = _incoming_text(callback_context)
+        action = parse_user_action(incoming)
         state = callback_context.state
-        reply, messages = route(state, action)
-        messages = messages + chips_surface(chips_for_action(action))
+        if action is None:
+            # A typed question that matches a known intent is answered from the
+            # router too, not by the model. Measured live: asked "who should I
+            # message?", the model replied "Sneha Reddy, for EEE Sem 3, Sec B."
+            # while the router says "6 students have ignored two campaigns — a
+            # broadcast won't move them…" -- the prototype's own copy. The demo
+            # is judged on that wording, so it must not vary turn to turn.
+            intent = intent_for(incoming)
+            if intent == "unknown":
+                return None       # off-script: let the model answer freely
+            reply, messages = route_question(state, incoming)
+            messages = messages + chips_surface(chips_for(intent))
+        else:
+            reply, messages = route(state, action)
+            messages = messages + chips_surface(chips_for_action(action))
         parts = []
         if reply:
             parts.append(types.Part(text=reply))
@@ -91,15 +103,14 @@ def render_surface(callback_context: CallbackContext) -> types.Content | None:
     """
     try:
         question = _incoming_text(callback_context)
-        intent = intent_for(question)
-        if intent == "unknown":
-            messages = build_greeting(
-                "Ask me anything about your section, or pick a suggestion"
-                " below.", DEFAULT_CHIPS,
-            )
-        else:
-            _reply, messages = route_question(callback_context.state, question)
-            messages = messages + chips_surface(chips_for(intent))
+        if intent_for(question) != "unknown":
+            return None      # handle_click already answered this turn in full
+        # Off-script question. The model answered it in its own words; add the
+        # chips so she is never left in a turn with no way forward.
+        messages = build_greeting(
+            "Ask me anything about your section, or pick a suggestion"
+            " below.", DEFAULT_CHIPS,
+        )
         return types.Content(role="model", parts=to_genai_parts(messages))
     except Exception:  # noqa: BLE001 - a broken widget must not break the answer
         logger.warning("Could not render A2UI surface", exc_info=True)

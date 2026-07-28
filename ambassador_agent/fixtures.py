@@ -12,17 +12,17 @@ SECTION_SIZE = 59
 PHASES = {"live": 43, "target": 54, "complete": 59}
 
 STRAGGLERS = [
-    {"studentId": "pn", "name": "Priya Nandakumar",
+    {"studentId": "pn", "phone": "919876543210", "name": "Priya Nandakumar",
      "context": "ignored 2 campaigns · 11 days"},
-    {"studentId": "sk", "name": "Suresh Kumar",
+    {"studentId": "sk", "phone": "919876543211", "name": "Suresh Kumar",
      "context": "ignored 2 campaigns · 9 days"},
-    {"studentId": "ar", "name": "Anjali Rao",
+    {"studentId": "ar", "phone": "919876543212", "name": "Anjali Rao",
      "context": "ignored 2 campaigns · 14 days"},
-    {"studentId": "vm", "name": "Vikram Mehta",
+    {"studentId": "vm", "phone": "919876543213", "name": "Vikram Mehta",
      "context": "never opened a link · 16 days"},
-    {"studentId": "dg", "name": "Deepa Gowda",
+    {"studentId": "dg", "phone": "919876543214", "name": "Deepa Gowda",
      "context": "ignored 2 campaigns · 8 days"},
-    {"studentId": "rt", "name": "Rahul Tiwari",
+    {"studentId": "rt", "phone": "919876543215", "name": "Rahul Tiwari",
      "context": "ignored 2 campaigns · 12 days"},
 ]
 

@@ -605,6 +605,55 @@ def test_simulate_is_matched_before_other_intents():
     assert intent_for("jump to the next state") == "simulate"
     assert intent_for("what unlocks next?") == "rewards"
 
+
+def _ctx(text):
+    from google.genai import types
+
+    class Ctx:
+        def __init__(self):
+            self.user_content = types.Content(
+                role="user", parts=[types.Part(text=text)])
+            self.state = {}
+    return Ctx()
+
+
+def test_typed_intents_are_answered_by_the_router_not_the_model():
+    """The demo is judged on the prototype's wording.
+
+    Measured live before this was wired: asked "who should I message?", the
+    model answered "Sneha Reddy, for EEE Sem 3, Sec B." while the router says
+    "6 students have ignored two campaigns — a broadcast won't move them…".
+    Letting the model narrate made the copy vary turn to turn.
+    """
+    from ambassador_agent.agent import handle_click
+
+    out = handle_click(_ctx("who should I message?"))
+    assert out is not None, "typed intent fell through to the model"
+    prose = next((p.text for p in out.parts if p.text), "")
+    assert prose.startswith("6 students have ignored two campaigns")
+    assert sum(1 for p in out.parts if p.inline_data) >= 2
+
+
+def test_off_script_questions_still_reach_the_model():
+    from ambassador_agent.agent import handle_click, render_surface
+
+    context = _ctx("what is the weather")
+    assert handle_click(context) is None, "hijacked an off-script question"
+    # ...but she is never left without a way forward.
+    assert render_surface(context) is not None
+
+
+def test_send_confirmation_carries_a_tappable_whatsapp_link():
+    """A2UI cannot put a link on a card, so this is the only thing that keeps
+    the promise that Sethu pre-fills and she sends."""
+    from ambassador_agent.actions import route
+
+    reply, _ = route({}, {"name": "send_whatsapp",
+                          "context": {"student_id": "pn"}})
+    assert "https://wa.me/919876543210?text=" in reply
+    assert "sethu.app/go/pn8x2" in reply          # credit still rides along
+    assert "Circuits%20agent" in reply            # message really is pre-filled
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

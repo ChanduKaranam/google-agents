@@ -9,6 +9,7 @@ the sent count climbs as she works through the list.
 """
 
 import math
+import urllib.parse
 
 from . import fixtures
 
@@ -160,4 +161,20 @@ def draft_for(student_id: str, angle: str = "Exam panic") -> str:
 
 
 def wa_link(student_id: str) -> str:
+    """The /go/ attribution link she sends. Credit rides on this url."""
     return f"sethu.app/go/{student_id}8x2"
+
+
+def whatsapp_deeplink(student_id: str, message: str) -> str:
+    """A tappable wa.me url that opens WhatsApp with the message pre-filled.
+
+    A2UI v0.8 cannot put a link on a card -- Button dispatches an action and
+    Text excludes links -- so this goes in the agent's prose reply, where the
+    chat surface renders it as a normal link. Without it the product promise
+    ("Sethu never sends from your number -- it pre-fills, you send") is not
+    kept: she would have to retype the message into WhatsApp herself.
+    """
+    entry = student(student_id)
+    phone = (entry or {}).get("phone", "")
+    return (f"https://wa.me/{phone}"
+            f"?text={urllib.parse.quote(message, safe='')}")
