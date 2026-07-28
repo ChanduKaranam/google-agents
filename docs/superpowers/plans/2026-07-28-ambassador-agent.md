@@ -945,7 +945,7 @@ def test_cohort_card_carries_the_certified_label_and_both_numbers():
     strings = _literals(cohort_summary({}))
     assert "EEE SEM 3 · SEC B — CERTIFIED" in strings
     assert "43 / 59" in strings
-    assert "72.9%" in strings
+    assert any("72.9%" in s for s in strings)  # may share a node with the meter
     assert any("2 more activations clear your 75% milestone." in s
                for s in strings)
     assert "Show the 6 who need me" in strings
@@ -1191,8 +1191,11 @@ def test_edit_form_offers_three_angles_and_a_send():
     messages = edit_form({}, "pn")
     strings = _literals(messages)
     assert "Edit before sending — Priya Nandakumar" in strings
+    # Angles render with a selection marker ("● Exam panic"), so match on
+    # substring. An exact assertion here would push the implementer to
+    # restructure the card just to satisfy the test.
     for angle in ("Exam panic", "Placement", "Plain"):
-        assert angle in strings
+        assert any(angle in s for s in strings)
     assert "Send to Priya" in strings
     names = _action_names(messages)
     assert names.count("set_angle") == 3
@@ -1365,7 +1368,7 @@ def test_rewards_lists_four_tiers_with_status():
     strings = _literals(rewards({}))
     assert "75% Club — tee + certificate" in strings
     assert "Full House — the 100% badge" in strings
-    assert "2 more" in strings
+    assert any("2 more" in s for s in strings)  # renders as "at 75% — 2 more"
     assert strings.count("earned") == 2
 
 def test_roster_shows_six_of_fiftynine():
