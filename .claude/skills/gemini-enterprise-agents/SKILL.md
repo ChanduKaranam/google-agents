@@ -262,6 +262,10 @@ gh api repos/google/a2ui/contents/renderers/angular/src/v0_8/test_data/mocks/con
   --jq '.content' | base64 -d
 ```
 
+A card that fails to render shows a red **"This content could not be displayed"**
+box in the chat with a short fragment naming the offending component id — and
+logs nothing server-side. That box is the only debugging signal GE gives you.
+
 ⚠️ **`output_schema` and `google_search` cannot coexist.** Gemini returns
 `400 INVALID_ARGUMENT: controlled generation is not supported with Search tool`,
 whatever ADK's `output_schema` docstring says about schema and tools composing.
@@ -495,6 +499,8 @@ not the structured row your tool stored — reconcile, don't assume round-trippi
 | Handing `to_a2a` an agent card file path | It uses the card verbatim; `host`/`port`/`protocol` are then dead, and the card advertises whatever `url` is on disk. Build the card in code. |
 | Trusting `google-adk[a2a]` to install the A2A server | It omits `a2a-sdk[http-server]`; `sse-starlette` is missing and the failure surfaces only at container start. |
 | `dict(callback_context.state)` | Raises `KeyError: 0` — `State` has no `keys()`. Use `.get()`. |
+| Naming an A2UI component `body` (or `root`, `title`) | GE's validator refuses the card with a red "This content could not be displayed" box. `body` is also a `Text.usageHint` value; the official fixture calls that node `main-column`. Namespace ids per surface. |
+| Expecting GE to tell the A2A agent who the user is | It does not — no identity header, no message metadata, no authenticated principal. Only the Discovery Engine service agent, which is the same for everyone. |
 | Giving a sub-agent a tool that calls `search_memory` | `AgentTool` hands it an empty `InMemoryMemoryService`. Silently returns nothing. Only the root sees memory. |
 | Assuming `--memory_service_uri` makes memories appear | It only wires the service. Something must call `add_session_to_memory` — use an after-agent callback. |
 | "The agent returned nothing, so it's broken" | Could be an empty final text, or a server crash. Read session events / Cloud Logging. |

@@ -4,11 +4,13 @@ Verified 2026-07-28 against `google-adk==2.4.0`, `a2a-sdk==0.3.26`, a live Cloud
 Run A2A service and a live `supadha-dev` GE registration. Method is stated per
 claim; treat anything unmarked as unverified.
 
-**One honest gap up front:** everything below about the *payload* is verified on
-the wire (real `DataPart`s, real mime, real component tree). What is NOT verified
-here is Gemini Enterprise itself painting the widget — that needs a human to open
-the GE app and look. Do not tell anyone "it renders in GE" on the strength of a
-correct payload.
+**Verification status, precisely.** The payload is verified on the wire (real
+`DataPart`s, real mime, real component tree). Gemini Enterprise is verified to
+**negotiate** the extension and to **receive and attempt to render** the card —
+observed as its own validation-failure box in the chat. A *valid* card painting
+successfully is still unverified at the time of writing. Do not upgrade "the
+payload is correct" into "it renders in GE"; those turned out to be several
+distinct bugs apart.
 
 ## What A2UI is
 
@@ -263,6 +265,53 @@ Sessions/Memory Bank both need an `agent_engine_id`, so the Agent Runtime
 instance stays provisioned as the store even after serving moves to Cloud Run.
 Don't delete it.
 
+## Getting structured data into the renderer
+
+`output_key` on an agent with an `output_schema` stores the **parsed object**,
+not the JSON string — `llm_agent.py:989-996` runs `validate_schema` before
+writing `state_delta[output_key]`. So a renderer reads `state["companies_data"]`
+as a dict, no `json.loads` needed.
+
+Without a schema, `output_key` stores whatever prose the model wrote. That is
+the usual reason a card cannot be built from an existing agent: `output_key`
+alone gives you text, and text is not drawable. Adding the schema is what turns
+an existing specialist into something a renderer can use — subject to the
+Search-tool conflict in the blockers table.
+
+Read state through `.get()`, never `dict(state)` — ADK's `State` has no
+`keys()`, so `dict()` raises `KeyError: 0`.
+
+## Debugging a card that will not draw
+
+GE gives you exactly one signal, and it is in the chat, not the logs: a red box
+reading **"This content could not be displayed."**, a short fragment string, and
+*Report to agent* / *Dismiss* buttons. The agent's text reply renders normally
+above it — so a broken widget looks like a working agent with a red box stapled
+underneath, and nothing at all appears in Cloud Logging.
+
+The fragment is the useful part. Observed 2026-07-28: **``se`body` ``** on a card
+whose Column node had `id: "body"`. Read the fragment as naming the offending
+component id.
+
+**Do not name a component `body`.** It is also a valid `Text.usageHint` value,
+and the official v0.8 fixture names that node `main-column`, never `body`.
+Treat `body`, `root`, `title`, `head`, `html`, `main` as reserved.
+
+**Namespace every id per surface.** Several surfaces can render in one turn
+(e.g. an upload prompt, a results card and a status board), and each naively
+built card wants to call its wrapper `root`. Prefix ids with the surface name
+and assert uniqueness across the whole message list in a test — a duplicate id
+across two surfaces is invisible offline.
+
+Check enums against the catalog rather than guessing; a bad enum fails the same
+silent way:
+- `Text.usageHint` ∈ `h1 h2 h3 h4 h5 caption body`
+- `Column.alignment` / `Row.alignment` ∈ `center end start stretch`
+
+And check every `child` / `children.explicitList` reference resolves to a
+component that exists in the same `surfaceUpdate`. A dangling reference drops
+the subtree silently rather than erroring.
+
 ## Blockers that only appear at runtime
 
 | Symptom | Cause | Fix |
@@ -273,6 +322,8 @@ Don't delete it.
 | `gcloud run deploy --source .` ignores your Dockerfile | gcloud only uses a Dockerfile at the **root** of the source dir; nested, it silently falls through to Buildpacks. No flag points at a nested one. | Put the Dockerfile at the repo root. Confirm the log says "Building using Dockerfile". |
 | A secret ships inside the image | `.dockerignore` is **root-anchored**, unlike `.gitignore`. A bare `.env` matches only a top-level `.env`. | Use `**/.env`. Entries like `docs/` work only because they happen to sit at the context root. |
 | Widget never appears, no error anywhere | `dict(callback_context.state)` → `KeyError: 0`, swallowed by the renderer's own guard. | `.get()` on the State. Keep the guard; add a test with a State-like double. |
+| Red "This content could not be displayed" box under an otherwise-normal reply | A component id or enum GE's validator rejects. Nothing is logged server-side. | Read the fragment in the box — it names the offender. See **Debugging a card that will not draw**. |
+| An orchestrator answers with its own tool instead of delegating, so the specialist never runs and its state key is never written | A root agent holding a fallback function tool will often use it directly rather than calling the specialist that would have produced the structured data. | Either generate the value deterministically in the renderer, or don't give root a tool that duplicates the specialist's job. |
 
 ## Worked example: structured output from a search agent
 
