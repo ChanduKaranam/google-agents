@@ -63,6 +63,54 @@ def test_parse_user_action_ignores_plain_text():
     from ambassador_agent.actions import parse_user_action
     assert parse_user_action("who should I message?") is None
 
+def test_live_phase_matches_the_prototype():
+    from ambassador_agent.data import get_cohort
+    cohort = get_cohort({})
+    assert cohort["stats"] == {"activated": 43, "size": 59, "pct": 72.9}
+    assert cohort["ambassador"] == {"name": "Sneha Reddy",
+                                    "section": "EEE Sem 3 · Sec B"}
+
+def test_milestone_line_is_verbatim():
+    from ambassador_agent.data import milestone_line
+    assert milestone_line({}) == (
+        "2 more activations clear your 75% milestone.")
+    assert milestone_line({"phase": "target"}) == (
+        "Your 75% milestone is earned. 5 more makes Full House, "
+        "the 100% badge.")
+    assert milestone_line({"phase": "complete"}) == (
+        "Every student in Sec B is activated — nothing left to unlock.")
+
+def test_target_phase_leaves_two_stragglers():
+    from ambassador_agent.data import get_stragglers
+    assert len(get_stragglers({})["data"]) == 6
+    ids = [s["studentId"] for s in get_stragglers({"phase": "target"})["data"]]
+    assert ids == ["dg", "rt"]
+    assert get_stragglers({"phase": "complete"})["data"] == []
+
+def test_sent_students_drop_out_of_the_pending_list():
+    from ambassador_agent.data import get_stragglers, mark_sent
+    state = {}
+    mark_sent(state, "pn")
+    ids = [s["studentId"] for s in get_stragglers(state)["data"]]
+    assert "pn" not in ids and len(ids) == 5
+
+def test_drafts_change_with_the_angle():
+    from ambassador_agent.data import draft_for
+    assert draft_for("pn", "Exam panic").startswith(
+        "Hey Priya — internals Tuesday.")
+    assert draft_for("pn", "Placement").startswith(
+        "Hey Priya — the placement agent")
+    assert draft_for("pn", "Plain").startswith(
+        "Hey Priya — your college study agents are ready.")
+
+def test_leaderboard_shows_percent_and_count_together():
+    from ambassador_agent.data import get_leaderboard
+    board = get_leaderboard({})
+    assert board["myRank"] == 19
+    me = [r for r in board["data"] if r["name"] == "You"][0]
+    assert me["pct"] == 72.9 and me["activated"] == 43 and me["size"] == 59
+    assert [r["rank"] for r in board["data"]] == [1, 2, 3, 19]
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
