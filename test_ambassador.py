@@ -655,36 +655,51 @@ def test_send_confirmation_carries_a_tappable_whatsapp_link():
     assert "Circuits%20agent" in reply            # message really is pre-filled
 
 
-def test_chips_only_follow_a_card_never_a_bare_sentence():
-    """Reported from the live demo: chips under every message.
+def test_every_turn_offers_the_options_again():
+    """Asked for explicitly: options after every message, card or not.
 
-    In the prototype there is ONE chip row, in the chat chrome. Here every
-    turn's row persists in the transcript, so appending them to plain
-    sentences too -- a send confirmation, "nobody left to chase" -- stacks a
-    wall of identical buttons down the conversation.
+    The prototype keeps one chip row in its chrome, always visible. GE gives
+    an agent no chrome, so the row has to ride in each turn -- including
+    replies that are only a sentence, like the send confirmation. She should
+    never have to type to get moving again.
     """
     from ambassador_agent.actions import chips_for_action, route
     from ambassador_agent.agent import _with_chips
 
     text_only = {"name": "send_whatsapp", "context": {"student_id": "pn"}}
     reply, messages = route({}, text_only)
-    assert reply and not messages
-    assert _with_chips(messages, chips_for_action(text_only)) == []
+    assert reply and not messages          # a bare sentence...
+    assert _with_chips(messages, chips_for_action(text_only)), (
+        "a text-only reply left her with nothing to tap")
 
     with_card = {"name": "show_stragglers", "context": {}}
     _reply, messages = route({}, with_card)
-    assert messages
     assert len(_with_chips(messages, chips_for_action(with_card))) > len(messages)
 
 
-def test_the_welcome_card_is_drawn_once_per_conversation():
+def test_the_greeting_is_drawn_once_but_the_options_keep_coming():
+    import json
+
     from ambassador_agent.agent import render_surface
 
+    def surfaces_of(content):
+        out = []
+        for part in content.parts:
+            raw = part.inline_data.data.decode()
+            payload = json.loads(raw.replace("<a2a_datapart_json>", "")
+                                    .replace("</a2a_datapart_json>", ""))
+            update = payload["data"].get("surfaceUpdate")
+            if update:
+                out.append(update["surfaceId"])
+        return out
+
     first = _ctx("hi")
-    assert render_surface(first) is not None
+    assert surfaces_of(render_surface(first)) == ["greet"]
+
     again = _ctx("hello again")
     again.state = first.state              # same conversation
-    assert render_surface(again) is None
+    # greeting text not repeated, but the options come back
+    assert surfaces_of(render_surface(again)) == ["chips"]
 
 
 def test_the_opening_greeting_matches_the_prototype():

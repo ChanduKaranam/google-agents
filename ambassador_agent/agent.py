@@ -51,16 +51,14 @@ def _incoming_text(callback_context: CallbackContext) -> str:
 
 
 def _with_chips(messages: list[dict], labels: list[str]) -> list[dict]:
-    """Attach follow-up chips only to a turn that actually drew a card.
+    """Attach follow-up chips to EVERY agent turn, card or not.
 
-    Chips are a way onward FROM a surface. In the prototype they live in the
-    chat chrome and there is exactly one row; here every turn's row persists in
-    the transcript, so appending them to plain sentences too -- a send
-    confirmation, "nobody left to chase" -- stacks a wall of identical buttons
-    down the conversation. Reported from the live demo.
+    The prototype keeps one chip row in its chrome, always visible. Gemini
+    Enterprise gives an agent no chrome, so the only way to keep options in
+    front of her is to put a row in each turn -- including replies that are
+    just a sentence, like a send confirmation. She should never have to type
+    to get moving again.
     """
-    if not messages:
-        return messages
     return messages + chips_surface(labels)
 
 
@@ -122,7 +120,11 @@ def render_surface(callback_context: CallbackContext) -> types.Content | None:
             return None      # handle_click already answered this turn in full
         state = callback_context.state
         if state.get("greeted"):
-            return None      # she has seen the options; the model's words stand
+            # Off-script turn later in the conversation: the model answered in
+            # its own words, but she still gets the options back.
+            return types.Content(
+                role="model",
+                parts=to_genai_parts(chips_surface(DEFAULT_CHIPS)))
         state["greeted"] = True
         # First turn: the prototype's opening, from live numbers, instead of a
         # generic welcome. It cannot fire before she speaks -- Gemini
