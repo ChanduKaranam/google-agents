@@ -4,6 +4,7 @@ from google.adk.agents import Agent
 from google.adk.agents.callback_context import CallbackContext
 from google.genai import types
 
+from . import data
 from .a2ui import build_greeting, to_genai_parts
 from .actions import (chips_for, chips_for_action, intent_for,
                       parse_user_action, route, route_question)
@@ -123,11 +124,16 @@ def render_surface(callback_context: CallbackContext) -> types.Content | None:
         if state.get("greeted"):
             return None      # she has seen the options; the model's words stand
         state["greeted"] = True
+        # First turn: the prototype's opening, from live numbers, instead of a
+        # generic welcome. It cannot fire before she speaks -- Gemini
+        # Enterprise gives an agent no "conversation opened" event -- so this
+        # rides on whatever she says first.
         messages = build_greeting(
-            "Ask me anything about your section, or pick a suggestion"
-            " below.", DEFAULT_CHIPS,
+            data.greeting_line(state) + "\n\nAsk me anything about your"
+            " section, or pick a suggestion below.", DEFAULT_CHIPS,
         )
         return types.Content(role="model", parts=to_genai_parts(messages))
+
     except Exception:  # noqa: BLE001 - a broken widget must not break the answer
         logger.warning("Could not render A2UI surface", exc_info=True)
         return None

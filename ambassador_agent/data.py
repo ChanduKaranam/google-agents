@@ -178,3 +178,21 @@ def whatsapp_deeplink(student_id: str, message: str) -> str:
     phone = (entry or {}).get("phone", "")
     return (f"https://wa.me/{phone}"
             f"?text={urllib.parse.quote(message, safe='')}")
+
+def greeting_line(state) -> str:
+    """The prototype's opening message, from live numbers.
+
+    Sethu's own `greet()` runs on mount; Gemini Enterprise gives an agent no
+    "conversation opened" event, so this fires on her first turn instead --
+    the closest the platform allows.
+    """
+    cohort = get_cohort(state)
+    who = cohort["ambassador"]
+    stats = cohort["stats"]
+    # The prototype speaks the section with a comma here ("EEE Sem 3, Sec B")
+    # though it labels it with a middle dot everywhere else. Keep both.
+    section = who["section"].replace(" · ", ", ")
+    return (f"Hi {who['name'].split(' ')[0]} — I look after {section}"
+            f" with you.\n\nRight now {stats['activated']} of your"
+            f" {stats['size']} classmates are activated ({stats['pct']}%),"
+            f" from Google’s certified reporting. {milestone_line(state)}")

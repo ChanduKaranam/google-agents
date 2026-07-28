@@ -686,6 +686,35 @@ def test_the_welcome_card_is_drawn_once_per_conversation():
     again.state = first.state              # same conversation
     assert render_surface(again) is None
 
+
+def test_the_opening_greeting_matches_the_prototype():
+    """Sethu's greet() runs on mount; GE gives an agent no "conversation
+    opened" event, so this rides on her first turn instead."""
+    from ambassador_agent.data import greeting_line
+
+    assert greeting_line({}) == (
+        "Hi Sneha — I look after EEE Sem 3, Sec B with you.\n\n"
+        "Right now 43 of your 59 classmates are activated (72.9%), from"
+        " Google’s certified reporting. 2 more activations clear your 75%"
+        " milestone.")
+    # and it tracks the live numbers, not a frozen string
+    assert "59 of your 59" in greeting_line({"phase": "complete"})
+    assert "nothing left to unlock" in greeting_line({"phase": "complete"})
+
+
+def test_the_agent_card_offers_starter_examples():
+    """GE may surface a skill's `examples` as clickable prompts. Costs nothing
+    if it does not, and an empty skills list guarantees it cannot."""
+    import json
+    import pathlib
+
+    card = json.loads(
+        (pathlib.Path(__file__).parent / "ambassador_agent"
+         / "agent_card.json").read_text())
+    examples = card["skills"][0]["examples"]
+    assert "Who should I message?" in examples
+    assert "What unlocks next?" in examples
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
