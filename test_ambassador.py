@@ -376,6 +376,21 @@ def test_sent_form_locks_and_relabels():
     assert "Sent to Priya ✓" in strings
 
 
+
+def test_edit_form_keeps_an_in_flight_edit():
+    """Her own words win over the angle's template.
+
+    Task 8 writes `state["drafts"][id]` when she edits, then re-renders on the
+    next action. If the form re-seeded from the template it would silently
+    discard what she typed.
+    """
+    from ambassador_agent.surfaces import edit_form
+
+    typed = "Priya please just open it, it takes two minutes 🙏"
+    messages = edit_form({"drafts": {"pn": typed}}, "pn")
+    seeded = [m for m in messages if "dataModelUpdate" in m][0]
+    assert seeded["dataModelUpdate"]["contents"]["draft"]["text"] == typed
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
