@@ -596,6 +596,42 @@ def test_build_a2ui_messages_accepts_adk_state_not_just_dict():
     assert build_a2ui_messages(None) == []
 
 
+def test_component_ids_are_namespaced_and_unique():
+    """Ids must not collide with reserved words or across surfaces.
+
+    Gemini Enterprise refused to draw a card with a component id of `body`
+    ("This content could not be displayed. se`body`", observed 2026-07-28).
+    `body` is also a valid Text usageHint value, and the official v0.8 fixture
+    names that node `main-column`, never `body`. Several surfaces can render in
+    one turn, so a bare `root` in each would collide too.
+    """
+    from Job_Helper_agent.a2ui import build_a2ui_messages
+
+    state = {
+        "applications": [{"company": "Zoho", "role": "Intern", "status": "Applied", "notes": ""}],
+        "companies_data": {"companies": [{"name": "CRED", "why_it_fits": "python", "fit": "Strong"}]},
+        "alumni_data": {"alumni": [], "search_links": {"people_search": "https://x/y"}},
+    }
+    msgs = build_a2ui_messages(state)
+    surfaces = [m["surfaceUpdate"] for m in msgs if "surfaceUpdate" in m]
+    assert len(surfaces) >= 3, "expected several surfaces in one turn"
+
+    seen = set()
+    reserved = {"body", "root", "head", "html", "title", "main"}
+    for surface in surfaces:
+        for component in surface["components"]:
+            cid = component["id"]
+            assert cid not in reserved, f"{cid!r} is a reserved/colliding id"
+            assert cid not in seen, f"duplicate component id {cid!r} across surfaces"
+            seen.add(cid)
+
+    # Every beginRendering root must name a component that exists.
+    roots = [m["beginRendering"]["root"] for m in msgs if "beginRendering" in m]
+    assert len(roots) == len(surfaces)
+    for root in roots:
+        assert root in seen, f"beginRendering names missing component {root!r}"
+
+
 def test_pipeline_board_renders_only_real_applications():
     import json
 

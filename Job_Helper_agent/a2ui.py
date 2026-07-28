@@ -38,8 +38,6 @@ _ADK_DATAPART_MIME = "text/plain"
 _ADK_START_TAG = b"<a2a_datapart_json>"
 _ADK_END_TAG = b"</a2a_datapart_json>"
 
-_PIPELINE_SURFACE = "job-helper-pipeline"
-
 # Ordered worst-to-best so the board reads as progress. Mirrors STATUSES in
 # tools.py; anything not listed sorts last rather than being dropped, because
 # silently hiding a student's application is worse than an odd sort order.
@@ -85,6 +83,26 @@ def _status_rank(status: str) -> int:
         return len(_STATUS_ORDER)
 
 
+def _card_surface(prefix: str, components: list[dict], children: list[str]) -> list[dict]:
+    """Wrap components in a Card and emit the two messages that draw it.
+
+    Every id is namespaced by `prefix`. Two reasons, both learned from a live
+    Gemini Enterprise refusal ("This content could not be displayed. se`body`",
+    2026-07-28): a node named `body` collides with something in the renderer --
+    `body` is also a valid Text usageHint, and the official v0.8 fixture calls
+    this node `main-column`, never `body` -- and several surfaces can render in
+    one turn, so a bare `root` in each would collide with the others.
+    """
+    column_id = f"{prefix}-main-column"
+    root_id = f"{prefix}-card"
+    components.append(_column(column_id, children))
+    components.append({"id": root_id, "component": {"Card": {"child": column_id}}})
+    return [
+        {"surfaceUpdate": {"surfaceId": f"job-helper-{prefix}", "components": components}},
+        {"beginRendering": {"surfaceId": f"job-helper-{prefix}", "root": root_id}},
+    ]
+
+
 def pipeline_board(applications: list[dict]) -> list[dict] | None:
     """Build the tracked-application board, or None if there is nothing real.
 
@@ -95,13 +113,13 @@ def pipeline_board(applications: list[dict]) -> list[dict] | None:
         return None
 
     components: list[dict] = []
-    body: list[str] = ["title", "subtitle"]
+    body: list[str] = ["pl-title", "pl-subtitle"]
 
-    components.append(_text("title", "Your application pipeline", "h2"))
+    components.append(_text("pl-title", "Your application pipeline", "h2"))
     count = len(applications)
     components.append(
         _text(
-            "subtitle",
+            "pl-subtitle",
             f"{count} application{'' if count == 1 else 's'} tracked",
             "caption",
         )
@@ -119,7 +137,7 @@ def pipeline_board(applications: list[dict]) -> list[dict] | None:
             # No company means no row. There is nothing truthful to draw.
             continue
 
-        prefix = f"app{index}"
+        prefix = f"pl-app{index}"
         heading = company if not role else f"{company} — {role}"
         children = [f"{prefix}-heading", f"{prefix}-status"]
         components.append(_text(f"{prefix}-heading", heading, "h3"))
@@ -139,31 +157,7 @@ def pipeline_board(applications: list[dict]) -> list[dict] | None:
     if len(body) <= 2:  # title + subtitle only: every row was unrenderable
         return None
 
-    components.append(_column("body", body))
-    components.append({"id": "root", "component": {"Card": {"child": "body"}}})
-
-    return [
-        {
-            "surfaceUpdate": {
-                "surfaceId": _PIPELINE_SURFACE,
-                "components": components,
-            }
-        },
-        {"beginRendering": {"surfaceId": _PIPELINE_SURFACE, "root": "root"}},
-    ]
-
-
-def _surface(surface_id: str, components: list[dict]) -> list[dict]:
-    return [
-        {"surfaceUpdate": {"surfaceId": surface_id, "components": components}},
-        {"beginRendering": {"surfaceId": surface_id, "root": "root"}},
-    ]
-
-
-def _card(components: list[dict], body: list[str]) -> list[dict]:
-    components.append(_column("body", body))
-    components.append({"id": "root", "component": {"Card": {"child": "body"}}})
-    return components
+    return _card_surface("pipeline", components, body)
 
 
 def company_shortlist(companies_data: dict) -> list[dict] | None:
@@ -172,8 +166,8 @@ def company_shortlist(companies_data: dict) -> list[dict] | None:
     if not companies:
         return None
 
-    components: list[dict] = [_text("title", "Companies worth your time", "h2")]
-    body = ["title"]
+    components: list[dict] = [_text("co-title", "Companies worth your time", "h2")]
+    body = ["co-title"]
 
     for index, company in enumerate(companies):
         name = str(company.get("name") or "").strip()
@@ -224,10 +218,10 @@ def company_shortlist(companies_data: dict) -> list[dict] | None:
 
     note = str((companies_data or {}).get("note") or "").strip()
     if note:
-        components.append(_text("note", note, "caption"))
-        body.append("note")
+        components.append(_text("co-note", note, "caption"))
+        body.append("co-note")
 
-    return _surface("job-helper-companies", _card(components, body))
+    return _card_surface("companies", components, body)
 
 
 def alumni_cards(alumni_data: dict) -> list[dict] | None:
@@ -246,8 +240,8 @@ def alumni_cards(alumni_data: dict) -> list[dict] | None:
     body: list[str] = []
 
     if alumni:
-        components.append(_text("title", "People who could refer you", "h2"))
-        body.append("title")
+        components.append(_text("al-title", "People who could refer you", "h2"))
+        body.append("al-title")
         for index, person in enumerate(alumni):
             name = str(person.get("name") or "").strip()
             url = str(person.get("profile_url") or "").strip()
@@ -281,28 +275,28 @@ def alumni_cards(alumni_data: dict) -> list[dict] | None:
             if alumni
             else "No verifiable contacts found — search LinkedIn yourself"
         )
-        components.append(_text("links-title", heading, "h3"))
+        components.append(_text("al-links-title", heading, "h3"))
         components.append(
             _text(
-                "links-help",
+                "al-links-help",
                 "Open these while signed in to LinkedIn. The school page search"
                 " then its People tab and 'Where they work' filter gives the"
                 " fullest list.",
                 "caption",
             )
         )
-        body += ["links-title", "links-help"]
+        body += ["al-links-title", "al-links-help"]
         if people:
-            components.append(_text("links-people", people, "caption"))
-            body.append("links-people")
+            components.append(_text("al-links-people", people, "caption"))
+            body.append("al-links-people")
         if school:
-            components.append(_text("links-school", school, "caption"))
-            body.append("links-school")
+            components.append(_text("al-links-school", school, "caption"))
+            body.append("al-links-school")
 
     if not body:
         return None
 
-    return _surface("job-helper-alumni", _card(components, body))
+    return _card_surface("alumni", components, body)
 
 
 def upload_prompt(state: dict) -> list[dict] | None:
@@ -320,16 +314,16 @@ def upload_prompt(state: dict) -> list[dict] | None:
         return None
 
     components = [
-        _text("title", "Start with your resume", "h2"),
+        _text("up-title", "Start with your resume", "h2"),
         _text(
-            "help",
+            "up-help",
             "Attach your resume (PDF or DOCX) using the attachment button, or"
             " paste its text here. Everything else — matching companies,"
             " finding alumni, tracking applications — runs off it.",
             "body",
         ),
     ]
-    return _surface("job-helper-upload", _card(components, ["title", "help"]))
+    return _card_surface("upload", components, ["up-title", "up-help"])
 
 
 def build_a2ui_messages(state: dict) -> list[dict]:
