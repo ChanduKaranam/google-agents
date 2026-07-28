@@ -49,6 +49,20 @@ def _incoming_text(callback_context: CallbackContext) -> str:
     return raw
 
 
+def _with_chips(messages: list[dict], labels: list[str]) -> list[dict]:
+    """Attach follow-up chips only to a turn that actually drew a card.
+
+    Chips are a way onward FROM a surface. In the prototype they live in the
+    chat chrome and there is exactly one row; here every turn's row persists in
+    the transcript, so appending them to plain sentences too -- a send
+    confirmation, "nobody left to chase" -- stacks a wall of identical buttons
+    down the conversation. Reported from the live demo.
+    """
+    if not messages:
+        return messages
+    return messages + chips_surface(labels)
+
+
 def handle_click(callback_context: CallbackContext) -> types.Content | None:
     """Short-circuit a button press: the router already knows the answer.
 
@@ -73,10 +87,10 @@ def handle_click(callback_context: CallbackContext) -> types.Content | None:
             if intent == "unknown":
                 return None       # off-script: let the model answer freely
             reply, messages = route_question(state, incoming)
-            messages = messages + chips_surface(chips_for(intent))
+            messages = _with_chips(messages, chips_for(intent))
         else:
             reply, messages = route(state, action)
-            messages = messages + chips_surface(chips_for_action(action))
+            messages = _with_chips(messages, chips_for_action(action))
         parts = []
         if reply:
             parts.append(types.Part(text=reply))
@@ -88,25 +102,27 @@ def handle_click(callback_context: CallbackContext) -> types.Content | None:
 
 
 def render_surface(callback_context: CallbackContext) -> types.Content | None:
-    """Draw a surface alongside the model's own reply, for typed turns.
+    """Welcome her once, then get out of the way.
 
-    Returning Content from an after-agent callback ADDS an event, so the
-    model's text answer survives next to the widget — the model already
-    answers the question per INSTRUCTION, so this only supplies the card and
-    the chips, matching what a routed click would have drawn for the same
-    question. A renderer bug must never cost the user their answer, so the
-    whole thing is guarded.
+    Only off-script turns reach here — `handle_click` (before-agent) already
+    answered anything that matched an intent or carried a click, and
+    short-circuited the run before the model.
 
-    A click never reaches here: `handle_click` (before-agent) already returned
-    Content and short-circuited the run before the model — and this text is
-    plain, since `parse_user_action` only recognises a tagged click payload.
+    The welcome card is drawn on the FIRST such turn only. Repeating it after
+    every off-script reply stacked an identical row of buttons down the
+    transcript, which is what the chips looked like in the live demo: the
+    prototype has one chip row in its chrome, not one per message.
+
+    A renderer bug must never cost the user their answer, so this is guarded.
     """
     try:
         question = _incoming_text(callback_context)
         if intent_for(question) != "unknown":
             return None      # handle_click already answered this turn in full
-        # Off-script question. The model answered it in its own words; add the
-        # chips so she is never left in a turn with no way forward.
+        state = callback_context.state
+        if state.get("greeted"):
+            return None      # she has seen the options; the model's words stand
+        state["greeted"] = True
         messages = build_greeting(
             "Ask me anything about your section, or pick a suggestion"
             " below.", DEFAULT_CHIPS,

@@ -654,6 +654,38 @@ def test_send_confirmation_carries_a_tappable_whatsapp_link():
     assert "sethu.app/go/pn8x2" in reply          # credit still rides along
     assert "Circuits%20agent" in reply            # message really is pre-filled
 
+
+def test_chips_only_follow_a_card_never_a_bare_sentence():
+    """Reported from the live demo: chips under every message.
+
+    In the prototype there is ONE chip row, in the chat chrome. Here every
+    turn's row persists in the transcript, so appending them to plain
+    sentences too -- a send confirmation, "nobody left to chase" -- stacks a
+    wall of identical buttons down the conversation.
+    """
+    from ambassador_agent.actions import chips_for_action, route
+    from ambassador_agent.agent import _with_chips
+
+    text_only = {"name": "send_whatsapp", "context": {"student_id": "pn"}}
+    reply, messages = route({}, text_only)
+    assert reply and not messages
+    assert _with_chips(messages, chips_for_action(text_only)) == []
+
+    with_card = {"name": "show_stragglers", "context": {}}
+    _reply, messages = route({}, with_card)
+    assert messages
+    assert len(_with_chips(messages, chips_for_action(with_card))) > len(messages)
+
+
+def test_the_welcome_card_is_drawn_once_per_conversation():
+    from ambassador_agent.agent import render_surface
+
+    first = _ctx("hi")
+    assert render_surface(first) is not None
+    again = _ctx("hello again")
+    again.state = first.state              # same conversation
+    assert render_surface(again) is None
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
