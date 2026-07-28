@@ -1,0 +1,15 @@
+# Keep the Cloud Run build context small. Everything the A2A app imports lives
+# under placement_agent/; nothing else needs to ship.
+.git/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.claude/
+docs/
+*.md
+!requirements.txt
+Job_Helper_agent/
+doubt_solver/
+test_agent.py
+diagnose_error.py

@@ -1,0 +1,4 @@
+# Cloud Run buildpack entry point for placement_agent/a2a_app.py.
+# The real list lives with the agent; this file only exists because Google
+# Cloud buildpacks look for requirements.txt at the source root.
+-r placement_agent/requirements.txt
