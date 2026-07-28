@@ -66,3 +66,44 @@ def cohort_summary(state) -> list[dict]:
     components.append(column(f"{prefix}-main-column", child_ids))
     components.append(card(f"{prefix}-card", f"{prefix}-main-column"))
     return surface(prefix, components, f"{prefix}-card")
+
+
+def straggler_list(state) -> list[dict]:
+    prefix = "strag"
+    students = data.get_stragglers(state)["data"]
+    components: list[dict] = []
+    child_ids: list[str] = []
+
+    for entry in students:
+        sid = entry["studentId"]
+        base = f"{prefix}-{sid}"
+        draft = data.draft_for(sid)
+        components.extend([
+            text(f"{base}-name", entry["name"], "h5"),
+            text(f"{base}-meta", entry["context"], "caption"),
+            text(f"{base}-msg", draft),
+            text(f"{base}-link", entry["waLink"], "caption"),
+            text(f"{base}-send-label", "Send from my WhatsApp"),
+            button(f"{base}-send", f"{base}-send-label", "send_whatsapp",
+                   {"student_id": sid}),
+            text(f"{base}-edit-label", "Edit"),
+            button(f"{base}-edit", f"{base}-edit-label", "open_edit",
+                   {"student_id": sid}),
+            row(f"{base}-actions", [f"{base}-send", f"{base}-edit"]),
+            column(f"{base}-column", [
+                f"{base}-name", f"{base}-meta", f"{base}-msg",
+                f"{base}-link", f"{base}-actions",
+            ]),
+            card(f"{base}-card", f"{base}-column"),
+        ])
+        child_ids.append(f"{base}-card")
+
+    components.append(text(
+        f"{prefix}-foot",
+        "You send from your own WhatsApp — I never send as you."
+        " Your link carries your credit.",
+        "caption"))
+    child_ids.append(f"{prefix}-foot")
+
+    components.append(column(f"{prefix}-main-column", child_ids))
+    return surface(prefix, components, f"{prefix}-main-column")

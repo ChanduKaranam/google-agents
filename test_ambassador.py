@@ -176,6 +176,40 @@ def test_cohort_card_with_no_pending_shows_roster_cta():
     assert "show_stragglers" not in names
 
 
+def test_straggler_list_draws_one_card_per_pending_student():
+    from ambassador_agent.surfaces import straggler_list
+    messages = straggler_list({})
+    names = _action_names(messages)
+    assert names.count("send_whatsapp") == 6
+    assert names.count("open_edit") == 6
+    strings = _literals(messages)
+    assert "Priya Nandakumar" in strings
+    assert "ignored 2 campaigns · 11 days" in strings
+    assert any("sethu.app/go/pn8x2" in s for s in strings)
+
+def test_send_buttons_carry_the_student_id():
+    from ambassador_agent.surfaces import straggler_list
+    sends = [c["component"]["Button"]["action"]
+             for c in _components(straggler_list({}))
+             if "Button" in c["component"]
+             and c["component"]["Button"]["action"]["name"] == "send_whatsapp"]
+    ids = [ctx["value"]["literalString"]
+           for a in sends for ctx in a["context"] if ctx["key"] == "student_id"]
+    assert ids == ["pn", "sk", "ar", "vm", "dg", "rt"]
+
+def test_sent_students_leave_the_list():
+    from ambassador_agent.data import mark_sent
+    from ambassador_agent.surfaces import straggler_list
+    state = {}
+    mark_sent(state, "pn")
+    assert "Priya Nandakumar" not in _literals(straggler_list(state))
+
+def test_ids_stay_unique_across_six_student_cards():
+    from ambassador_agent.surfaces import straggler_list
+    ids = [c["id"] for c in _components(straggler_list({}))]
+    assert len(ids) == len(set(ids))
+
+
 # ---------------------------------------------------------------------------
 # Structural invariants, applied to EVERY surface automatically.
 #
