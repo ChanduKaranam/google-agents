@@ -90,7 +90,7 @@ def get_leaderboard(state) -> dict:
     mine = {"name": "You", "cohortSection": fixtures.AMBASSADOR["section"],
             "pct": _pct(activated), "activated": activated,
             "size": fixtures.SECTION_SIZE}
-    rows = sorted([*fixtures.PEERS, mine], key=lambda r: -r["pct"])
+    rows = sorted([{**p} for p in fixtures.PEERS] + [mine], key=lambda r: -r["pct"])
     # Live, she sits at #19 of 178; once she climbs, the visible slot is her
     # sorted position. The prototype shows the same four rows either way.
     slots = [1, 2, 3, 19] if _phase(state) == "live" else [1, 2, 3, 4]
@@ -122,6 +122,8 @@ def milestone_line(state) -> str:
         return (f"Your 75% milestone is earned. {remaining} more makes Full"
                 " House, the 100% badge.")
     need = _needed_for_75(state)
+    # need == 1 is unreachable with today's fixed three phases (always 2 at
+    # "live"); kept for when PHASES is driven by real activation counts.
     verb = "activation clears" if need == 1 else "activations clear"
     return f"{need} more {verb} your 75% milestone."
 

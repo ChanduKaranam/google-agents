@@ -111,6 +111,29 @@ def test_leaderboard_shows_percent_and_count_together():
     assert me["pct"] == 72.9 and me["activated"] == 43 and me["size"] == 59
     assert [r["rank"] for r in board["data"]] == [1, 2, 3, 19]
 
+def test_get_leaderboard_does_not_mutate_fixtures():
+    from ambassador_agent import fixtures
+    from ambassador_agent.data import get_leaderboard
+    get_leaderboard({})
+    assert all("rank" not in p for p in fixtures.PEERS)
+
+def test_leaderboard_at_complete_puts_sneha_first():
+    from ambassador_agent.data import get_leaderboard
+    board = get_leaderboard({"phase": "complete"})
+    assert board["myRank"] == 1
+    me = [r for r in board["data"] if r["name"] == "You"][0]
+    assert me["rank"] == 1 and me["pct"] == 100.0
+    assert [r["rank"] for r in board["data"]] == [1, 2, 3, 4]
+
+def test_mark_sent_is_idempotent():
+    from ambassador_agent.data import get_stragglers, mark_sent
+    state = {}
+    mark_sent(state, "pn")
+    mark_sent(state, "pn")
+    assert state["sent"] == ["pn"]
+    ids = [s["studentId"] for s in get_stragglers(state)["data"]]
+    assert "pn" not in ids and len(ids) == 5
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
