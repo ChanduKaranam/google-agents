@@ -230,6 +230,17 @@ def test_a2a_extra_is_installed():
     import google.adk.a2a.utils.agent_to_a2a  # noqa: F401
 
 
+def test_a2a_http_server_deps_are_installed():
+    # Importing A2AStarletteApplication is NOT enough to prove the server can
+    # run: `google-adk[a2a]` pulls a2a-sdk without its http-server extra, and
+    # the missing sse-starlette only surfaces when the class is CONSTRUCTED,
+    # inside to_a2a's lifespan startup. The class import passed, the suite was
+    # green, and Cloud Run still died with "failed to start and listen on port
+    # 8080". Assert the dependency itself.
+    import sse_starlette  # noqa: F401
+    import starlette  # noqa: F401
+
+
 def test_agent_card_is_schema_valid_and_names_an_endpoint():
     from a2a.types import AgentCard
 

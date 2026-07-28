@@ -1,3 +1,8 @@
 google-adk[a2a]==2.4.0
+# google-adk[a2a] pulls a2a-sdk but NOT its http-server extra, so sse-starlette
+# is absent and A2AStarletteApplication raises at construction -- at lifespan
+# startup, not at import. The container dies with "failed to start and listen on
+# port 8080" while every import test passes. Cost a Cloud Run revision to find.
+a2a-sdk[http-server]
 google-cloud-aiplatform
 uvicorn
