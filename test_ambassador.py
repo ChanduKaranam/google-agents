@@ -410,7 +410,11 @@ def test_rewards_lists_four_tiers_with_status():
     assert "75% Club — tee + certificate" in strings
     assert "Full House — the 100% badge" in strings
     assert any("2 more" in s for s in strings)  # renders as "at 75% — 2 more"
-    assert strings.count("earned") == 2
+    # Count the rows whose status is earned, not bare occurrences of the word
+    # -- an exact-count assertion pushed an earlier build to drop "at 25%"
+    # from those rows entirely just to make the number come out right.
+    assert len([s for s in strings if s.endswith("— earned")]) == 2
+    assert "at 25% — earned" in strings and "at 50% — earned" in strings
 
 def test_roster_shows_six_of_fiftynine():
     from ambassador_agent.surfaces import roster

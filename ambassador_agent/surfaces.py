@@ -139,7 +139,8 @@ def leaderboard(state) -> list[dict]:
         child_ids.append(card_id)
 
     components.append(text(f"{prefix}-basis",
-                           "Ranked on % of section activated · under-30 pooled"
+                           "Ranked on % of section activated"
+                           " · under-30 sections pooled"
                            " · verified activations only", "caption"))
     components.append(text(f"{prefix}-foot", fixtures_board_footnote(),
                            "caption"))
@@ -152,11 +153,10 @@ def rewards(state) -> list[dict]:
     prefix = "rew"
     components, child_ids = [], []
     for index, tier in enumerate(data.get_rewards(state)):
-        # Earned tiers read just "earned" -- no "at X%" clutter for something
-        # already banked. Tiers still ahead keep the "at X% -- N more" form so
-        # the distance to unlock stays visible.
-        status = tier["status"]
-        detail = status if status == "earned" else f"at {tier['at']} — {status}"
+        # Every tier states its threshold. "Starter" and "Half-way" do not
+        # carry a percentage in their names, so dropping "at 25%" from earned
+        # rows loses the column the prototype's table showed for all four.
+        detail = f"at {tier['at']} — {tier['status']}"
         made, card_id = _entry_card(prefix, f"t{index}", [
             ("head", tier["reward"]),
             ("detail", detail),

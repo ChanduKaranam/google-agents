@@ -1413,7 +1413,8 @@ def leaderboard(state) -> list[dict]:
         child_ids.append(card_id)
 
     components.append(text(f"{prefix}-basis",
-                           "Ranked on % of section activated · under-30 pooled"
+                           "Ranked on % of section activated"
+                           " · under-30 sections pooled"
                            " · verified activations only", "caption"))
     components.append(text(f"{prefix}-foot", fixtures_board_footnote(),
                            "caption"))
