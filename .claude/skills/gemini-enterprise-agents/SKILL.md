@@ -1,6 +1,6 @@
 ---
 name: gemini-enterprise-agents
-description: Use when working with Vertex AI or Vertex AI Studio or Agentspace (all renamed), Gemini Enterprise, Gemini Enterprise Agent Platform, Agent Platform, Agent Designer, Agent Studio, Agent Engine/Agent Runtime, ADK (google-adk), adk deploy, reasoningEngines, Discovery Engine, A2A, agent-starter-pack, Memory Bank, or deploying and registering custom agents on Google Cloud
+description: Use when working with Vertex AI or Vertex AI Studio or Agentspace (all renamed), Gemini Enterprise, Gemini Enterprise Agent Platform, Agent Platform, Agent Designer, Agent Studio, Agent Engine/Agent Runtime, ADK (google-adk), adk deploy, reasoningEngines, Discovery Engine, A2A, A2UI (agent-drawn UI in the chat surface), agent-starter-pack, Memory Bank, or deploying and registering custom agents on Google Cloud
 ---
 
 # Gemini Enterprise & Agent Platform
@@ -222,6 +222,53 @@ file a tool writes vanishes between runs, silently, and the agent repeats its wo
 forever. For "what have I already processed," use GCS or Firestore explicitly, and grant
 the runtime's service account access to it.
 
+## A2UI — agent-drawn widgets in the GE chat surface
+
+Full detail — wire format, both build paths, the runtime blockers:
+**read `references/a2ui.md`.**
+
+The two facts that change your plan before you write anything:
+
+**1. A2UI renders only for agents registered via `a2aAgentDefinition`.** An agent
+deployed to Agent Runtime and registered via `adkAgentDefinition` will not render
+it. So "add A2UI to our deployed agent" is a runtime migration to a self-hosted
+A2A endpoint, not a UI task — and it inherits everything the managed runtime did
+for you: `to_a2a()` silently swaps persistent sessions and Memory Bank for
+in-memory stand-ins, and the end user's identity for a per-conversation
+`A2A_USER_*` sentinel.
+
+**2. Gemini Enterprise supports v0.8 only**, and identifies the payload by
+`mimeType: application/json+a2ui` on the DataPart metadata. The newer
+`application/a2ui+json` spelling is v0.9+ and will not render there.
+
+Two ways to build, and they are genuinely different architectures:
+
+| | Path A: convert a deployed ADK agent | Path B: A2UI agent from scratch |
+|---|---|---|
+| Who composes the UI | your code, from session state | the model, from a generated system prompt |
+| Serving | `to_a2a()` + an `after_agent_callback` emitting DataParts | custom `AgentExecutor`, per Google's own sample |
+| Needs | nothing beyond ADK | `pip install a2ui-agent-sdk` |
+| Can invent facts | no — a value not in state cannot be drawn | yes — every widget is model output |
+| Use when | the data is already structured | the UI must adapt to open-ended requests |
+
+Google's reference implementation for Path B is
+`samples/community/agent/adk/gemini_enterprise/v0_8/` in `github.com/google/a2ui`
+(`agent_engine/` and `cloud_run/` variants). Read it before writing an executor.
+
+Get the wire format from the v0.8 renderer fixtures, not from memory:
+
+```bash
+gh api repos/google/a2ui/contents/renderers/angular/src/v0_8/test_data/mocks/contact-card.json \
+  --jq '.content' | base64 -d
+```
+
+⚠️ **`output_schema` and `google_search` cannot coexist.** Gemini returns
+`400 INVALID_ARGUMENT: controlled generation is not supported with Search tool`,
+whatever ADK's `output_schema` docstring says about schema and tools composing.
+To get structured data out of a search agent, split it: search agent (built-in,
+prose) → structuring agent (no tools, `output_schema`), wrapped in a
+`SequentialAgent`. This also keeps the one-built-in-per-agent rule intact.
+
 ## Runtime behaviour — measured end-to-end (2026-07-22)
 
 Everything in this section was **observed against a live deployed ADK agent registered
@@ -442,6 +489,12 @@ not the structured row your tool stored — reconcile, don't assume round-trippi
 | Mistake | Reality |
 |---|---|
 | "GE file upload doesn't reach custom agents" | It does — as an artifact plus empty text markers. Needs `LoadArtifactsTool`. |
+| Adding A2UI to an agent registered via `adkAgentDefinition` | It will never render. A2UI needs the `a2aAgentDefinition` path — that is a runtime migration, not a UI change. |
+| `output_schema` on an agent holding `google_search` | Gemini 400s: controlled generation is unsupported with the Search tool. Split search and structuring into two agents. |
+| Emitting `application/a2ui+json` for Gemini Enterprise | That is the v0.9+ spelling. GE is v0.8 and wants `application/json+a2ui`. |
+| Handing `to_a2a` an agent card file path | It uses the card verbatim; `host`/`port`/`protocol` are then dead, and the card advertises whatever `url` is on disk. Build the card in code. |
+| Trusting `google-adk[a2a]` to install the A2A server | It omits `a2a-sdk[http-server]`; `sse-starlette` is missing and the failure surfaces only at container start. |
+| `dict(callback_context.state)` | Raises `KeyError: 0` — `State` has no `keys()`. Use `.get()`. |
 | Giving a sub-agent a tool that calls `search_memory` | `AgentTool` hands it an empty `InMemoryMemoryService`. Silently returns nothing. Only the root sees memory. |
 | Assuming `--memory_service_uri` makes memories appear | It only wires the service. Something must call `add_session_to_memory` — use an after-agent callback. |
 | "The agent returned nothing, so it's broken" | Could be an empty final text, or a server crash. Read session events / Cloud Logging. |
@@ -476,6 +529,8 @@ not the structured row your tool stored — reconcile, don't assume round-trippi
 - About to claim a CLI exists without finding its install docs
 - Quoting a devsite table you only saw through a summarizer
 - Confidence high, string must be exact
+- About to write an A2UI component tree from memory instead of reading the v0.8 fixtures
+- About to claim a widget "renders in GE" when you have only seen the payload on the wire
 
 ## Staleness
 
@@ -494,6 +549,10 @@ docs move. Re-verify it only if `google-adk` majors or the GE chat surface chang
 | CLI flags, precedence, folder layout | **executed `--help` + read `cli_deploy.py` source** | `adk deploy agent_engine --help` |
 | Registration REST payload | doc page, `v1alpha` | fetch the page; expect churn |
 | Agent Designer nesting limit | **observed builder refusal, NOT DOCUMENTED** | re-test in the UI |
+| A2UI: registration path, v0.8-only, mime | GE docs + `a2ui/a2a/parts.py` source, 2026-07-28 | refetch the a2ui-agents doc pages |
+| A2UI: wire format and catalog | v0.8 renderer fixtures in `google/a2ui` | `gh api` the mocks directory |
+| A2UI: DataPart emission, `output_schema`+Search 400, missing `sse-starlette` | **live Cloud Run service + live Gemini API errors, 2026-07-28** | redeploy and POST `message/send` |
+| **A2UI actually painting in the GE app** | **NOT VERIFIED — payload only** | open the GE web app and look |
 
 ⚠️ The CLI table is the least independently checkable section here: it requires
 `google-adk` installed, has **no doc page as a second source** (the page that should
