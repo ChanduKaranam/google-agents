@@ -76,9 +76,18 @@ def build_request_converter():
         # root level stays at WARNING and an info() call is silently dropped --
         # which is exactly what happened on the first real Gemini Enterprise
         # call, costing a deploy cycle. Drop this line once the header is known.
+        # Also log where else an identity could be hiding, so one real call
+        # answers the question even if GE sends no identity header at all.
+        # Keys and shapes only -- never values.
+        message = getattr(request, "message", None)
         logger.warning(
-            "a2a request headers=%s identity_found=%s",
+            "a2a request headers=%s state_keys=%s msg_meta_keys=%s"
+            " ctx_user=%r resolved_user_id=%r identity_found=%s",
             sorted(str(name).lower() for name in (headers or {})),
+            sorted(str(k) for k in (getattr(call_context, "state", None) or {})),
+            sorted(str(k) for k in (getattr(message, "metadata", None) or {})),
+            getattr(getattr(call_context, "user", None), "user_name", None),
+            run_request.user_id,
             bool(user_id),
         )
         # Only override on a real find. No match means the A2A_USER_* sentinel
