@@ -17,6 +17,7 @@ from google.genai import types
 
 from Job_Helper_agent.agent import SPECIALISTS, root_agent
 from Job_Helper_agent.tools import list_applications, track_application
+from placement_agent import a2a_app
 from placement_agent.a2ui import A2UI_CLOSE, A2UI_OPEN
 from placement_agent.a2ui.probe import show_a2ui_probe_card
 from placement_agent.agent import root_agent as placement_root_agent
@@ -574,6 +575,53 @@ def test_placement_root_is_told_to_emit_the_a2ui_block_verbatim():
     instruction = placement_root_agent.instruction
     assert "a2ui_block" in instruction
     assert "verbatim" in instruction.lower()
+
+
+# ---------------------------------------------------------------------------
+# A2A transport -- the wrapper Gemini Enterprise needs to see A2UI at all
+#
+# GE renders A2UI only for agents registered as A2A agents. `to_a2a()` wraps
+# the existing root_agent without touching it, but its convenience defaults are
+# wrong for production in two ways that fail silently, so both are pinned here.
+# ---------------------------------------------------------------------------
+
+
+def test_a2a_app_wraps_the_same_root_agent_that_is_deployed_today():
+    """A second agent definition would drift from the one in production."""
+    assert a2a_app.AGENT is placement_root_agent
+
+
+def test_a2a_runner_keeps_session_state_off_the_container():
+    """`to_a2a`'s default runner uses InMemorySessionService, which would put
+    interview progress back in per-container memory -- undoing M0 without a
+    single test failing anywhere else."""
+    runner = a2a_app.build_runner(
+        project="supadha-dev", location="us-central1", agent_engine_id="123",
+        artifact_bucket="some-bucket",
+    )
+    assert type(runner.session_service).__name__ == "VertexAiSessionService"
+    assert type(runner.artifact_service).__name__ == "GcsArtifactService"
+
+
+def test_a2a_runner_falls_back_to_in_memory_when_unconfigured():
+    """`adk web` and tests must still work with no cloud config present."""
+    runner = a2a_app.build_runner(project="", location="", agent_engine_id="")
+    assert type(runner.session_service).__name__ == "InMemorySessionService"
+
+
+def test_a2a_card_url_carries_no_port_on_https():
+    """to_a2a builds `{protocol}://{host}:{port}/` unconditionally; an
+    advertised `:443` is a needless mismatch risk at registration time."""
+    url = a2a_app.rpc_url("https://placement-abc.a.run.app")
+    assert url == "https://placement-abc.a.run.app/a2a", url
+    assert ":443" not in url
+
+
+def test_a2a_card_advertises_streaming():
+    """Without streaming the client waits for the whole turn before showing
+    anything -- and A2UI surfaces arrive mid-turn."""
+    card = asyncio.run(a2a_app.build_agent_card("https://placement-abc.a.run.app"))
+    assert a2a_app.card_streaming_enabled(card) is True
 
 
 if __name__ == "__main__":
