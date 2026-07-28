@@ -17,7 +17,14 @@ METER_WIDTH = 20
 
 
 def meter(pct: float) -> str:
-    filled = round(pct / 100 * METER_WIDTH)
+    """Draw activation as text. A2UI v0.8 has no ProgressBar.
+
+    Clamped because an out-of-range percentage silently produces a meter of the
+    wrong LENGTH rather than an error: `"█" * -1` is empty, while the remainder
+    term grows past METER_WIDTH. Unreachable from `data.py` today, but this
+    helper is the kind of thing a later caller passes a raw number to.
+    """
+    filled = round(max(0.0, min(100.0, pct)) / 100 * METER_WIDTH)
     return "█" * filled + "░" * (METER_WIDTH - filled)
 
 

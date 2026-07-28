@@ -175,6 +175,109 @@ def test_cohort_card_with_no_pending_shows_roster_cta():
     assert "show_roster" in names
     assert "show_stragglers" not in names
 
+
+# ---------------------------------------------------------------------------
+# Structural invariants, applied to EVERY surface automatically.
+#
+# These are the rules whose violation fails silently in Gemini Enterprise: a
+# reserved or duplicate id, an illegal usageHint, or a dangling child reference
+# produces a red "This content could not be displayed" box and nothing in the
+# server logs. Auto-discovering the builders means a surface added later is
+# covered the day it lands, instead of relying on whoever writes it to
+# reproduce these checks.
+# ---------------------------------------------------------------------------
+
+_RESERVED = {"body", "root", "title", "head", "html", "main"}
+_USAGE_HINTS = {"h1", "h2", "h3", "h4", "h5", "caption", "body"}
+
+# Surfaces needing more than `state`. Extend as builders are added.
+_EXTRA_ARGS = {"edit_form": ("pn",)}
+
+
+def _all_surface_cases():
+    """Every public builder in surfaces.py, paired with each demo phase."""
+    import inspect
+
+    from ambassador_agent import surfaces
+
+    cases = []
+    for name, fn in inspect.getmembers(surfaces, inspect.isfunction):
+        if name.startswith("_") or fn.__module__ != surfaces.__name__:
+            continue
+        params = list(inspect.signature(fn).parameters)
+        if not params or params[0] != "state":
+            continue  # helper, not a surface builder
+        extra = _EXTRA_ARGS.get(name, ())
+        if len(params) != 1 + len(extra):
+            continue
+        for phase in ("live", "target", "complete"):
+            cases.append((f"{name}[{phase}]", fn, ({"phase": phase},) + extra))
+    return cases
+
+
+def test_surface_builders_were_discovered():
+    # Guards the discovery itself: a typo that matched nothing would make every
+    # check below vacuously pass.
+    names = {n.split("[")[0] for n, _, _ in _all_surface_cases()}
+    assert "cohort_summary" in names, names
+
+
+def test_every_surface_obeys_the_structural_rules():
+    for label, fn, args in _all_surface_cases():
+        try:
+            messages = fn(*args)
+        except KeyError:
+            continue  # surface not meaningful in this phase
+        ids, roots, surface_ids = [], [], set()
+        for message in messages:
+            update = message.get("surfaceUpdate")
+            if update:
+                surface_ids.add(update["surfaceId"])
+                for component in update["components"]:
+                    ids.append(component["id"])
+                    spec = next(iter(component["component"].values()))
+                    hint = spec.get("usageHint")
+                    assert hint is None or hint in _USAGE_HINTS, (
+                        f"{label}: illegal usageHint {hint!r}")
+            begin = message.get("beginRendering")
+            if begin:
+                roots.append(begin["root"])
+
+        assert ids, f"{label}: drew nothing"
+        assert len(ids) == len(set(ids)), f"{label}: duplicate ids"
+        assert not (set(ids) & _RESERVED), (
+            f"{label}: reserved id {set(ids) & _RESERVED}")
+        assert roots, f"{label}: no beginRendering"
+        for root in roots:
+            assert root in ids, f"{label}: root {root!r} does not exist"
+
+        known = set(ids)
+        for message in messages:
+            update = message.get("surfaceUpdate")
+            if not update:
+                continue
+            for component in update["components"]:
+                spec = next(iter(component["component"].values()))
+                refs = []
+                if isinstance(spec.get("child"), str):
+                    refs.append(spec["child"])
+                for key in ("entryPointChild", "contentChild"):
+                    if isinstance(spec.get(key), str):
+                        refs.append(spec[key])
+                refs.extend((spec.get("children") or {}).get("explicitList") or [])
+                for ref in refs:
+                    assert ref in known, (
+                        f"{label}: {component['id']} references missing {ref!r}")
+
+
+def test_meter_stays_the_right_width_at_the_edges():
+    from ambassador_agent.surfaces import METER_WIDTH, meter
+
+    for pct in (-5, 0, 0.4, 50, 72.9, 99.9, 100, 140):
+        assert len(meter(pct)) == METER_WIDTH, (pct, meter(pct))
+    assert meter(0) == "░" * METER_WIDTH
+    assert meter(100) == "█" * METER_WIDTH
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
