@@ -153,6 +153,185 @@ def pipeline_board(applications: list[dict]) -> list[dict] | None:
     ]
 
 
+def _surface(surface_id: str, components: list[dict]) -> list[dict]:
+    return [
+        {"surfaceUpdate": {"surfaceId": surface_id, "components": components}},
+        {"beginRendering": {"surfaceId": surface_id, "root": "root"}},
+    ]
+
+
+def _card(components: list[dict], body: list[str]) -> list[dict]:
+    components.append(_column("body", body))
+    components.append({"id": "root", "component": {"Card": {"child": "body"}}})
+    return components
+
+
+def company_shortlist(companies_data: dict) -> list[dict] | None:
+    """Draw the matched companies, one block per company."""
+    companies = (companies_data or {}).get("companies") or []
+    if not companies:
+        return None
+
+    components: list[dict] = [_text("title", "Companies worth your time", "h2")]
+    body = ["title"]
+
+    for index, company in enumerate(companies):
+        name = str(company.get("name") or "").strip()
+        if not name:
+            continue
+        prefix = f"co{index}"
+        children = [f"{prefix}-name"]
+        fit = str(company.get("fit") or "").strip()
+        components.append(
+            _text(f"{prefix}-name", f"{name} — {fit}" if fit else name, "h3")
+        )
+
+        why = str(company.get("why_it_fits") or "").strip()
+        if why:
+            children.append(f"{prefix}-why")
+            components.append(_text(f"{prefix}-why", why, "body"))
+
+        meta = " · ".join(
+            v
+            for v in (
+                str(company.get("industry") or "").strip(),
+                str(company.get("size_or_stage") or "").strip(),
+            )
+            if v
+        )
+        if meta:
+            children.append(f"{prefix}-meta")
+            components.append(_text(f"{prefix}-meta", meta, "caption"))
+
+        # The opening link is rendered as text, not as a Text markdown link:
+        # v0.8 Text explicitly excludes links, and a Button dispatches a
+        # client-side action rather than opening a URL. Showing the URL plainly
+        # is the honest option -- a link that silently does nothing is worse.
+        url = str(company.get("opening_url") or "").strip()
+        if url:
+            title = str(company.get("opening_title") or "Open role").strip()
+            children.append(f"{prefix}-role")
+            components.append(_text(f"{prefix}-role", f"{title}: {url}", "caption"))
+
+        components.append(_column(f"{prefix}-col", children))
+        body.append(f"{prefix}-col")
+        if index < len(companies) - 1:
+            components.append({"id": f"{prefix}-div", "component": {"Divider": {}}})
+            body.append(f"{prefix}-div")
+
+    if len(body) == 1:
+        return None
+
+    note = str((companies_data or {}).get("note") or "").strip()
+    if note:
+        components.append(_text("note", note, "caption"))
+        body.append("note")
+
+    return _surface("job-helper-companies", _card(components, body))
+
+
+def alumni_cards(alumni_data: dict) -> list[dict] | None:
+    """Draw verified contacts, or the searches the student can run themselves.
+
+    An empty alumni list is the ordinary case, not a failure: public search
+    cannot answer "who from college X works at company Y". So when there is
+    nobody verifiable we render the LinkedIn searches from `links.py` instead --
+    never a padded list of guessed names.
+    """
+    data = alumni_data or {}
+    alumni = data.get("alumni") or []
+    links = data.get("search_links") or {}
+
+    components: list[dict] = []
+    body: list[str] = []
+
+    if alumni:
+        components.append(_text("title", "People who could refer you", "h2"))
+        body.append("title")
+        for index, person in enumerate(alumni):
+            name = str(person.get("name") or "").strip()
+            url = str(person.get("profile_url") or "").strip()
+            # No link, no person. This is REAL_PEOPLE_RULES made structural:
+            # the student cannot verify an unlinked name, so we never draw one.
+            if not name or not url:
+                continue
+            prefix = f"al{index}"
+            children = [f"{prefix}-name"]
+            role = str(person.get("role") or "").strip()
+            company = str(person.get("company") or "").strip()
+            headline = " · ".join(v for v in (role, company) if v)
+            components.append(_text(f"{prefix}-name", name, "h3"))
+            if headline:
+                children.append(f"{prefix}-role")
+                components.append(_text(f"{prefix}-role", headline, "body"))
+            shared = str(person.get("shared_context") or "").strip()
+            if shared:
+                children.append(f"{prefix}-shared")
+                components.append(_text(f"{prefix}-shared", shared, "caption"))
+            children.append(f"{prefix}-link")
+            components.append(_text(f"{prefix}-link", url, "caption"))
+            components.append(_column(f"{prefix}-col", children))
+            body.append(f"{prefix}-col")
+
+    people = str(links.get("people_search") or "").strip()
+    school = str(links.get("school_page_search") or "").strip()
+    if people or school:
+        heading = (
+            "Search LinkedIn yourself"
+            if alumni
+            else "No verifiable contacts found — search LinkedIn yourself"
+        )
+        components.append(_text("links-title", heading, "h3"))
+        components.append(
+            _text(
+                "links-help",
+                "Open these while signed in to LinkedIn. The school page search"
+                " then its People tab and 'Where they work' filter gives the"
+                " fullest list.",
+                "caption",
+            )
+        )
+        body += ["links-title", "links-help"]
+        if people:
+            components.append(_text("links-people", people, "caption"))
+            body.append("links-people")
+        if school:
+            components.append(_text("links-school", school, "caption"))
+            body.append("links-school")
+
+    if not body:
+        return None
+
+    return _surface("job-helper-alumni", _card(components, body))
+
+
+def upload_prompt(state: dict) -> list[dict] | None:
+    """Ask for the resume, but only until there is a profile.
+
+    Gemini Enterprise delivers an attached file as an artifact plus empty
+    `<start_of_user_uploaded_file: name>` markers, and the root agent already
+    holds `load_artifacts` to read it -- so the attach control the student
+    needs is GE's own, and what is missing is simply being told to use it.
+    """
+    getter = getattr(state, "get", None)
+    if not callable(getter):
+        return None
+    if getter("profile"):
+        return None
+
+    components = [
+        _text("title", "Start with your resume", "h2"),
+        _text(
+            "help",
+            "Attach your resume (PDF or DOCX) using the attachment button, or"
+            " paste its text here. Everything else — matching companies,"
+            " finding alumni, tracking applications — runs off it.",
+            "body",
+        ),
+    ]
+    return _surface("job-helper-upload", _card(components, ["title", "help"]))
+
+
 def build_a2ui_messages(state: dict) -> list[dict]:
     """Render whatever the session state supports. Empty list renders nothing.
 
@@ -168,9 +347,19 @@ def build_a2ui_messages(state: dict) -> list[dict]:
     # keys() and falls back to reading it as a sequence of pairs. That failure
     # was swallowed by the caller's guard, so the widget silently never drew.
     getter = getattr(state, "get", None)
-    applications = getter("applications") if callable(getter) else None
-    board = pipeline_board(applications or [])
-    return board or []
+    if not callable(getter):
+        return []
+
+    messages: list[dict] = []
+    for surface in (
+        upload_prompt(state),
+        company_shortlist(getter("companies") or {}),
+        alumni_cards(getter("alumni") or {}),
+        pipeline_board(getter("applications") or []),
+    ):
+        if surface:
+            messages += surface
+    return messages
 
 
 def to_genai_parts(messages: list[dict]) -> list[types.Part]:

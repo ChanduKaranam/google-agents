@@ -383,6 +383,95 @@ def test_require_public_host_refuses_the_localhost_default_on_cloud_run():
     assert require_public_host(None, None) == LOCAL_HOST_DEFAULT
 
 
+def test_specialists_emit_structured_data_for_rendering():
+    """Cards need structure; prose cannot be drawn.
+
+    company_agent and alumni_agent keep google_search -- ADK enforces the
+    schema only on the final output, so the built-in still runs during the
+    thought loop and the one-built-in-per-agent rule is untouched.
+    """
+    from Job_Helper_agent.agent import alumni_agent, company_agent
+
+    for agent in (company_agent, alumni_agent):
+        assert agent.output_schema is not None, f"{agent.name} has no output_schema"
+        # Rule 5: plain dict schemas, no Pydantic.
+        assert isinstance(agent.output_schema, dict), f"{agent.name} schema is not a dict"
+
+    alumni_props = alumni_agent.output_schema["properties"]["alumni"]["items"]
+    # NO_INVENTION, structurally: a person without a found link is not a person
+    # we may name, so the schema itself refuses to describe one.
+    assert "profile_url" in alumni_props["required"]
+    assert "name" in alumni_props["required"]
+
+
+def test_company_and_alumni_surfaces_render_from_structured_state():
+    from Job_Helper_agent.a2ui import build_a2ui_messages
+
+    state = {
+        "companies": {
+            "companies": [
+                {"name": "Zerodha", "why_it_fits": "Python + backend", "fit": "Strong",
+                 "industry": "Fintech", "size_or_stage": "Mid-size",
+                 "opening_title": "Backend Intern",
+                 "opening_url": "https://zerodha.com/careers/backend-intern"},
+            ]
+        },
+        "alumni": {
+            "alumni": [
+                {"name": "A. Rao", "role": "SDE", "company": "Zerodha",
+                 "profile_url": "https://example.com/a-rao", "shared_context": "NITW 2019"},
+            ],
+            "search_links": {
+                "people_search": "https://www.linkedin.com/search/results/people/?keywords=NITW+Zerodha",
+                "school_page_search": "https://www.linkedin.com/search/results/schools/?keywords=NITW",
+            },
+        },
+    }
+    blob = json.dumps(build_a2ui_messages(state))
+    assert "Zerodha" in blob and "Backend Intern" in blob
+    assert "A. Rao" in blob and "https://example.com/a-rao" in blob
+
+
+def test_alumni_surface_falls_back_to_linkedin_search_links():
+    """No alumni found is the normal case, not an error.
+
+    Public search cannot answer "who from college X works at company Y", so the
+    student gets the LinkedIn searches to run themselves rather than nothing --
+    and never a padded list of guessed names.
+    """
+    from Job_Helper_agent.a2ui import build_a2ui_messages
+
+    state = {
+        "alumni": {
+            "alumni": [],
+            "search_links": {
+                "people_search": "https://www.linkedin.com/search/results/people/?keywords=NITW+Stripe",
+                "school_page_search": "https://www.linkedin.com/search/results/schools/?keywords=NITW",
+            },
+        }
+    }
+    blob = json.dumps(build_a2ui_messages(state))
+    assert "linkedin.com/search/results/people" in blob
+    # Nothing may be invented to fill the gap.
+    assert "A. Rao" not in blob
+
+    # No links and no alumni -> that surface draws nothing at all.
+    from Job_Helper_agent.a2ui import alumni_cards
+
+    assert alumni_cards({"alumni": []}) is None
+    assert alumni_cards({}) is None
+
+
+def test_upload_prompt_shows_only_before_a_profile_exists():
+    from Job_Helper_agent.a2ui import build_a2ui_messages
+
+    empty = json.dumps(build_a2ui_messages({}))
+    assert "resume" in empty.lower(), "no resume prompt on a cold start"
+
+    warm = json.dumps(build_a2ui_messages({"profile": "B.Tech CSE, Python, NITW"}))
+    assert "resume" not in warm.lower(), "still nagging after the profile exists"
+
+
 def test_build_a2ui_messages_accepts_adk_state_not_just_dict():
     """ADK hands callbacks a `State`, and `dict(State)` raises `KeyError: 0`.
 
@@ -429,16 +518,22 @@ def test_pipeline_board_renders_only_real_applications():
         to_genai_parts,
     )
 
-    # No state -> nothing rendered. A student who has tracked nothing must not
-    # get an empty board presented as if it were real.
-    assert build_a2ui_messages({}) == []
-    assert build_a2ui_messages({"applications": []}) == []
+    # Nothing tracked -> no board. A student who has tracked nothing must not
+    # get an empty board presented as if it were real. Asserted against the
+    # builder directly: build_a2ui_messages also draws the upload prompt on a
+    # cold start, which is a different surface with its own test.
+    from Job_Helper_agent.a2ui import pipeline_board
+
+    assert pipeline_board([]) is None
+    assert pipeline_board([{"company": "", "role": "x", "status": "Applied"}]) is None
 
     apps = [
         {"company": "Freshworks", "role": "SWE Intern", "status": "Applied", "notes": ""},
         {"company": "Zoho", "role": "Backend Intern", "status": "Interview", "notes": "onsite Aug 3"},
     ]
-    msgs = build_a2ui_messages({"applications": apps})
+    # A profile is present so the cold-start upload prompt does not also draw;
+    # this test is about the board alone.
+    msgs = build_a2ui_messages({"profile": "B.Tech CSE", "applications": apps})
 
     # Flat list of messages, surfaceUpdate before beginRendering.
     kinds = [next(iter(m)) for m in msgs]

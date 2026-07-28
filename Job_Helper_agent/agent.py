@@ -96,6 +96,101 @@ profile_agent = Agent(
 )
 
 
+# Structured output so the A2UI renderer can draw real cards. Plain dicts, not
+# Pydantic (rule 5). ADK exposes tools during the thought loop and enforces the
+# schema only on the final answer, so google_search still runs and the
+# one-built-in-per-agent rule is untouched.
+COMPANIES_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "companies": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "why_it_fits": {
+                        "type": "string",
+                        "description": "Names the specific overlapping skills.",
+                    },
+                    "fit": {
+                        "type": "string",
+                        "enum": ["Strong", "Moderate", "Stretch"],
+                    },
+                    "industry": {"type": "string"},
+                    "size_or_stage": {"type": "string"},
+                    "opening_title": {"type": "string"},
+                    "opening_url": {
+                        "type": "string",
+                        "description": (
+                            "Link to an opening you actually found. Omit it"
+                            " entirely rather than guessing a careers URL."
+                        ),
+                    },
+                },
+                "required": ["name", "why_it_fits", "fit"],
+            },
+        },
+        "note": {
+            "type": "string",
+            "description": (
+                "Anything the student must hear that is not a company -- e.g."
+                " that the profile is missing, or that they fit almost nothing"
+                " at a sensible level and should run a resume-gap check."
+            ),
+        },
+    },
+    "required": ["companies"],
+}
+
+# `profile_url` is required on purpose: a person we cannot link to is a person
+# we may not name (REAL_PEOPLE_RULES). The schema refuses to describe one, so
+# the guarantee survives even if the instruction is later edited badly.
+ALUMNI_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "alumni": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "role": {"type": "string"},
+                    "company": {"type": "string"},
+                    "college_and_year": {"type": "string"},
+                    "location": {"type": "string"},
+                    "profile_url": {
+                        "type": "string",
+                        "description": "The public profile link you found them through.",
+                    },
+                    "shared_context": {
+                        "type": "string",
+                        "description": "One phrase naming what they share with the student.",
+                    },
+                },
+                "required": ["name", "profile_url"],
+            },
+        },
+        "search_links": {
+            "type": "object",
+            "description": (
+                "Fill this from the alumni_search_links tool whenever the"
+                " alumni list is short or empty, so the student can run the"
+                " search on LinkedIn themselves."
+            ),
+            "properties": {
+                "people_search": {"type": "string"},
+                "people_search_with_role": {"type": "string"},
+                "school_page_search": {"type": "string"},
+            },
+        },
+        "verified_count": {"type": "integer"},
+        "note": {"type": "string"},
+    },
+    "required": ["alumni"],
+}
+
+
 company_agent = Agent(
     model=MODEL,
     name="company_agent",
@@ -152,6 +247,7 @@ company_agent = Agent(
         " openings you actually found, with links.\n\n" + NO_INVENTION
     ),
     tools=[google_search],
+    output_schema=COMPANIES_SCHEMA,
     output_key="companies",
 )
 
@@ -192,6 +288,7 @@ alumni_agent = Agent(
         " could not verify. " + NO_INVENTION + REAL_PEOPLE_RULES
     ),
     tools=[google_search],
+    output_schema=ALUMNI_SCHEMA,
     output_key="alumni",
 )
 
