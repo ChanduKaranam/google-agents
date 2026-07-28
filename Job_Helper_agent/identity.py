@@ -72,7 +72,11 @@ def build_request_converter():
         # bearer tokens. The names alone are what tells us which one Gemini
         # Enterprise actually sends, which is the open question this logging
         # exists to close. Drop it to DEBUG once IDENTITY_HEADERS is narrowed.
-        logger.info(
+        # WARNING, not INFO: nothing configures logging for this package, so the
+        # root level stays at WARNING and an info() call is silently dropped --
+        # which is exactly what happened on the first real Gemini Enterprise
+        # call, costing a deploy cycle. Drop this line once the header is known.
+        logger.warning(
             "a2a request headers=%s identity_found=%s",
             sorted(str(name).lower() for name in (headers or {})),
             bool(user_id),
