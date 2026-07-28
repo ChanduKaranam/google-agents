@@ -163,7 +163,16 @@ def route(state, action: dict) -> tuple[str, list[dict]]:
         return "", surfaces.cohort_summary(state)
 
     if name == "ask":
-        return route_question(state, context.get("question", ""))
+        question = context.get("question", "")
+        reply, messages = route_question(state, question)
+        # Echo what she picked. Gemini Enterprise renders its own placeholder
+        # for a click -- the literal string "User action triggered." -- and
+        # nothing an agent sends can change that bubble. Without this the
+        # transcript reads as a question nobody asked, and with several chips
+        # on screen there is no record of WHICH one she pressed.
+        if question:
+            reply = f"**{question}**\n\n{reply}" if reply else f"**{question}**"
+        return reply, messages
 
     return UNKNOWN_REPLY, []
 

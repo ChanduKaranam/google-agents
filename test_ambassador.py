@@ -730,6 +730,48 @@ def test_the_agent_card_offers_starter_examples():
     assert "Who should I message?" in examples
     assert "What unlocks next?" in examples
 
+
+def test_a_chip_press_echoes_which_chip():
+    """GE renders "User action triggered." for a click and nothing an agent
+    sends can change that bubble. With four chips on screen, the transcript
+    otherwise has no record of which one she pressed."""
+    from ambassador_agent.actions import route
+
+    reply, _ = route({}, {"name": "ask",
+                          "context": {"question": "Who should I message?"}})
+    assert reply.startswith("**Who should I message?**")
+    assert "6 students have ignored two campaigns" in reply
+
+    # a surface with no prose of its own still says what was picked
+    reply, _ = route({}, {"name": "ask",
+                          "context": {"question": "Where do I stand?"}})
+    assert reply == "**Where do I stand?**"
+
+
+def test_every_surface_is_reachable_by_a_tool():
+    """Keyword matching only knows the prototype's wording. The tools are what
+    let the model handle "who's falling behind?" and still draw a card."""
+    from ambassador_agent.agent import _SURFACE_BUILDERS
+    from ambassador_agent.tools import ALL_TOOLS
+
+    class Ctx:
+        def __init__(self):
+            self.state = {}
+
+    reached = set()
+    for tool in ALL_TOOLS:
+        context = Ctx()
+        result = (tool("complete", context) if tool.__name__ == "simulate_phase"
+                  else tool(context))
+        assert result.get("say"), tool.__name__
+        picked = context.state.get("surface")
+        assert picked, f"{tool.__name__} picked no surface"
+        assert picked in _SURFACE_BUILDERS, (tool.__name__, picked)
+        reached.add(picked)
+
+    assert reached == set(_SURFACE_BUILDERS), (
+        f"unreachable surfaces: {set(_SURFACE_BUILDERS) - reached}")
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

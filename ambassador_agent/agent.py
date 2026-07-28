@@ -8,7 +8,9 @@ from . import data
 from .a2ui import build_greeting, to_genai_parts
 from .actions import (chips_for, chips_for_action, intent_for,
                       parse_user_action, route, route_question)
-from .surfaces import chips_surface
+from .surfaces import (chips_surface, cohort_summary, leaderboard, rewards,
+                       roster, straggler_list)
+from .tools import ALL_TOOLS
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +19,34 @@ INSTRUCTION = """You are the Campus Ambassador agent for Sethu at SVEC Tirupati.
 You work with ONE ambassador: Sneha Reddy, who looks after EEE Sem 3, Sec B.
 You only ever know her section. There is no search, no other cohort.
 
-Answer briefly and plainly. Never invent an activation count, a rank, or a
-student. Never claim to have sent a message: you draft, she sends from her own
-WhatsApp."""
+For anything about her section, CALL A TOOL. The tools are how the cards get
+drawn — answering from memory leaves her with prose and no card:
+
+- who to message, nudge, chase, follow up, who is stalling  -> show_stragglers
+- how far along, how many left, pace, her numbers           -> show_progress
+- rank, standing, who is ahead, how ranking works           -> show_leaderboard
+- rewards, badges, certificate, what unlocks next           -> show_rewards
+- the roster, the class list, who has activated             -> show_roster
+- only if she explicitly asks to simulate or jump a state   -> simulate_phase
+
+She will phrase these any way she likes. "Is there anyone I should message?",
+"who's falling behind?" and "anyone ignoring me?" all mean show_stragglers.
+
+Every tool returns a `say` field. Open your reply with that sentence, close to
+verbatim — it carries the numbers and the wording the product is built on.
+Add at most one short sentence of your own.
+
+Never invent an activation count, a rank, or a student. Never claim to have
+sent a message: you draft, she sends from her own WhatsApp."""
+
+# Which builder draws each surface a tool can pick.
+_SURFACE_BUILDERS = {
+    "stragglers": straggler_list,
+    "cohort": cohort_summary,
+    "leaderboard": leaderboard,
+    "rewards": rewards,
+    "roster": roster,
+}
 
 DEFAULT_CHIPS = [
     "Who should I message?",
@@ -119,6 +146,18 @@ def render_surface(callback_context: CallbackContext) -> types.Content | None:
         if intent_for(question) != "unknown":
             return None      # handle_click already answered this turn in full
         state = callback_context.state
+
+        # The model reached a surface by calling a tool, so it understood a
+        # phrasing the keyword list does not cover. Draw what it picked.
+        picked = state.get("surface")
+        if picked:
+            state["surface"] = None
+            builder = _SURFACE_BUILDERS.get(picked)
+            if builder:
+                messages = _with_chips(builder(state), chips_for(picked))
+                return types.Content(
+                    role="model", parts=to_genai_parts(messages))
+
         if state.get("greeted"):
             # Off-script turn later in the conversation: the model answered in
             # its own words, but she still gets the options back.
@@ -146,6 +185,7 @@ root_agent = Agent(
     name="ambassador_agent",
     description="Campus Ambassador cockpit for one section.",
     instruction=INSTRUCTION,
+    tools=ALL_TOOLS,
     before_agent_callback=handle_click,
     after_agent_callback=render_surface,
 )
