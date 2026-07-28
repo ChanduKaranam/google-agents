@@ -28,7 +28,8 @@ from .suggestions import (
     compare_resume_versions,
 )
 
-# -- A2UI (rich UI) diagnostic ------------------------------------------------
+# -- A2UI (rich UI) -----------------------------------------------------------
+from .a2ui.emit import emit_queued_a2ui
 from .a2ui.probe import show_a2ui_probe_card
 
 # -- Sub-agent import ---------------------------------------------------------
@@ -192,14 +193,17 @@ root_agent = Agent(
         "  - show_a2ui_probe_card() is a diagnostic. Call it ONLY when the user asks\n"
         "    to test, check or verify rich UI / interactive cards. Never call it as\n"
         "    part of resume or interview work.\n"
-        "  - When it returns, your reply must end with the value of its 'a2ui_block'\n"
-        "    field copied VERBATIM -- character for character, on its own line, with\n"
-        "    no code fence, no backticks, no reformatting and no pretty-printing of\n"
-        "    the JSON. The client finds the card by scanning for the exact tags; one\n"
-        "    edited character and nothing renders.\n"
-        "  - Put any words you want to say BEFORE the block, never after it.\n"
-        "  - If the user replies that they see no card, use 'fallback_text' and tell\n"
-        "    them rich UI is not supported in this surface.\n\n"
+        "  - The card draws itself. It is sent to the screen for you the moment the\n"
+        "    tool returns, so you do NOT need to output it.\n"
+        "  - NEVER print, quote, echo, summarise or pretty-print the JSON in the\n"
+        "    'a2ui_block' field, and never wrap it in a code fence. The user would\n"
+        "    see a wall of raw JSON sitting next to the card that already rendered.\n"
+        "  - Just say something short in plain words -- follow the 'say_next' hint --\n"
+        "    and stop.\n"
+        "  - When the user presses a button you receive a userAction with its name.\n"
+        "    Respond to that name; see 'on_button_press'.\n"
+        "  - If the user replies that they can see no card at all, use\n"
+        "    'fallback_text' and tell them rich UI is not supported in this surface.\n\n"
 
         "=== REMEMBER ===\n\n"
         "Your goal is to coach the user to build a resume that gets them hired AND\n"
@@ -221,4 +225,7 @@ root_agent = Agent(
         show_a2ui_probe_card,
     ],
     sub_agents=[interview_prep_agent],
+    # Emits any A2UI surface a tool queued, as its own event, so the component
+    # JSON never has to survive a round trip through the model.
+    after_agent_callback=emit_queued_a2ui,
 )

@@ -19,6 +19,7 @@ from Job_Helper_agent.agent import SPECIALISTS, root_agent
 from Job_Helper_agent.tools import list_applications, track_application
 from placement_agent import a2a_app
 from placement_agent.a2ui import A2UI_CLOSE, A2UI_OPEN
+from placement_agent.a2ui.emit import A2UI_QUEUE_KEY, emit_queued_a2ui
 from placement_agent.a2ui.probe import show_a2ui_probe_card
 from placement_agent.agent import root_agent as placement_root_agent
 from placement_agent.interview_prep.agent import interview_prep_agent
@@ -485,7 +486,7 @@ def _a2ui_messages(block: str) -> list[dict]:
 
 
 def _probe_block() -> str:
-    return show_a2ui_probe_card()["a2ui_block"]
+    return show_a2ui_probe_card(_FakeProgressContext())["a2ui_block"]
 
 
 def test_a2ui_block_uses_the_marker_the_renderer_scans_for():
@@ -570,11 +571,54 @@ def test_a2ui_probe_card_is_wired_into_the_placement_root():
     assert "show_a2ui_probe_card" in names
 
 
-def test_placement_root_is_told_to_emit_the_a2ui_block_verbatim():
-    """The block only renders if it survives the model unedited."""
-    instruction = placement_root_agent.instruction
-    assert "a2ui_block" in instruction
-    assert "verbatim" in instruction.lower()
+class _FakeCallbackContext:
+    """Stand-in for CallbackContext: the emitter only touches .state."""
+
+    def __init__(self, state=None):
+        self.state = {} if state is None else state
+
+
+def test_a2ui_block_is_emitted_by_a_callback_not_copied_by_the_model():
+    """Asking the model to reproduce ~900 chars of JSON byte-for-byte is a
+    coin flip, and one wrong character renders nothing. The tool queues the
+    block; after_agent_callback emits it as its own event."""
+    tool_ctx = _FakeProgressContext()
+    result = show_a2ui_probe_card(tool_ctx)
+
+    content = emit_queued_a2ui(_FakeCallbackContext(tool_ctx.state))
+    assert content is not None, "nothing was emitted for the queued surface"
+    assert content.parts[0].text == result["a2ui_block"]
+
+
+def test_a2ui_callback_stays_silent_when_no_surface_was_queued():
+    """It runs after every single turn; it must not emit empty events."""
+    assert emit_queued_a2ui(_FakeCallbackContext()) is None
+
+
+def test_a2ui_surface_is_not_re_emitted_on_later_turns():
+    """A queue that never drains repaints the card on every reply."""
+    ctx = _FakeProgressContext()
+    show_a2ui_probe_card(ctx)
+
+    assert emit_queued_a2ui(_FakeCallbackContext(ctx.state)) is not None
+    assert emit_queued_a2ui(_FakeCallbackContext(ctx.state)) is None
+
+
+def test_a2ui_queue_key_is_temp_so_it_never_persists():
+    """A render payload in durable state would be replayed on session resume."""
+    assert A2UI_QUEUE_KEY.startswith("temp:"), A2UI_QUEUE_KEY
+
+
+def test_placement_root_emits_a2ui_through_its_after_agent_callback():
+    assert placement_root_agent.after_agent_callback is emit_queued_a2ui
+
+
+def test_placement_root_is_told_not_to_print_the_a2ui_json():
+    """The card is emitted for it; a model that also prints the block shows
+    the user a wall of raw JSON next to the rendered card."""
+    instruction = placement_root_agent.instruction.lower()
+    assert "a2ui" in instruction
+    assert "json" in instruction
 
 
 # ---------------------------------------------------------------------------
