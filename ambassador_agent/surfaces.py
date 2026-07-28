@@ -12,7 +12,7 @@ by colour. Meaning lives in the text.
 
 from . import data
 from .a2ui import (button, button_with_values, card, column, data_model, row,
-                   surface, text, text_field)
+                   suggestions, surface, text, text_field)
 
 METER_WIDTH = 20
 
@@ -205,6 +205,24 @@ def fixtures_angles():
     # module allowed to know the backend is fixtures today.
     from . import fixtures
     return fixtures.ANGLES
+
+
+def chips_surface(labels: list[str]) -> list[dict]:
+    """Standalone follow-up chip row drawn after every routed reply.
+
+    Not auto-discovered by the structural-invariant harness in
+    test_ambassador.py: its first parameter is `labels`, not `state` (there is
+    no cohort state to read — the labels are already resolved by the caller).
+    Covered instead by an explicit test.
+    """
+    prefix = "chips"
+    components, ids = suggestions(prefix, labels)
+    child_ids = list(ids)
+    if child_ids:
+        components.append(row(f"{prefix}-row", child_ids))
+        child_ids = [f"{prefix}-row"]
+    components.append(column(f"{prefix}-main-column", child_ids))
+    return surface(prefix, components, f"{prefix}-main-column")
 
 
 def edit_form(state, student_id: str) -> list[dict]:

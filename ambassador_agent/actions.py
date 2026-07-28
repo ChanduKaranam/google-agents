@@ -10,6 +10,8 @@ pressed.
 import json
 import re
 
+from . import data, surfaces
+
 _TAGGED = re.compile(r"<a2a_datapart_json>(.*?)</a2a_datapart_json>", re.S)
 
 
@@ -27,3 +29,153 @@ def parse_user_action(content: str) -> dict | None:
         if action and action.get("name"):
             return action
     return None
+
+
+# Keyword sets lifted from the prototype's own reply() so the demo answers the
+# same questions with the same surfaces.
+_INTENTS = [
+    ("stragglers", ("nudge", "message", "who should")),
+    ("leaderboard", ("rank", "leader")),
+    ("rewards", ("reward", "badge", "credential", "unlock", "next")),
+    ("roster", ("cohort", "list", "roster", "who is")),
+    ("cohort", ("how many", "progress", "pace", "left", "stand")),
+]
+
+_CHIPS = {
+    "stragglers": ["Where do I stand?", "What unlocks next?", "Show my cohort"],
+    "leaderboard": ["Who should I message?", "What unlocks next?"],
+    "rewards": ["Who should I message?", "Where do I stand?"],
+}
+_DEFAULT_CHIPS = [
+    "Who should I message?",
+    "Where do I stand?",
+    "How is my rank calculated?",
+    "What unlocks next?",
+]
+
+# Maps a button's action name to the surface it just drew, so the chip row
+# that follows matches what's on screen rather than always the default four.
+_ACTION_SURFACE = {
+    "show_stragglers": "stragglers",
+    "show_leaderboard": "leaderboard",
+    "show_rewards": "rewards",
+    "show_roster": "roster",
+    "simulate_phase": "cohort",
+}
+
+UNKNOWN_REPLY = (
+    'I only know your section. Try "who should I message?", "where do I'
+    ' stand?", "how is my rank calculated?" or "what unlocks next?"')
+
+
+def intent_for(question: str) -> str:
+    lowered = (question or "").lower()
+    for name, keywords in _INTENTS:
+        if any(keyword in lowered for keyword in keywords):
+            return name
+    return "unknown"
+
+
+def chips_for(surface_name: str) -> list[str]:
+    return list(_CHIPS.get(surface_name, _DEFAULT_CHIPS))
+
+
+def chips_for_action(action: dict) -> list[str]:
+    name = action.get("name")
+    if name == "ask":
+        surface_name = intent_for((action.get("context") or {}).get("question", ""))
+    else:
+        surface_name = _ACTION_SURFACE.get(name, "")
+    return chips_for(surface_name)
+
+
+def _stragglers_reply(state) -> tuple[str, list[dict]]:
+    pending = data.get_stragglers(state)["data"]
+    if not pending:
+        if state.get("phase") == "complete":
+            return "Nobody left to chase — all 59 are activated.", []
+        return ("Nobody is waiting on you. Everyone still pending is inside"
+                " Sethu’s campaign cycle; they escalate to you only after"
+                " ignoring two."), []
+    count = len(pending)
+    verb = "student has" if count == 1 else "students have"
+    return (f"{count} {verb} ignored two campaigns — a broadcast won’t move"
+            " them. I’ve drafted one message each, in the angle that converts"
+            " best this week.",
+            surfaces.straggler_list(state))
+
+
+def route(state, action: dict) -> tuple[str, list[dict]]:
+    """Handle one button press. Returns (prose reply, A2UI messages)."""
+    name = action.get("name")
+    context = action.get("context") or {}
+    student_id = context.get("student_id")
+
+    if name == "show_stragglers":
+        return _stragglers_reply(state)
+
+    if name == "open_edit":
+        return "", surfaces.edit_form(state, student_id)
+
+    if name == "set_angle":
+        angle = context.get("angle", "Exam panic")
+        angles = dict(state.get("angles", {}) or {})
+        angles[student_id] = angle
+        state["angles"] = angles
+        drafts = dict(state.get("drafts", {}) or {})
+        drafts[student_id] = data.draft_for(student_id, angle)
+        state["drafts"] = drafts
+        return "", surfaces.edit_form(state, student_id)
+
+    if name == "send_whatsapp":
+        entry = data.student(student_id)
+        first = entry["name"].split(" ")[0]
+        message = context.get("message") or data.draft_for(
+            student_id, (state.get("angles", {}) or {}).get(
+                student_id, "Exam panic"))
+        data.mark_sent(state, student_id)
+        link = data.wa_link(student_id)
+        # The link goes in prose, not the card: A2UI v0.8 Text excludes links
+        # and Button dispatches an action rather than navigating.
+        return (f"Opened WhatsApp with the message for {first}. Once that"
+                " sign-in lands, the activation is credited to you — usually"
+                f" within the hour.\n\n{message}\n{link}"), []
+
+    if name == "show_leaderboard":
+        return "", surfaces.leaderboard(state)
+
+    if name == "show_rewards":
+        return "", surfaces.rewards(state)
+
+    if name == "show_roster":
+        return "", surfaces.roster(state)
+
+    if name == "simulate_phase":
+        data.set_phase(state, context.get("phase", "live"))
+        return "", surfaces.cohort_summary(state)
+
+    if name == "ask":
+        return route_question(state, context.get("question", ""))
+
+    return UNKNOWN_REPLY, []
+
+
+def route_question(state, question: str) -> tuple[str, list[dict]]:
+    intent = intent_for(question)
+    if intent == "stragglers":
+        return _stragglers_reply(state)
+    if intent == "leaderboard":
+        cohort = data.get_cohort(state)["stats"]
+        return (f"You’re ranked on % of your section activated — sections under"
+                f" 30 students are pooled. Sec B is at {cohort['activated']} of"
+                f" 59 ({cohort['pct']}%). {data.milestone_line(state)}",
+                surfaces.leaderboard(state))
+    if intent == "rewards":
+        return data.milestone_line(state), surfaces.rewards(state)
+    if intent == "roster":
+        activated = data.get_cohort(state)["stats"]["activated"]
+        return (f"EEE Sem 3, Sec B — 59 students from the college roster,"
+                f" {activated} activated.", surfaces.roster(state))
+    if intent == "cohort":
+        return "", surfaces.cohort_summary(state)
+    return UNKNOWN_REPLY, []

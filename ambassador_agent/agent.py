@@ -5,6 +5,9 @@ from google.adk.agents.callback_context import CallbackContext
 from google.genai import types
 
 from .a2ui import build_greeting, to_genai_parts
+from .actions import (chips_for, chips_for_action, intent_for,
+                      parse_user_action, route, route_question)
+from .surfaces import chips_surface
 
 logger = logging.getLogger(__name__)
 
@@ -25,18 +28,78 @@ DEFAULT_CHIPS = [
 ]
 
 
-def render_surface(callback_context: CallbackContext) -> types.Content | None:
-    """Draw a card alongside the model's own reply.
+def _incoming_text(callback_context: CallbackContext) -> str:
+    """Join the user turn's text and inline-data parts into one string.
 
-    Returning Content from an after-agent callback ADDS an event, so the text
-    answer survives next to the widget. A renderer bug must never cost the user
-    their answer, so the whole thing is guarded.
+    The A2UI click payload arrives as `inline_data` (`part_converter.py`'s
+    conversion of a DataPart to a tagged blob), not `part.text` — GE also sends
+    a companion text part reading "User action triggered.", which is a
+    transcript placeholder and never something to route on. Both joins guard
+    against `content` being None: a turn with no content raises AttributeError
+    on `.parts`, which the caller's try/except would otherwise swallow the
+    consequences of, so the routing is skipped instead of silently misfiring.
+    """
+    content = callback_context.user_content
+    raw = "".join(part.text or "" for part in (content.parts or [])) \
+        if content else ""
+    raw += "".join(
+        (part.inline_data.data or b"").decode("utf-8", "replace")
+        for part in (content.parts or []) if part.inline_data) \
+        if content else ""
+    return raw
+
+
+def handle_click(callback_context: CallbackContext) -> types.Content | None:
+    """Short-circuit a button press: the router already knows the answer.
+
+    Runs as a before-agent callback so a click skips the model entirely — a
+    model asked to re-derive a routed answer will sometimes answer the
+    question instead of performing the action. A routing bug must never cost
+    the user their turn, so this returns None (falls through to the model) on
+    any failure instead of raising or answering with an error.
     """
     try:
-        messages = build_greeting(
-            "Ask me anything about your section, or pick a suggestion below.",
-            DEFAULT_CHIPS,
-        )
+        action = parse_user_action(_incoming_text(callback_context))
+        if action is None:
+            return None
+        state = callback_context.state
+        reply, messages = route(state, action)
+        messages = messages + chips_surface(chips_for_action(action))
+        parts = []
+        if reply:
+            parts.append(types.Part(text=reply))
+        parts.extend(to_genai_parts(messages))
+        return types.Content(role="model", parts=parts)
+    except Exception:  # noqa: BLE001 - never cost the user their turn
+        logger.warning("Could not handle A2UI action", exc_info=True)
+        return None
+
+
+def render_surface(callback_context: CallbackContext) -> types.Content | None:
+    """Draw a surface alongside the model's own reply, for typed turns.
+
+    Returning Content from an after-agent callback ADDS an event, so the
+    model's text answer survives next to the widget — the model already
+    answers the question per INSTRUCTION, so this only supplies the card and
+    the chips, matching what a routed click would have drawn for the same
+    question. A renderer bug must never cost the user their answer, so the
+    whole thing is guarded.
+
+    A click never reaches here: `handle_click` (before-agent) already returned
+    Content and short-circuited the run before the model — and this text is
+    plain, since `parse_user_action` only recognises a tagged click payload.
+    """
+    try:
+        question = _incoming_text(callback_context)
+        intent = intent_for(question)
+        if intent == "unknown":
+            messages = build_greeting(
+                "Ask me anything about your section, or pick a suggestion"
+                " below.", DEFAULT_CHIPS,
+            )
+        else:
+            _reply, messages = route_question(callback_context.state, question)
+            messages = messages + chips_surface(chips_for(intent))
         return types.Content(role="model", parts=to_genai_parts(messages))
     except Exception:  # noqa: BLE001 - a broken widget must not break the answer
         logger.warning("Could not render A2UI surface", exc_info=True)
@@ -48,5 +111,6 @@ root_agent = Agent(
     name="ambassador_agent",
     description="Campus Ambassador cockpit for one section.",
     instruction=INSTRUCTION,
+    before_agent_callback=handle_click,
     after_agent_callback=render_surface,
 )

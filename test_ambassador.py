@@ -454,6 +454,105 @@ def test_every_list_surface_keeps_its_shape_in_every_phase():
         assert "Showing 6 of 59" in _literals(roster(state)), phase
 
 
+def test_intents_match_the_prototype_keywords():
+    from ambassador_agent.actions import intent_for
+    assert intent_for("who should I message?") == "stragglers"
+    assert intent_for("time to nudge someone") == "stragglers"
+    assert intent_for("how is my rank calculated?") == "leaderboard"
+    assert intent_for("what unlocks next?") == "rewards"
+    assert intent_for("show my cohort") == "roster"
+    assert intent_for("where do I stand?") == "cohort"
+    assert intent_for("what is the weather") == "unknown"
+
+def test_chips_change_with_the_surface():
+    from ambassador_agent.actions import chips_for
+    assert chips_for("stragglers") == [
+        "Where do I stand?", "What unlocks next?", "Show my cohort"]
+    assert chips_for("leaderboard") == [
+        "Who should I message?", "What unlocks next?"]
+    assert chips_for("rewards") == [
+        "Who should I message?", "Where do I stand?"]
+    assert len(chips_for("cohort")) == 4
+
+def test_send_marks_the_student_and_returns_the_link():
+    from ambassador_agent.actions import route
+    state = {}
+    reply, _messages = route(state, {"name": "send_whatsapp",
+                                     "context": {"student_id": "pn"}})
+    assert "Opened WhatsApp with the message for Priya." in reply
+    assert "sethu.app/go/pn8x2" in reply
+    assert state["sent"] == ["pn"]
+
+def test_set_angle_redrafts_and_keeps_the_link():
+    from ambassador_agent.actions import route
+    state = {}
+    route(state, {"name": "set_angle",
+                  "context": {"student_id": "pn", "angle": "Placement"}})
+    assert state["angles"]["pn"] == "Placement"
+    assert "placement agent" in state["drafts"]["pn"]
+
+def test_simulate_phase_moves_the_numbers():
+    from ambassador_agent.actions import route
+    from ambassador_agent.data import get_cohort
+    state = {}
+    route(state, {"name": "simulate_phase", "context": {"phase": "complete"}})
+    assert get_cohort(state)["stats"]["activated"] == 59
+
+def test_no_stragglers_message_is_verbatim():
+    from ambassador_agent.actions import route
+    state = {"phase": "complete"}
+    reply, _ = route(state, {"name": "show_stragglers", "context": {}})
+    assert reply == "Nobody left to chase — all 59 are activated."
+
+def test_no_stragglers_message_when_none_are_pending_yet():
+    from ambassador_agent.actions import route
+    from ambassador_agent.data import mark_sent
+    state = {}
+    # live phase always has 6 stragglers in fixtures, so this path is only
+    # reachable once everyone in the pool has been sent to; simulate that.
+    for sid in ("pn", "sk", "ar", "vm", "dg", "rt"):
+        mark_sent(state, sid)
+    reply, _ = route(state, {"name": "show_stragglers", "context": {}})
+    assert reply == (
+        "Nobody is waiting on you. Everyone still pending is inside Sethu’s"
+        " campaign cycle; they escalate to you only after ignoring two.")
+
+def test_ask_routes_a_typed_question_to_the_same_surface():
+    from ambassador_agent.actions import route
+    reply, messages = route({}, {"name": "ask",
+                                 "context": {"question": "who should I message?"}})
+    assert "ignored two campaigns" in reply
+    assert any("surfaceUpdate" in m for m in messages)
+
+def test_unknown_action_falls_through_without_raising():
+    from ambassador_agent.actions import route, UNKNOWN_REPLY
+    reply, messages = route({}, {"name": "something_unrouted", "context": {}})
+    assert reply == UNKNOWN_REPLY
+    assert messages == []
+
+def test_chips_surface_builds_a_standalone_chip_row():
+    from ambassador_agent.surfaces import chips_surface
+    messages = chips_surface(["Where do I stand?", "What unlocks next?"])
+    ids = [c["id"] for m in messages if "surfaceUpdate" in m
+           for c in m["surfaceUpdate"]["components"]]
+    assert len(ids) == len(set(ids))
+    assert all(i.startswith("chips-") for i in ids)
+    names = [c["component"]["Button"]["action"]["name"]
+             for m in messages if "surfaceUpdate" in m
+             for c in m["surfaceUpdate"]["components"]
+             if "Button" in c["component"]]
+    assert names == ["ask", "ask"]
+
+def test_chips_for_action_maps_the_action_name_to_its_surface():
+    from ambassador_agent.actions import chips_for_action
+    assert chips_for_action({"name": "show_stragglers"}) == [
+        "Where do I stand?", "What unlocks next?", "Show my cohort"]
+    assert chips_for_action({"name": "show_leaderboard"}) == [
+        "Who should I message?", "What unlocks next?"]
+    assert chips_for_action({"name": "show_rewards"}) == [
+        "Who should I message?", "Where do I stand?"]
+    assert len(chips_for_action({"name": "send_whatsapp"})) == 4
+
 def test_prototype_copy_reference_is_committed():
     """Copy fidelity must be checkable by someone who only has this repo.
 
