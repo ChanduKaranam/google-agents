@@ -383,6 +383,43 @@ def test_require_public_host_refuses_the_localhost_default_on_cloud_run():
     assert require_public_host(None, None) == LOCAL_HOST_DEFAULT
 
 
+def test_build_a2ui_messages_accepts_adk_state_not_just_dict():
+    """ADK hands callbacks a `State`, and `dict(State)` raises `KeyError: 0`.
+
+    dict() finds no keys() and falls back to reading it as a sequence of pairs.
+    The caller swallows renderer errors so the student never loses their answer
+    to a broken widget -- which meant this failed completely silently in
+    production and the card simply never appeared.
+    """
+    from Job_Helper_agent.a2ui import build_a2ui_messages
+
+    class _StateLike:
+        def __init__(self, data):
+            self._data = data
+
+        def get(self, key, default=None):
+            return self._data.get(key, default)
+
+        def __getitem__(self, key):
+            return self._data[key]
+
+    raised = None
+    try:
+        dict(_StateLike({"applications": []}))
+    except KeyError as e:
+        raised = e
+    assert raised is not None, "stand-in no longer reproduces the ADK State shape"
+
+    state = _StateLike(
+        {"applications": [{"company": "Zoho", "role": "Intern", "status": "Applied", "notes": ""}]}
+    )
+    msgs = build_a2ui_messages(state)
+    assert msgs, "a State with applications must still render a board"
+    assert "Zoho" in json.dumps(msgs)
+
+    assert build_a2ui_messages(None) == []
+
+
 def test_pipeline_board_renders_only_real_applications():
     import json
 

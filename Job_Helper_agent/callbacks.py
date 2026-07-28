@@ -86,8 +86,7 @@ def _render_a2ui(callback_context: CallbackContext) -> types.Content | None:
     renderer bug is worth losing the widget over, not the reply.
     """
     try:
-        state = dict(getattr(callback_context, "state", None) or {})
-        messages = build_a2ui_messages(state)
+        messages = build_a2ui_messages(getattr(callback_context, "state", None))
         if not messages:
             return None
         return types.Content(role="model", parts=to_genai_parts(messages))

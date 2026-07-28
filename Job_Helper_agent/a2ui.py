@@ -163,7 +163,13 @@ def build_a2ui_messages(state: dict) -> list[dict]:
     cards from. Rendering those needs those specialists to emit structured
     output first; see the ticket-2 notes in the design spec.
     """
-    board = pipeline_board((state or {}).get("applications") or [])
+    # Take the mapping by `.get` rather than converting it. ADK hands callbacks
+    # a `State`, and `dict(State)` raises `KeyError: 0` -- dict() finds no
+    # keys() and falls back to reading it as a sequence of pairs. That failure
+    # was swallowed by the caller's guard, so the widget silently never drew.
+    getter = getattr(state, "get", None)
+    applications = getter("applications") if callable(getter) else None
+    board = pipeline_board(applications or [])
     return board or []
 
 
