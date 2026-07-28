@@ -266,6 +266,14 @@ A card that fails to render shows a red **"This content could not be displayed"*
 box in the chat with a short fragment naming the offending component id — and
 logs nothing server-side. That box is the only debugging signal GE gives you.
 
+**The return leg works** (verified 2026-07-28): a `Button` press comes back as a
+`userAction` DataPart carrying `name`, `surfaceId`, `sourceComponentId` and the
+resolved `context`. But **only `Button` has an action** — `TextField`,
+`CheckBox`, `MultipleChoice` and `Slider` bind to the data model and cannot
+notify the agent, so a typed value only reaches you via a Button's
+`action.context` as a `path` reference. GE sends a companion text part reading
+"User action triggered."; that is its placeholder, not your payload.
+
 ⚠️ **`output_schema` and `google_search` cannot coexist.** Gemini returns
 `400 INVALID_ARGUMENT: controlled generation is not supported with Search tool`,
 whatever ADK's `output_schema` docstring says about schema and tools composing.
@@ -558,7 +566,7 @@ docs move. Re-verify it only if `google-adk` majors or the GE chat surface chang
 | A2UI: registration path, v0.8-only, mime | GE docs + `a2ui/a2a/parts.py` source, 2026-07-28 | refetch the a2ui-agents doc pages |
 | A2UI: wire format and catalog | v0.8 renderer fixtures in `google/a2ui` | `gh api` the mocks directory |
 | A2UI: DataPart emission, `output_schema`+Search 400, missing `sse-starlette` | **live Cloud Run service + live Gemini API errors, 2026-07-28** | redeploy and POST `message/send` |
-| **A2UI actually painting in the GE app** | **NOT VERIFIED — payload only** | open the GE web app and look |
+| **A2UI painting in the GE app; buttons returning `userAction`** | **live GE web app, 2026-07-28 — both confirmed** | send a message, tap a button, read the session events |
 
 ⚠️ The CLI table is the least independently checkable section here: it requires
 `google-adk` installed, has **no doc page as a second source** (the page that should

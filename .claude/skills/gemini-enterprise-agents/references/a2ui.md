@@ -4,13 +4,15 @@ Verified 2026-07-28 against `google-adk==2.4.0`, `a2a-sdk==0.3.26`, a live Cloud
 Run A2A service and a live `supadha-dev` GE registration. Method is stated per
 claim; treat anything unmarked as unverified.
 
-**Verification status, precisely.** The payload is verified on the wire (real
-`DataPart`s, real mime, real component tree). Gemini Enterprise is verified to
-**negotiate** the extension and to **receive and attempt to render** the card —
-observed as its own validation-failure box in the chat. A *valid* card painting
-successfully is still unverified at the time of writing. Do not upgrade "the
-payload is correct" into "it renders in GE"; those turned out to be several
-distinct bugs apart.
+**Verification status.** End-to-end confirmed 2026-07-28 in the live Gemini
+Enterprise web app: a valid v0.8 card **paints**, and a button press **returns a
+real `userAction` DataPart** to the agent. Both directions work. Earlier
+revisions of this file called the render unverified; it no longer is.
+
+Note the ordering, because it cost several deploy cycles to separate: "the
+payload is correct on the wire" and "GE renders it" and "GE sends clicks back"
+are three distinct claims with three distinct failure modes. Verify them
+separately.
 
 ## What A2UI is
 
@@ -281,6 +283,65 @@ Search-tool conflict in the blockers table.
 Read state through `.get()`, never `dict(state)` — ADK's `State` has no
 `keys()`, so `dict()` raises `KeyError: 0`.
 
+## The return leg — handling a button press
+
+**Confirmed working in Gemini Enterprise, 2026-07-28.** Only `Button` carries an
+`action`; `TextField`, `CheckBox`, `MultipleChoice` and `Slider` bind to the
+client data model and **cannot notify the agent at all**. So a Button is the
+only way anything a user does gets back to you — including anything they typed,
+which must ride along in that Button's `action.context` as a `path` reference.
+
+Outbound, a button looks like this (`action.name` is required; `context` is a
+list of key/value pairs, each value a literal or a data-model path):
+
+```json
+{"id": "greet-sug0", "component": {"Button": {
+  "child": "greet-sug0-label",
+  "action": {"name": "ask",
+             "context": [{"key": "question",
+                          "value": {"literalString": "Who should I message?"}}]}}}}
+```
+
+Inbound, GE sends **two parts in the same user turn**. The real payload, copied
+from a live session event log:
+
+```json
+{"data": {"userAction": {
+    "name": "ask",
+    "surfaceId": "greet",
+    "sourceComponentId": "greet-sug0",
+    "timestamp": "2026-07-28T07:02:26.921Z",
+    "context": {"question": "Who should I message?"}}},
+ "kind": "data",
+ "metadata": {"mimeType": "application/json+a2ui", "is_user_input": true}}
+```
+
+Note `context` arrives as a **flat object**, not the key/value list you sent —
+bindings are resolved client-side before dispatch.
+
+**GE also sends a companion text part reading `"User action triggered."`** That
+string is GE's own transcript placeholder, not something you emitted. Do not
+route on it, and do not treat a turn as free text merely because a text part is
+present — check for the DataPart first.
+
+**How it reaches an ADK agent.** An inbound `DataPart` carrying no ADK metadata
+is converted to an `inline_data` Blob, mime `text/plain`, whose bytes are the
+serialised DataPart between `<a2a_datapart_json>` tags
+(`part_converter.py:176-183`) — the same envelope you use outbound. So it is
+**not** on `part.text`; a handler that only reads text parts will never see it:
+
+```python
+raw = "".join(
+    (p.inline_data.data or b"").decode("utf-8", "replace")
+    for p in (content.parts or []) if p.inline_data)
+```
+
+Parse that deterministically in a `before_agent_callback` and short-circuit the
+turn. Letting the model interpret raw `userAction` JSON is strictly worse: it
+already knows which button was pressed and what it carried, and a model asked to
+re-derive that will sometimes answer the question instead of performing the
+action.
+
 ## Debugging a card that will not draw
 
 GE gives you exactly one signal, and it is in the chat, not the logs: a red box
@@ -416,4 +477,4 @@ Two consequences worth planning for:
 | missing `sse-starlette` | **live container crash** | deploy without `a2a-sdk[http-server]` |
 | in-memory runner defaults, `app_name`, `_get_user_id` | ADK source, cited above | read the cited lines |
 | GE forwards no end-user identity; negotiates the A2UI extension | **live GE call, 2026-07-28** | log header names in the request converter |
-| **GE actually painting the widget** | **NOT VERIFIED** | open the GE app and look |
+| **GE painting the widget; buttons returning `userAction`** | **live GE web app, 2026-07-28 — both confirmed** | send a message, tap a button, read the session events |
