@@ -196,8 +196,13 @@ from .agent import root_agent
 from .card import load_agent_card, require_public_host
 from .runtime import build_runner
 
-PUBLIC_HOST = require_public_host("PUBLIC_HOST", "K_SERVICE")
-PROTOCOL = os.environ.get("PROTOCOL", "https")
+# require_public_host takes the env VALUES, not their names. Passing the names
+# makes the first argument always truthy, the guard never fires, and the card
+# advertises `https://PUBLIC_HOST/` -- a dead agent that boots green.
+PUBLIC_HOST = require_public_host(
+    os.environ.get("PUBLIC_HOST"), os.environ.get("K_SERVICE")
+)
+PROTOCOL = os.environ.get("PUBLIC_PROTOCOL", "https")
 
 app = to_a2a(
     root_agent,
