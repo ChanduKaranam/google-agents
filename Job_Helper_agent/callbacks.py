@@ -15,6 +15,8 @@ import logging
 from google.adk.agents.callback_context import CallbackContext
 from google.genai import types
 
+from .a2ui import build_a2ui_messages, to_genai_parts
+
 logger = logging.getLogger(__name__)
 
 _DEFAULT_USER_ID = "default-user-id"
@@ -68,4 +70,27 @@ async def remember_session(callback_context: CallbackContext) -> None:
         await callback_context.add_session_to_memory()
     except Exception:  # noqa: BLE001 - memory is best-effort, the answer is not
         logger.warning("Could not persist session to memory", exc_info=True)
-    return None
+
+    return _render_a2ui(callback_context)
+
+
+def _render_a2ui(callback_context: CallbackContext) -> types.Content | None:
+    """Draw the tracked-application board, when there is one to draw.
+
+    Returning None leaves the model's own answer untouched, which is the right
+    outcome for every turn that has no structured state behind it -- most of
+    them. A widget is an addition to the conversation, never a replacement for
+    being able to answer.
+
+    Like the memory write above, this must never cost the student their turn: a
+    renderer bug is worth losing the widget over, not the reply.
+    """
+    try:
+        state = dict(getattr(callback_context, "state", None) or {})
+        messages = build_a2ui_messages(state)
+        if not messages:
+            return None
+        return types.Content(role="model", parts=to_genai_parts(messages))
+    except Exception:  # noqa: BLE001 - a broken widget must not break the answer
+        logger.warning("Could not render A2UI surface", exc_info=True)
+        return None

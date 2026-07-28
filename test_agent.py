@@ -383,6 +383,62 @@ def test_require_public_host_refuses_the_localhost_default_on_cloud_run():
     assert require_public_host(None, None) == LOCAL_HOST_DEFAULT
 
 
+def test_pipeline_board_renders_only_real_applications():
+    import json
+
+    from Job_Helper_agent.a2ui import (
+        A2UI_MIME_TYPE,
+        build_a2ui_messages,
+        to_genai_parts,
+    )
+
+    # No state -> nothing rendered. A student who has tracked nothing must not
+    # get an empty board presented as if it were real.
+    assert build_a2ui_messages({}) == []
+    assert build_a2ui_messages({"applications": []}) == []
+
+    apps = [
+        {"company": "Freshworks", "role": "SWE Intern", "status": "Applied", "notes": ""},
+        {"company": "Zoho", "role": "Backend Intern", "status": "Interview", "notes": "onsite Aug 3"},
+    ]
+    msgs = build_a2ui_messages({"applications": apps})
+
+    # Flat list of messages, surfaceUpdate before beginRendering.
+    kinds = [next(iter(m)) for m in msgs]
+    assert kinds == ["surfaceUpdate", "beginRendering"], kinds
+
+    comps = msgs[0]["surfaceUpdate"]["components"]
+    ids = {c["id"] for c in comps}
+    root = msgs[1]["beginRendering"]["root"]
+    assert root in ids
+
+    # Every referenced child must exist, or the renderer drops the subtree.
+    for c in comps:
+        body = next(iter(c["component"].values()))
+        refs = []
+        if "child" in body:
+            refs.append(body["child"])
+        refs += (body.get("children") or {}).get("explicitList", [])
+        for r in refs:
+            assert r in ids, f"{c['id']} references missing component {r}"
+
+    blob = json.dumps(msgs)
+    assert "Freshworks" in blob and "Interview" in blob
+    # NO_INVENTION, structurally: nothing may appear that was not in state.
+    assert "Google" not in blob
+
+    parts = to_genai_parts(msgs)
+    assert len(parts) == len(msgs)
+    for p in parts:
+        raw = p.inline_data.data.decode("utf-8")
+        assert raw.startswith("<a2a_datapart_json>")
+        inner = json.loads(raw[len("<a2a_datapart_json>") : -len("</a2a_datapart_json>")])
+        # Gemini Enterprise identifies an A2UI payload by this mime on the
+        # DataPart metadata. Wrong mime renders as raw JSON text.
+        assert inner["metadata"]["mimeType"] == A2UI_MIME_TYPE
+
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):
