@@ -1181,7 +1181,7 @@ edited text back.
 
 **Interfaces:**
 - Produces: `edit_form(state, student_id) -> list[dict]`,
-  `a2ui.text_field(id, label, path)`, `a2ui.button_with_paths(...)`
+  `a2ui.text_field(id, label, path)`, `a2ui.button_with_values(...)`
 
 - [ ] **Step 1: Write the failing test**
 
