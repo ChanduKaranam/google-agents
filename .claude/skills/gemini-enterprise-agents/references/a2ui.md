@@ -342,6 +342,27 @@ already knows which button was pressed and what it carried, and a model asked to
 re-derive that will sometimes answer the question instead of performing the
 action.
 
+## An A2UI agent cannot speak first
+
+Verified 2026-07-28 in the live GE web app. There is **no "conversation opened"
+event** for a custom agent: it is invoked only by a user message, so a greeting
+card cannot render before the user types. Neither the A2A nor the A2UI
+registration doc contains the words *starter*, *suggested*, *greeting* or
+*welcome*.
+
+**`skills[].examples` on the agent card are NOT surfaced as starter prompts.**
+Tested with five examples on a registered skill: the empty-conversation screen
+shows the avatar, display name, description and the input box — nothing else.
+
+So the only text you control before the first turn is the registration's
+**`description`**. Write it as an instruction ("Say hi to open your section
+cockpit…") rather than a label, and fire the real greeting on turn one.
+
+Note the agent card is **snapshotted at registration**. Redeploying the service
+changes what it *serves*; Gemini Enterprise keeps the old copy until you PATCH
+the registration with the new `jsonAgentCard`. Change both, or you will be
+debugging a card the client never received.
+
 ## Debugging a card that will not draw
 
 GE gives you exactly one signal, and it is in the chat, not the logs: a red box

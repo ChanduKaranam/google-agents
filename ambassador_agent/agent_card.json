@@ -1,7 +1,7 @@
 {
   "protocolVersion": "0.3.0",
   "name": "ambassador_agent",
-  "description": "Campus Ambassador cockpit for one section.",
+  "description": "Say hi to open your section cockpit \u2014 who needs a nudge, where you stand, what unlocks next.",
   "url": "https://REPLACE-AT-RUNTIME/",
   "version": "1.0.0",
   "defaultInputModes": [
