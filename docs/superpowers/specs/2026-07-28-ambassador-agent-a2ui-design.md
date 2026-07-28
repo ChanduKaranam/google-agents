@@ -192,11 +192,17 @@ Every ambassador endpoint is `/mine`-scoped, so without identity there is no
 ambassador-student `GoToken`, so serving the wrong ambassador's link credits the
 wrong person.
 
-**Decision: solve it with OAuth.** Set `authorizationConfig.agentAuthorization`
-on the GE registration; GE runs a Google OAuth flow and forwards a user token;
-the agent introspects it for the email and maps email → ambassador.
+**Decision for v1: conversation-scoped, OAuth deferred.** This build has no
+backend, so there are no `/mine` endpoints to scope and OAuth buys nothing. ADK's
+`A2A_USER_{context_id}` fragments state into one private bucket per conversation
+— forgetful, never leaky — and every demo viewer is Sneha, so a single fixture
+identity is correct rather than a compromise.
 
-Setup, fetched from the A2A registration doc:
+`identity.py` stays pluggable: when the backend lands, OAuth drops in behind the
+same interface without touching surfaces or actions.
+
+OAuth setup, fetched from the A2A registration doc and recorded here for when it
+is needed:
 
 1. OAuth 2.0 Web client; authorized redirect URI must include
    `https://vertexaisearch.cloud.google.com/static/oauth/oauth.html`.
@@ -219,25 +225,25 @@ consent screen will be External with a test-user list and an unverified-app
 warning. Acceptable for a demo and pilot; verification is required before real
 students use it.
 
-## Spike — required before implementation
+## The unknown that shapes everything
 
-Two unknowns gate the whole design, and one throwaway deployment answers both.
+**Does GE emit `userAction`?** The v0.8 spec defines the contract
+(`specification/v0_8/json/client_to_server.json`: `name`, `surfaceId`,
+`sourceComponentId`, `timestamp`, `context`). GE is the client and must
+implement it. Cards are proven to go out; a click has never been seen coming
+back.
 
-1. **Does GE emit `userAction`?** The v0.8 spec defines the contract
-   (`specification/v0_8/json/client_to_server.json`: `name`, `surfaceId`,
-   `sourceComponentId`, `timestamp`, `context`). GE must implement it. If it
-   does not, every button in this design is inert and the agent degrades to
-   read-only cards plus typing.
-2. **Does `authorizationConfig` cause GE to forward a user token?** Answered by
-   adding it to the existing Job Helper registration and re-reading the header
-   log already deployed there.
+If it works, every button in this design works. If it does not, the agent
+degrades to read-only cards plus typing — still useful, but the "select instead
+of replying" premise is gone.
 
-Also worth confirming in the same pass: TextField → data model → Button context
-round-trip.
+This is answered by the **second task of the plan**, not by a throwaway: the
+greeting card and its first button are real code we keep either way. Learning
+the answer on day one is what stops eight surfaces being built on a false
+assumption.
 
-If (1) fails, stop and redesign before writing surfaces. If (2) fails, identity
-falls back to conversation-scoped and the `/mine` endpoints cannot be called for
-real.
+Confirmed in the same pass: TextField → data model → Button `context` via
+`{"path": "/…"}`.
 
 ## Gaps in the backend, for the team
 
