@@ -43,6 +43,41 @@ def button(component_id: str, label_id: str, name: str,
     }
 
 
+def text_field(component_id: str, label: str, path: str,
+               field_type: str = "longText") -> dict:
+    return {
+        "id": component_id,
+        "component": {"TextField": {
+            "label": {"literalString": label},
+            "text": {"path": path},
+            "textFieldType": field_type,
+        }},
+    }
+
+
+def data_model(surface_id: str, contents: dict) -> dict:
+    return {"dataModelUpdate": {"surfaceId": surface_id, "contents": contents}}
+
+
+def button_with_values(component_id: str, label_id: str, name: str,
+                       values: dict) -> dict:
+    """Like `button`, but each value is a full A2UI value object.
+
+    Needed because a Button is the ONLY way a typed value reaches the agent:
+    TextField binds to the data model and cannot dispatch anything itself, so
+    the send button references the draft by path.
+    """
+    return {
+        "id": component_id,
+        "component": {"Button": {
+            "child": label_id,
+            "action": {"name": name,
+                       "context": [{"key": k, "value": v}
+                                   for k, v in values.items()]},
+        }},
+    }
+
+
 def column(component_id: str, children: list[str]) -> dict:
     return {
         "id": component_id,

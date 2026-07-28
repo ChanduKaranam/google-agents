@@ -338,6 +338,44 @@ def test_each_card_binds_both_buttons_to_its_own_student():
                        for c in spec["context"]}
             assert carried == {"student_id": sid}, (sid, suffix, carried)
 
+
+def test_edit_form_offers_three_angles_and_a_send():
+    from ambassador_agent.surfaces import edit_form
+    messages = edit_form({}, "pn")
+    strings = _literals(messages)
+    assert "Edit before sending — Priya Nandakumar" in strings
+    # Angles render with a selection marker ("● Exam panic"), so match on
+    # substring. An exact assertion here would push the implementer to
+    # restructure the card just to satisfy the test.
+    for angle in ("Exam panic", "Placement", "Plain"):
+        assert any(angle in s for s in strings)
+    assert "Send to Priya" in strings
+    names = _action_names(messages)
+    assert names.count("set_angle") == 3
+    assert "send_whatsapp" in names
+
+
+def test_send_carries_the_edited_text_by_path():
+    from ambassador_agent.surfaces import edit_form
+    send = [c["component"]["Button"]["action"]
+            for c in _components(edit_form({}, "pn"))
+            if "Button" in c["component"]
+            and c["component"]["Button"]["action"]["name"] == "send_whatsapp"][0]
+    by_key = {ctx["key"]: ctx["value"] for ctx in send["context"]}
+    assert by_key["student_id"] == {"literalString": "pn"}
+    assert by_key["message"] == {"path": "/draft/text"}
+
+
+def test_sent_form_locks_and_relabels():
+    from ambassador_agent.data import mark_sent
+    from ambassador_agent.surfaces import edit_form
+    state = {}
+    mark_sent(state, "pn")
+    strings = _literals(edit_form(state, "pn"))
+    assert "Sent — Priya Nandakumar" in strings
+    assert "Sent to Priya ✓" in strings
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

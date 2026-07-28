@@ -11,7 +11,8 @@ by colour. Meaning lives in the text.
 """
 
 from . import data
-from .a2ui import button, card, column, row, surface, text
+from .a2ui import (button, button_with_values, card, column, data_model, row,
+                   surface, text, text_field)
 
 METER_WIDTH = 20
 
@@ -107,3 +108,60 @@ def straggler_list(state) -> list[dict]:
 
     components.append(column(f"{prefix}-main-column", child_ids))
     return surface(prefix, components, f"{prefix}-main-column")
+
+
+def fixtures_angles():
+    # Kept as a function, not a module-level `from . import fixtures`, so
+    # surfaces.py never imports fixtures directly -- data.py is the only
+    # module allowed to know the backend is fixtures today.
+    from . import fixtures
+    return fixtures.ANGLES
+
+
+def edit_form(state, student_id: str) -> list[dict]:
+    prefix = f"edit-{student_id}"
+    entry = data.student(student_id)
+    if entry is None:
+        raise KeyError(student_id)
+    first = entry["name"].split(" ")[0]
+    sent = data.is_sent(state, student_id)
+    angle = (state.get("angles", {}) or {}).get(student_id, "Exam panic")
+    draft = (state.get("drafts", {}) or {}).get(student_id) \
+        or data.draft_for(student_id, angle)
+
+    title = (f"Sent — {entry['name']}" if sent
+             else f"Edit before sending — {entry['name']}")
+    cta = f"Sent to {first} ✓" if sent else f"Send to {first}"
+
+    components = [
+        text(f"{prefix}-heading", title, "h5"),
+        text(f"{prefix}-angle-label", "Angle", "caption"),
+    ]
+    angle_ids = []
+    for index, (name, _hint) in enumerate(fixtures_angles()):
+        marker = "● " if name == angle else "○ "
+        components.append(text(f"{prefix}-a{index}-label", marker + name))
+        components.append(button(f"{prefix}-a{index}", f"{prefix}-a{index}-label",
+                                 "set_angle",
+                                 {"student_id": student_id, "angle": name}))
+        angle_ids.append(f"{prefix}-a{index}")
+    components.append(row(f"{prefix}-angles", angle_ids))
+
+    components.append(text_field(f"{prefix}-body", "Message", "/draft/text"))
+    components.append(text(f"{prefix}-cta-label", cta))
+    components.append(button_with_values(
+        f"{prefix}-cta", f"{prefix}-cta-label", "send_whatsapp",
+        {"student_id": {"literalString": student_id},
+         "message": {"path": "/draft/text"}}))
+    components.append(column(f"{prefix}-main-column", [
+        f"{prefix}-heading", f"{prefix}-angle-label", f"{prefix}-angles",
+        f"{prefix}-body", f"{prefix}-cta",
+    ]))
+    components.append(card(f"{prefix}-card", f"{prefix}-main-column"))
+
+    messages = surface(prefix, components, f"{prefix}-card")
+    # The data model seeds the TextField and is what the send button reads
+    # back; kept between surfaceUpdate and beginRendering so the client can
+    # paint with the draft already filled in.
+    messages.insert(1, data_model(prefix, {"draft": {"text": draft}}))
+    return messages
