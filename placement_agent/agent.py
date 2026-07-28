@@ -28,6 +28,9 @@ from .suggestions import (
     compare_resume_versions,
 )
 
+# -- A2UI (rich UI) diagnostic ------------------------------------------------
+from .a2ui.probe import show_a2ui_probe_card
+
 # -- Sub-agent import ---------------------------------------------------------
 from .interview_prep import interview_prep_agent
 
@@ -185,6 +188,19 @@ root_agent = Agent(
         "  - Always end your turn with a visible message. After any tool call you\n"
         "    MUST write the result out to the user -- never finish with empty text.\n\n"
 
+        "=== RICH UI (A2UI) ===\n\n"
+        "  - show_a2ui_probe_card() is a diagnostic. Call it ONLY when the user asks\n"
+        "    to test, check or verify rich UI / interactive cards. Never call it as\n"
+        "    part of resume or interview work.\n"
+        "  - When it returns, your reply must end with the value of its 'a2ui_block'\n"
+        "    field copied VERBATIM -- character for character, on its own line, with\n"
+        "    no code fence, no backticks, no reformatting and no pretty-printing of\n"
+        "    the JSON. The client finds the card by scanning for the exact tags; one\n"
+        "    edited character and nothing renders.\n"
+        "  - Put any words you want to say BEFORE the block, never after it.\n"
+        "  - If the user replies that they see no card, use 'fallback_text' and tell\n"
+        "    them rich UI is not supported in this surface.\n\n"
+
         "=== REMEMBER ===\n\n"
         "Your goal is to coach the user to build a resume that gets them hired AND\n"
         "to prepare them to ace the interview. Use your sub-agent for prep intents --\n"
@@ -202,6 +218,7 @@ root_agent = Agent(
         generate_improvement_suggestions,
         generate_step_by_step_action_plan,
         compare_resume_versions,
+        show_a2ui_probe_card,
     ],
     sub_agents=[interview_prep_agent],
 )

@@ -6,6 +6,7 @@ or just: .venv/bin/python test_agent.py
 
 import asyncio
 import io
+import json
 import os
 import tempfile
 
@@ -16,6 +17,8 @@ from google.genai import types
 
 from Job_Helper_agent.agent import SPECIALISTS, root_agent
 from Job_Helper_agent.tools import list_applications, track_application
+from placement_agent.a2ui import A2UI_CLOSE, A2UI_OPEN
+from placement_agent.a2ui.probe import show_a2ui_probe_card
 from placement_agent.agent import root_agent as placement_root_agent
 from placement_agent.interview_prep.agent import interview_prep_agent
 from placement_agent.interview_prep.progress_tracker import (
@@ -457,6 +460,120 @@ def test_interview_prompt_does_not_hardcode_a_shared_user():
     assert "user_id" not in instruction, (
         "the prompt still tells the model to pass a user_id that no tool accepts"
     )
+
+
+# ---------------------------------------------------------------------------
+# A2UI -- the payload the renderer will actually accept
+#
+# Every assertion below is taken from ADK's own bundled A2UI renderer
+# (google/adk/cli/browser/chunk-2SRK2U7X.js), not from prose docs. That client
+# throws `Invalid data; expected <Type>` and renders nothing when a component
+# fails its shape check, and it fails silently when a referenced component id
+# was never declared -- which is the single most common way an A2UI surface
+# comes back blank.
+# ---------------------------------------------------------------------------
+
+
+def _a2ui_messages(block: str) -> list[dict]:
+    """Parse a block the way the renderer's extractA2uiJsonFromText does."""
+    assert block.startswith(A2UI_OPEN), block[:40]
+    assert block.endswith(A2UI_CLOSE), block[-40:]
+    payload = json.loads(block[len(A2UI_OPEN): -len(A2UI_CLOSE)].strip())
+    assert isinstance(payload, list), "renderer expects an array of messages"
+    return payload
+
+
+def _probe_block() -> str:
+    return show_a2ui_probe_card()["a2ui_block"]
+
+
+def test_a2ui_block_uses_the_marker_the_renderer_scans_for():
+    """The renderer finds A2UI by string search for these exact tags."""
+    messages = _a2ui_messages(_probe_block())
+    kinds = [k for m in messages for k in m]
+    assert "surfaceUpdate" in kinds
+    assert "beginRendering" in kinds
+    # beginRendering names the root; without it the tree is never built.
+    assert kinds.index("surfaceUpdate") < kinds.index("beginRendering"), (
+        "components must be declared before the root that references them"
+    )
+
+
+def test_a2ui_every_referenced_component_id_is_declared():
+    """A dangling id makes buildNodeRecursive return null -- a blank surface,
+    with no error anywhere. Nothing else in the stack catches this."""
+    messages = _a2ui_messages(_probe_block())
+    declared, referenced = set(), set()
+
+    for message in messages:
+        for component in message.get("surfaceUpdate", {}).get("components", []):
+            declared.add(component["id"])
+            (props,) = component["component"].values()
+            for value in props.values():
+                if isinstance(value, str):
+                    referenced.add(value)
+                elif isinstance(value, dict) and "explicitList" in value:
+                    referenced.update(value["explicitList"])
+        if "beginRendering" in message:
+            referenced.add(message["beginRendering"]["root"])
+
+    assert referenced <= declared, f"undeclared component ids: {referenced - declared}"
+
+
+def test_a2ui_components_carry_a_single_typed_body():
+    """buildNodeRecursive switches on Object.keys(component)[0]; a second key
+    is silently ignored and a zero-key component throws."""
+    for message in _a2ui_messages(_probe_block()):
+        for component in message.get("surfaceUpdate", {}).get("components", []):
+            assert set(component) <= {"id", "component", "weight"}, component
+            assert len(component["component"]) == 1, (
+                f"{component['id']} declares {list(component['component'])}"
+            )
+
+
+def test_a2ui_text_is_never_a_bare_string():
+    """isResolvedText requires {path|literal|literalString}; a bare string
+    fails the check and the whole surface throws."""
+    for message in _a2ui_messages(_probe_block()):
+        for component in message.get("surfaceUpdate", {}).get("components", []):
+            body = component["component"].get("Text")
+            if body is None:
+                continue
+            assert isinstance(body["text"], dict), body
+            assert {"path", "literal", "literalString"} & set(body["text"]), body
+
+
+def test_a2ui_button_action_can_be_routed_back_to_a_tool():
+    """The client posts back {userAction:{name, context}}; an unnamed action
+    gives the agent nothing to dispatch on."""
+    buttons = [
+        component["component"]["Button"]
+        for message in _a2ui_messages(_probe_block())
+        for component in message.get("surfaceUpdate", {}).get("components", [])
+        if "Button" in component["component"]
+    ]
+    assert buttons, "the probe card has no interactive element to validate"
+
+    for button in buttons:
+        assert button["action"]["name"], button
+        assert isinstance(button["child"], str), "Button needs a child component"
+        for entry in button["action"].get("context", []):
+            assert set(entry) == {"key", "value"}, entry
+            assert {"literalString", "literalNumber", "literalBoolean", "path"} & set(
+                entry["value"]
+            ), entry
+
+
+def test_a2ui_probe_card_is_wired_into_the_placement_root():
+    names = [_tool_name(t) for t in (placement_root_agent.tools or [])]
+    assert "show_a2ui_probe_card" in names
+
+
+def test_placement_root_is_told_to_emit_the_a2ui_block_verbatim():
+    """The block only renders if it survives the model unedited."""
+    instruction = placement_root_agent.instruction
+    assert "a2ui_block" in instruction
+    assert "verbatim" in instruction.lower()
 
 
 if __name__ == "__main__":
