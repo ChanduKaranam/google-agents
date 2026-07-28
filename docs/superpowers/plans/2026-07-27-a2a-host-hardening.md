@@ -763,6 +763,36 @@ Record the returned agent name. Per the
 before concluding anything about behaviour — a truncated engine ID produces an
 agent that silently does nothing.
 
+- [ ] **Step 4b: Confirm which identity header Gemini Enterprise actually sends**
+
+**Do this before Step 5 — until it passes, the agent refuses every turn.**
+
+`to_a2a()` installs no authentication middleware, so ADK's `_get_user_id` falls
+back to `A2A_USER_{context_id}`, which the identity guard correctly rejects.
+`identity.py` lifts the real end-user identity out of the request headers
+instead — but *which* header Gemini Enterprise sends is undocumented, and
+`IDENTITY_HEADERS` currently carries three candidates as a guess.
+
+Make one real GE call and log what arrives:
+
+```python
+# temporary, in identity.py's converter
+logger.info("GE headers: %s", sorted(headers))
+```
+
+Then **cut `IDENTITY_HEADERS` down to the single confirmed header name.**
+In particular drop `x-user-email`: it is not a Google-managed header, so no
+proxy strips a client-supplied copy of it. Any principal that can invoke the
+service could use it to assert another student's identity and read their
+sessions and Memory Bank. Today that is contained only by
+`--no-allow-unauthenticated`, which is a deploy flag no test enforces —
+narrowing the list is the durable fix.
+
+If GE turns out to send no usable identity header at all, stop and redesign the
+identity path. Do not widen the guard to let the service-agent identity through:
+that collapses every student into one Memory Bank scope, which is the exact leak
+`callbacks.py` exists to prevent — and unlike a refusal, it fails silently.
+
 - [ ] **Step 5: Verify parity in the GE chat surface**
 
 Run each check in GE against the newly registered agent and record the result
@@ -775,6 +805,12 @@ in the ticket's Verification Log. Parity, not improvement, is the bar.
 3. Close the conversation, start a new one, and ask about earlier applications.
    History must come back. This is the Regression 2 check — and it is the one
    most likely to fail first, since it depends on Memory Bank writes landing.
+   It also settles an inference: `build_runner()` sets `app_name` to the engine
+   id because the Agent Engine template defaults it that way
+   (`templates/adk.py:995-1001`) and Memory Bank scopes retrieval on it. That
+   was read from source, never measured. If history does not come back, the
+   app_name scope is the first place to look — a returning student reading back
+   nothing is precisely the silent failure this branch exists to prevent.
 4. Confirm the agent answers at all — if every turn returns the "I can't
    continue: this request arrived without a user identity" refusal, then auth
    is not populating `call_context.user.user_name` and identity must be fixed
