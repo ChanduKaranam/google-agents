@@ -17,6 +17,15 @@ from google.genai import types
 from Job_Helper_agent.agent import SPECIALISTS, root_agent
 from Job_Helper_agent.tools import list_applications, track_application
 from placement_agent.agent import root_agent as placement_root_agent
+from placement_agent.interview_prep.agent import interview_prep_agent
+from placement_agent.interview_prep.progress_tracker import (
+    get_progress_summary,
+    init_progress,
+    log_mock_interview,
+    log_question_attempt,
+    mark_topic_complete,
+    suggest_next_step,
+)
 from placement_agent.resume_parser import parse_resume
 
 # Built-in Gemini tools, which cannot share an agent with function tools.
@@ -347,6 +356,107 @@ def test_placement_agents_do_not_mix_builtin_and_function_tools():
                 f"{agent.name} holds built-in {_tool_name(built_ins[0])!r} alongside"
                 " function tools. Gemini rejects this at request time."
             )
+
+
+# ---------------------------------------------------------------------------
+# interview_prep -- whose progress is this, and where does it live
+#
+# Two defects shipped together here. The store was a module-global dict, which
+# on Agent Runtime is per-container memory: it dies on restart and diverges
+# across instances. Worse, `user_id` was a model-supplied argument and the
+# prompt told the model to pass the literal 'default_user' -- so every end user
+# of the deployed agent read and wrote one shared record. Identity must come
+# from the session, never from the model.
+# ---------------------------------------------------------------------------
+
+PROGRESS_TOOLS = [
+    init_progress,
+    mark_topic_complete,
+    log_question_attempt,
+    log_mock_interview,
+    get_progress_summary,
+    suggest_next_step,
+]
+
+
+class _FakeSession:
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.id = "session-1"
+
+
+class _FakeProgressContext:
+    """Stand-in for ToolContext: .state plus the session that names the user."""
+
+    def __init__(self, user_id="student@example.com", state=None):
+        self.session = _FakeSession(user_id)
+        self.state = {} if state is None else state
+
+
+def test_progress_tools_never_take_a_user_id_from_the_model():
+    """The declaration is the contract. If `user_id` is in it, the model fills
+    it in -- and one hallucinated constant merges every student's record."""
+    for fn in PROGRESS_TOOLS:
+        schema = FunctionTool(fn)._get_declaration().parameters_json_schema or {}
+        assert "user_id" not in (schema.get("properties") or {}), (
+            f"{fn.__name__} still asks the model for user_id; identity must come"
+            " from tool_context.session"
+        )
+
+
+def test_progress_identity_comes_from_the_session():
+    ctx = _FakeProgressContext("priya@college.edu")
+    out = init_progress(ctx, "software engineer")
+    assert out["user_id"] == "priya@college.edu"
+
+
+def test_two_users_do_not_share_one_progress_record():
+    """The live bug: with 'default_user' hardcoded, B saw A's completed topics."""
+    a = _FakeProgressContext("a@college.edu")
+    b = _FakeProgressContext("b@college.edu")
+
+    init_progress(a, "software engineer")
+    mark_topic_complete(a, "data_structures")
+
+    assert get_progress_summary(b)["status"] == "no_session", (
+        "user B can see user A's progress"
+    )
+
+
+def test_progress_persists_in_session_state_across_tool_calls():
+    """Survives because it is in ADK session state, not a module global."""
+    state = {}
+    init_progress(_FakeProgressContext(state=state), "data analyst")
+    for topic in ("data_structures", "algorithms", "sql_databases"):
+        mark_topic_complete(_FakeProgressContext(state=state), topic)
+
+    summary = get_progress_summary(_FakeProgressContext(state=state))
+    assert summary["completed_topics"] == [
+        "data_structures",
+        "algorithms",
+        "sql_databases",
+    ]
+    # Three completions is the auto-level-up threshold.
+    assert summary["current_difficulty"] == "medium"
+    assert summary["role"] == "data analyst"
+
+
+def test_progress_writes_through_state_so_adk_records_the_delta():
+    """Mutating a dict already in state is not a recorded delta in ADK; the
+    record has to be assigned back or the write is lost on the real service."""
+    ctx = _FakeProgressContext()
+    init_progress(ctx, "software engineer")
+    assert "interview_progress" in ctx.state
+
+
+def test_interview_prompt_does_not_hardcode_a_shared_user():
+    instruction = interview_prep_agent.instruction
+    assert "default_user" not in instruction, (
+        "the prompt still names one shared record"
+    )
+    assert "user_id" not in instruction, (
+        "the prompt still tells the model to pass a user_id that no tool accepts"
+    )
 
 
 if __name__ == "__main__":

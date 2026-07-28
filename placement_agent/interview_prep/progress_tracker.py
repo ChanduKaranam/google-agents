@@ -1,21 +1,25 @@
 # -*- coding: utf-8 -*-
 """
 interview_prep/progress_tracker.py
-In-session progress tracking for the Interview Preparation Agent.
+Progress tracking for the Interview Preparation Agent.
 Tracks completed topics, current difficulty, and suggests next steps.
 
-Note: Progress is stored per session in memory (dict). For persistence
-across sessions, swap _SESSION_STORE with a file or DB backend.
+Storage is ADK session state (``tool_context.state``), not process memory.
+Deployed on Agent Runtime that is VertexAiSessionService, so a record survives
+container restarts and is isolated per (app, user, session) by construction.
+
+The user is identified from ``tool_context.session.user_id`` -- never from a
+model-supplied argument. An earlier version took ``user_id`` as a tool
+parameter and the prompt told the model to pass the literal 'default_user',
+which merged every student's progress into one shared record.
 """
 
-import json
 import time
-from typing import Optional
 
-# ---------------------------------------------------------------------------
-# In-memory store  {user_id: progress_record}
-# ---------------------------------------------------------------------------
-_SESSION_STORE: dict[str, dict] = {}
+from google.adk.tools.tool_context import ToolContext
+
+# Session-state key holding this user's progress record.
+_STATE_KEY = "interview_progress"
 
 _TOPIC_AREAS = [
     "data_structures",
@@ -42,10 +46,36 @@ _BADGES = {
 }
 
 
-def _get_or_create(user_id: str, role: str = "") -> dict:
-    if user_id not in _SESSION_STORE:
-        _SESSION_STORE[user_id] = {
-            "user_id": user_id,
+# ---------------------------------------------------------------------------
+# Session-state access
+# ---------------------------------------------------------------------------
+
+def _user_id(tool_context: ToolContext) -> str:
+    """The signed-in user, straight from the session. Never from the model."""
+    session = getattr(tool_context, "session", None)
+    return getattr(session, "user_id", "") or "unknown_user"
+
+
+def _load(tool_context: ToolContext) -> dict | None:
+    return tool_context.state.get(_STATE_KEY)
+
+
+def _save(tool_context: ToolContext, record: dict) -> None:
+    """Assign the whole record back.
+
+    ADK tracks state deltas by assignment. Mutating a dict already sitting in
+    state is not recorded, so the write would be silently dropped by the real
+    session service.
+    """
+    record["last_active"] = time.time()
+    tool_context.state[_STATE_KEY] = record
+
+
+def _get_or_create(tool_context: ToolContext, role: str = "") -> dict:
+    record = _load(tool_context)
+    if record is None:
+        record = {
+            "user_id": _user_id(tool_context),
             "role": role,
             "current_difficulty": "easy",
             "completed_topics": [],
@@ -58,10 +88,8 @@ def _get_or_create(user_id: str, role: str = "") -> dict:
             "badges_earned": [],
             "notes": [],
         }
-    record = _SESSION_STORE[user_id]
     if role and not record["role"]:
         record["role"] = role
-    record["last_active"] = time.time()
     return record
 
 
@@ -96,26 +124,25 @@ def _check_and_award_badges(record: dict) -> list[str]:
 # Public tool functions
 # ---------------------------------------------------------------------------
 
-def init_progress(user_id: str, role: str, difficulty: str = "easy") -> dict:
+def init_progress(tool_context: ToolContext, role: str, difficulty: str = "easy") -> dict:
     """
-    Initialize or reset a user's interview preparation progress session.
+    Initialize or reset the current user's interview preparation progress.
 
     Args:
-        user_id: Unique identifier for the user (use session ID or name).
         role: Target job role (e.g., 'software engineer').
         difficulty: Starting difficulty level: 'easy' | 'medium' | 'hard'.
 
     Returns:
         dict with the initialized progress record summary.
     """
-    if user_id in _SESSION_STORE:
-        del _SESSION_STORE[user_id]
-    record = _get_or_create(user_id, role)
+    tool_context.state[_STATE_KEY] = None
+    record = _get_or_create(tool_context, role)
     if difficulty in _DIFFICULTY_LEVELS:
         record["current_difficulty"] = difficulty
+    _save(tool_context, record)
     return {
         "status": "initialized",
-        "user_id": user_id,
+        "user_id": record["user_id"],
         "role": role,
         "starting_difficulty": record["current_difficulty"],
         "total_topics": len(_TOPIC_AREAS),
@@ -123,19 +150,18 @@ def init_progress(user_id: str, role: str, difficulty: str = "easy") -> dict:
     }
 
 
-def mark_topic_complete(user_id: str, topic: str, role: str = "") -> dict:
+def mark_topic_complete(tool_context: ToolContext, topic: str, role: str = "") -> dict:
     """
     Mark a preparation topic as completed and check for difficulty progression.
 
     Args:
-        user_id: User identifier.
         topic: Topic name (e.g., 'data_structures', 'behavioral', 'system_design').
-        role: Optional role, used if session doesn't exist yet.
+        role: Optional role, used if no session exists yet.
 
     Returns:
         dict with updated progress, any new badges, and next topic suggestion.
     """
-    record = _get_or_create(user_id, role)
+    record = _get_or_create(tool_context, role)
 
     if topic not in record["completed_topics"]:
         record["completed_topics"].append(topic)
@@ -148,6 +174,7 @@ def mark_topic_complete(user_id: str, topic: str, role: str = "") -> dict:
         record["current_difficulty"] = _DIFFICULTY_LEVELS[new_idx]
 
     new_badges = _check_and_award_badges(record)
+    _save(tool_context, record)
 
     # Suggest the next incomplete topic
     remaining = [t for t in _TOPIC_AREAS if t not in record["completed_topics"]]
@@ -165,7 +192,7 @@ def mark_topic_complete(user_id: str, topic: str, role: str = "") -> dict:
 
 
 def log_question_attempt(
-    user_id: str,
+    tool_context: ToolContext,
     correct: bool,
     role: str = "",
 ) -> dict:
@@ -173,17 +200,17 @@ def log_question_attempt(
     Log a question attempt and update accuracy stats.
 
     Args:
-        user_id: User identifier.
         correct: Whether the user answered correctly.
-        role: Optional role for session init.
+        role: Optional role, used if no session exists yet.
 
     Returns:
         dict with updated attempt stats and accuracy percentage.
     """
-    record = _get_or_create(user_id, role)
+    record = _get_or_create(tool_context, role)
     record["questions_attempted"] += 1
     if correct:
         record["questions_correct"] += 1
+    _save(tool_context, record)
 
     accuracy = (
         int(100 * record["questions_correct"] / record["questions_attempted"])
@@ -198,20 +225,20 @@ def log_question_attempt(
     }
 
 
-def log_mock_interview(user_id: str, role: str = "") -> dict:
+def log_mock_interview(tool_context: ToolContext, role: str = "") -> dict:
     """
     Log the completion of a full mock interview session.
 
     Args:
-        user_id: User identifier.
-        role: Optional role for session init.
+        role: Optional role, used if no session exists yet.
 
     Returns:
         dict with mock count, any new badges, and encouragement message.
     """
-    record = _get_or_create(user_id, role)
+    record = _get_or_create(tool_context, role)
     record["mock_interviews_done"] += 1
     new_badges = _check_and_award_badges(record)
+    _save(tool_context, record)
 
     messages = [
         "Great practice! Each mock makes the real thing easier.",
@@ -227,23 +254,20 @@ def log_mock_interview(user_id: str, role: str = "") -> dict:
     }
 
 
-def get_progress_summary(user_id: str) -> dict:
+def get_progress_summary(tool_context: ToolContext) -> dict:
     """
-    Get a full progress summary for a user's current preparation session.
-
-    Args:
-        user_id: User identifier.
+    Get a full progress summary for the current user's preparation session.
 
     Returns:
         dict with completion stats, difficulty, badges, and next steps.
     """
-    if user_id not in _SESSION_STORE:
+    record = _load(tool_context)
+    if record is None:
         return {
             "status": "no_session",
             "message": "No active session found. Start by telling me what role you are preparing for.",
         }
 
-    record = _SESSION_STORE[user_id]
     completed = record["completed_topics"]
     remaining = [t for t in _TOPIC_AREAS if t not in completed]
     pct = int(100 * len(completed) / len(_TOPIC_AREAS)) if _TOPIC_AREAS else 0
@@ -251,7 +275,7 @@ def get_progress_summary(user_id: str) -> dict:
     session_minutes = int((time.time() - record["session_start"]) / 60)
 
     return {
-        "user_id": user_id,
+        "user_id": record["user_id"],
         "role": record["role"],
         "completion_percent": pct,
         "current_difficulty": record["current_difficulty"],
@@ -273,23 +297,20 @@ def get_progress_summary(user_id: str) -> dict:
     }
 
 
-def suggest_next_step(user_id: str) -> dict:
+def suggest_next_step(tool_context: ToolContext) -> dict:
     """
-    Suggest the single most impactful next preparation step for a user.
-
-    Args:
-        user_id: User identifier.
+    Suggest the single most impactful next preparation step for the current user.
 
     Returns:
         dict with a focused next action recommendation.
     """
-    if user_id not in _SESSION_STORE:
+    record = _load(tool_context)
+    if record is None:
         return {
             "suggestion": "Start by telling me the role you are preparing for so I can build your personalized plan.",
             "action": "provide_role",
         }
 
-    record = _SESSION_STORE[user_id]
     remaining = [t for t in _TOPIC_AREAS if t not in record["completed_topics"]]
 
     if not remaining:
