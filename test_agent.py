@@ -166,18 +166,47 @@ class _FakeCallbackContext:
         self.user_id = user_id
 
 
-def test_identity_guard_rejects_untrustworthy_user_ids():
-    # Agent Engine's silent fallback.
-    assert require_real_user(_FakeCallbackContext("default-user-id")) is not None
+def test_identity_guard_rejects_only_the_shared_bucket():
+    """Reject values that put two students in ONE bucket. Nothing else.
 
-    # ADK's A2A fallback when auth is off. Per-conversation, not per-student:
-    # letting this through means Memory Bank scopes history to a single chat
-    # and the privacy guard is effectively disabled.
-    assert require_real_user(_FakeCallbackContext("A2A_USER_ctx-abc123")) is not None
+    `default-user-id` is Agent Engine's silent fallback and is identical for
+    every caller -- one bucket, everyone's data in it. That is a leak and stays
+    refused.
+
+    `A2A_USER_{context_id}` is ADK's A2A fallback. Measured 2026-07-28: Gemini
+    Enterprise forwards no end-user identity to an A2A agent at all -- no email
+    header, nothing in message metadata, and the only credential present is the
+    Discovery Engine service agent, which is the same for everyone. The
+    context_id is a per-conversation UUID, so accepting it FRAGMENTS the scope
+    into one bucket per conversation rather than collapsing it. Forgetful, not
+    leaky -- and refusing it instead simply took the agent offline.
+    """
+    # One shared bucket for everyone. Still refused.
+    assert require_real_user(_FakeCallbackContext("default-user-id")) is not None
+    assert require_real_user(_FakeCallbackContext("")) is not None
+    assert require_real_user(_FakeCallbackContext(None)) is not None
+
+    # No context id means no conversation to scope to.
     assert require_real_user(_FakeCallbackContext("A2A_USER_")) is not None
 
-    # A real signed-in student must still get through.
+    # Conversation-scoped: private per chat, so allowed.
+    assert require_real_user(_FakeCallbackContext("A2A_USER_ctx-abc123")) is None
+
+    # A real signed-in student, if identity ever becomes available.
     assert require_real_user(_FakeCallbackContext("student@example.com")) is None
+
+
+def test_identity_headers_exclude_client_assertable_names():
+    """Only proxy-managed headers may name a user.
+
+    `x-user-email` is not managed by any Google proxy, so nothing strips a
+    client-supplied copy -- anyone able to reach the service could assert
+    another student's identity with it.
+    """
+    from Job_Helper_agent.identity import IDENTITY_HEADERS
+
+    assert "x-user-email" not in IDENTITY_HEADERS
+    assert all(h.startswith("x-goog-") for h in IDENTITY_HEADERS), IDENTITY_HEADERS
 
 
 class _FakeContext:
@@ -365,8 +394,8 @@ def test_extract_user_id_returns_none_rather_than_guessing():
     from Job_Helper_agent.identity import extract_user_id
 
     assert extract_user_id({}) is None
-    assert extract_user_id({"x-user-email": ""}) is None
-    assert extract_user_id({"x-user-email": "   "}) is None
+    assert extract_user_id({"x-goog-authenticated-user-email": ""}) is None
+    assert extract_user_id({"x-goog-authenticated-user-email": "   "}) is None
     assert extract_user_id({"x-goog-authenticated-user-email": "accounts.google.com:"}) is None
     assert extract_user_id({"user-agent": "curl/8.0", "host": "example.com"}) is None
 
@@ -399,13 +428,17 @@ def test_request_converter_only_overrides_user_id_on_a_real_find():
             lambda request, part_converter: _FakeRunRequest()
         )
 
-        found = convert(_FakeRequest({"x-user-email": "student@example.edu"}))
+        found = convert(_FakeRequest({"x-goog-authenticated-user-email": "student@example.edu"}))
         assert found.user_id == "student@example.edu"
         assert require_real_user(_FakeCallbackContext("student@example.edu")) is None
 
+        # No identity header: the sentinel must survive UNTOUCHED. The converter
+        # must never invent an identity or reach for the service account.
         missing = convert(_FakeRequest({"user-agent": "curl/8.0"}))
         assert missing.user_id == "A2A_USER_ctx-abc123"
-        assert require_real_user(_FakeCallbackContext(missing.user_id)) is not None
+        # That sentinel is now allowed through, because it scopes to one
+        # conversation rather than to one shared bucket -- see the guard test.
+        assert require_real_user(_FakeCallbackContext(missing.user_id)) is None
     finally:
         identity_module.convert_a2a_request_to_agent_run_request = original
 

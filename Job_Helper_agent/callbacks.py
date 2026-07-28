@@ -19,23 +19,41 @@ from .a2ui import build_a2ui_messages, to_genai_parts
 
 logger = logging.getLogger(__name__)
 
+# Agent Engine's silent fallback (`vertexai/agent_engines/templates/adk.py:102`).
+# It is the SAME string for every caller, so accepting it puts every student's
+# sessions, artifacts and memories in one shared bucket. That is the leak this
+# guard exists to prevent, and it stays refused.
 _DEFAULT_USER_ID = "default-user-id"
 
 # ADK's A2A server synthesises this when no authenticated caller is present
-# (`google/adk/a2a/converters/request_converter.py:66-77`). It is scoped to one
-# conversation, not one student, so treating it as an identity would silently
-# reset a returning student's history and collapse the Memory Bank scope.
-_A2A_ANONYMOUS_PREFIX = "A2A_USER_"
+# (`google/adk/a2a/converters/request_converter.py:66-77`).
+#
+# Measured against a live Gemini Enterprise call, 2026-07-28: GE forwards NO
+# end-user identity to an A2A agent. Not an email header, not message metadata,
+# not an authenticated principal -- the only credential on the request is
+# `x-serverless-authorization`, the Discovery Engine service agent, which is
+# identical for every student. So this sentinel is the only identity available.
+#
+# Accepting it is safe because `context_id` is a per-conversation UUID: it
+# FRAGMENTS the scope into one private bucket per conversation rather than
+# collapsing it into one shared bucket. The cost is memory, not privacy -- a
+# returning student starts fresh, because their next conversation is a new id.
+# Refusing it instead simply took the agent offline for everyone.
+_A2A_CONVERSATION_PREFIX = "A2A_USER_"
 
 
 def _is_real_user(user_id: str | None) -> bool:
+    """True when this id isolates one student from another."""
     if not user_id or user_id == _DEFAULT_USER_ID:
         return False
-    return not user_id.startswith(_A2A_ANONYMOUS_PREFIX)
+    # A bare prefix carries no context id, so it scopes to nothing.
+    if user_id == _A2A_CONVERSATION_PREFIX:
+        return False
+    return True
 
 
 def require_real_user(callback_context: CallbackContext) -> types.Content | None:
-    """Block the turn unless the caller supplied a real user identity."""
+    """Block the turn unless the caller's id isolates them from other students."""
     if _is_real_user(callback_context.user_id):
         return None
     return types.Content(

@@ -14,11 +14,22 @@ The same call context already carries every request header at
 `call_context.state['headers']`, so the identity is available; it just is not
 where ADK looks. This module bridges the two.
 
-WHICH header Gemini Enterprise actually sends is UNCONFIRMED and must be
-verified against a live GE call (inspect `call_context.state['headers']` on a
-real request). Until then the lookup is deliberately tolerant of several
-plausible names -- and when none of them match it returns None, leaving the
-`A2A_USER_*` sentinel in place so the guard still refuses. It never invents an
+MEASURED 2026-07-28 against a live Gemini Enterprise call: **GE forwards no
+end-user identity to an A2A agent.** The request carried only
+`['a2a-extensions', 'accept', 'cache-control', 'content-length',
+'content-type', 'forwarded', 'host', 'traceparent', 'user-agent',
+'x-a2a-extensions', 'x-cloud-trace-context', 'x-forwarded-for',
+'x-forwarded-proto', 'x-serverless-authorization']` -- no email header, empty
+message metadata, and an unauthenticated principal. `x-serverless-authorization`
+is the Discovery Engine service agent, identical for every student, so it must
+never be used as an identity.
+
+So this module finds nothing today, and students are isolated per conversation
+by the sentinel instead (see `callbacks.py`). It is kept because the supported
+route to real identity -- an `authorizationConfig` on the GE registration, which
+makes GE run an OAuth flow and forward a user token -- would surface here.
+
+When it returns None the sentinel survives untouched. It never invents an
 identity and never falls back to the service account.
 """
 
@@ -33,10 +44,14 @@ from google.adk.a2a.converters.request_converter import (
 
 logger = logging.getLogger(__name__)
 
+# Only proxy-managed names. `x-user-email` was dropped 2026-07-28: nothing
+# strips a client-supplied copy of it, so anyone able to reach the service could
+# assert another student's identity. Measured the same day, Gemini Enterprise
+# sends none of these -- they are kept for the day it does, and until then the
+# conversation-scoped fallback in callbacks.py is what isolates students.
 IDENTITY_HEADERS = (
     "x-goog-authenticated-user-email",
     "x-goog-iap-jwt-assertion-email",
-    "x-user-email",
 )
 
 # Google identity headers carry the issuer as a prefix, e.g.
