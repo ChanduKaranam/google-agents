@@ -24,10 +24,14 @@ identity and never falls back to the service account.
 
 from __future__ import annotations
 
+import logging
+
 from google.adk.a2a.converters.part_converter import convert_a2a_part_to_genai_part
 from google.adk.a2a.converters.request_converter import (
     convert_a2a_request_to_agent_run_request,
 )
+
+logger = logging.getLogger(__name__)
 
 IDENTITY_HEADERS = (
     "x-goog-authenticated-user-email",
@@ -64,6 +68,15 @@ def build_request_converter():
         call_context = getattr(request, "call_context", None)
         headers = (getattr(call_context, "state", None) or {}).get("headers", {})
         user_id = extract_user_id(headers)
+        # Names only, never values: these headers carry the student's email and
+        # bearer tokens. The names alone are what tells us which one Gemini
+        # Enterprise actually sends, which is the open question this logging
+        # exists to close. Drop it to DEBUG once IDENTITY_HEADERS is narrowed.
+        logger.info(
+            "a2a request headers=%s identity_found=%s",
+            sorted(str(name).lower() for name in (headers or {})),
+            bool(user_id),
+        )
         # Only override on a real find. No match means the A2A_USER_* sentinel
         # survives and `require_real_user` refuses the turn -- refusing beats
         # guessing who the student is.
