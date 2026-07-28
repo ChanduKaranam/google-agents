@@ -110,6 +110,95 @@ def straggler_list(state) -> list[dict]:
     return surface(prefix, components, f"{prefix}-main-column")
 
 
+def _entry_card(prefix: str, key: str, lines: list[tuple[str, str]]) -> tuple[list[dict], str]:
+    """One card per row. `lines` is (suffix, content), first line is the head."""
+    components, child_ids = [], []
+    for index, (suffix, content) in enumerate(lines):
+        component_id = f"{prefix}-{key}-{suffix}"
+        components.append(text(component_id, content,
+                               "h5" if index == 0 else "caption"))
+        child_ids.append(component_id)
+    components.append(column(f"{prefix}-{key}-column", child_ids))
+    components.append(card(f"{prefix}-{key}-card", f"{prefix}-{key}-column"))
+    return components, f"{prefix}-{key}-card"
+
+
+def leaderboard(state) -> list[dict]:
+    prefix = "board"
+    board = data.get_leaderboard(state)
+    components, child_ids = [], []
+    for index, entry in enumerate(board["data"]):
+        # Her section rides along in the head so her row reads "#19  You —
+        # EEE Sem 3 · Sec B" -- the marker is text, never colour, per the
+        # fairness rule, so it has to sit next to the name that carries it.
+        head = f"#{entry['rank']}  {entry['name']} — {entry['cohortSection']}"
+        detail = f"{entry['pct']}% · {entry['activated']} / {entry['size']}"
+        made, card_id = _entry_card(prefix, f"r{index}",
+                                    [("head", head), ("detail", detail)])
+        components.extend(made)
+        child_ids.append(card_id)
+
+    components.append(text(f"{prefix}-basis",
+                           "Ranked on % of section activated · under-30 pooled"
+                           " · verified activations only", "caption"))
+    components.append(text(f"{prefix}-foot", fixtures_board_footnote(),
+                           "caption"))
+    child_ids.extend([f"{prefix}-basis", f"{prefix}-foot"])
+    components.append(column(f"{prefix}-main-column", child_ids))
+    return surface(prefix, components, f"{prefix}-main-column")
+
+
+def rewards(state) -> list[dict]:
+    prefix = "rew"
+    components, child_ids = [], []
+    for index, tier in enumerate(data.get_rewards(state)):
+        # Earned tiers read just "earned" -- no "at X%" clutter for something
+        # already banked. Tiers still ahead keep the "at X% -- N more" form so
+        # the distance to unlock stays visible.
+        status = tier["status"]
+        detail = status if status == "earned" else f"at {tier['at']} — {status}"
+        made, card_id = _entry_card(prefix, f"t{index}", [
+            ("head", tier["reward"]),
+            ("detail", detail),
+        ])
+        components.extend(made)
+        child_ids.append(card_id)
+    components.append(text(
+        f"{prefix}-foot",
+        "Your credential is yours regardless of rank. Rewards are fulfilled at"
+        " close-out, and follow section outcomes — never effort.", "caption"))
+    child_ids.append(f"{prefix}-foot")
+    components.append(column(f"{prefix}-main-column", child_ids))
+    return surface(prefix, components, f"{prefix}-main-column")
+
+
+def roster(state) -> list[dict]:
+    prefix = "ros"
+    components, child_ids = [], []
+    for index, entry in enumerate(data.get_roster(state)):
+        made, card_id = _entry_card(prefix, f"s{index}", [
+            ("head", entry["name"]),
+            ("detail", f"{entry['status']} · {entry['how']}"),
+        ])
+        components.extend(made)
+        child_ids.append(card_id)
+    components.append(text(f"{prefix}-foot", fixtures_roster_footnote(),
+                           "caption"))
+    child_ids.append(f"{prefix}-foot")
+    components.append(column(f"{prefix}-main-column", child_ids))
+    return surface(prefix, components, f"{prefix}-main-column")
+
+
+def fixtures_board_footnote():
+    from . import fixtures
+    return fixtures.BOARD_FOOTNOTE
+
+
+def fixtures_roster_footnote():
+    from . import fixtures
+    return fixtures.ROSTER_FOOTNOTE
+
+
 def fixtures_angles():
     # Kept as a function, not a module-level `from . import fixtures`, so
     # surfaces.py never imports fixtures directly -- data.py is the only

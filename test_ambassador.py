@@ -391,6 +391,34 @@ def test_edit_form_keeps_an_in_flight_edit():
     seeded = [m for m in messages if "dataModelUpdate" in m][0]
     assert seeded["dataModelUpdate"]["contents"]["draft"]["text"] == typed
 
+def test_leaderboard_always_shows_percent_and_count_and_the_basis():
+    from ambassador_agent.surfaces import leaderboard
+    strings = _literals(leaderboard({}))
+    assert any("96.7%" in s and "58 / 60" in s for s in strings)
+    assert any("72.9%" in s and "43 / 59" in s for s in strings)
+    assert any(s.startswith("#19") for s in strings)
+    assert "178 qualifying sections · under-30 pooled" in strings
+
+def test_leaderboard_marks_her_row_in_text_not_colour():
+    from ambassador_agent.surfaces import leaderboard
+    assert any("You" in s and "EEE Sem 3 · Sec B" in s
+               for s in _literals(leaderboard({})))
+
+def test_rewards_lists_four_tiers_with_status():
+    from ambassador_agent.surfaces import rewards
+    strings = _literals(rewards({}))
+    assert "75% Club — tee + certificate" in strings
+    assert "Full House — the 100% badge" in strings
+    assert any("2 more" in s for s in strings)  # renders as "at 75% — 2 more"
+    assert strings.count("earned") == 2
+
+def test_roster_shows_six_of_fiftynine():
+    from ambassador_agent.surfaces import roster
+    strings = _literals(roster({}))
+    assert "Aarti Sharma" in strings
+    assert "Showing 6 of 59" in strings
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
