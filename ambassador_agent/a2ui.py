@@ -62,10 +62,25 @@ def card(component_id: str, child: str) -> dict:
 
 
 def surface(prefix: str, components: list[dict], root_id: str) -> list[dict]:
-    """Wrap components into the two messages a client needs to paint."""
+    """Wrap components into the two messages a client needs to paint.
+
+    Raises rather than asserts: `python -O` strips assertions, and this is the
+    only guard between a bad id and a card that fails silently in Gemini
+    Enterprise -- no server-side log, at most a red box in the chat.
+    """
+    seen: set[str] = set()
     for component in components:
-        assert component["id"] not in RESERVED_IDS, component["id"]
-        assert component["id"].startswith(f"{prefix}-"), component["id"]
+        component_id = component["id"]
+        if component_id in RESERVED_IDS:
+            raise ValueError(
+                f"{component_id!r} is reserved and GE's validator rejects it")
+        if not component_id.startswith(f"{prefix}-"):
+            raise ValueError(
+                f"{component_id!r} is not namespaced under {prefix!r};"
+                " ids must be unique across every surface drawn in one turn")
+        if component_id in seen:
+            raise ValueError(f"duplicate component id {component_id!r}")
+        seen.add(component_id)
     return [
         {"surfaceUpdate": {"surfaceId": prefix, "components": components}},
         {"beginRendering": {"surfaceId": prefix, "root": root_id}},
