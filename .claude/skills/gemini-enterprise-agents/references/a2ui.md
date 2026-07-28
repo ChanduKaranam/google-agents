@@ -220,13 +220,44 @@ Set `app_name` to the engine id.
 per-conversation id, not a person. Verified live: an agent that guards on
 identity refuses every turn.
 
-Lift the real identity from `call_context.state['headers']` (populated at
-`a2a/server/apps/jsonrpc/jsonrpc_app.py:151`) via
-`A2aAgentExecutorConfig(request_converter=...)`, which both executor paths honour
-(`a2a_agent_executor.py:211`). **Which header GE sends is not documented** —
-log the header names on a real call and confirm. Never fall back to the
-Discovery Engine service-agent identity: it is the same for every user and
-collapses everyone into one memory scope.
+**Measured 2026-07-28 against a live GE call: Gemini Enterprise forwards NO
+end-user identity to an A2A agent.** The request carried only:
+
+```
+a2a-extensions, accept, cache-control, content-length, content-type, forwarded,
+host, traceparent, user-agent, x-a2a-extensions, x-cloud-trace-context,
+x-forwarded-for, x-forwarded-proto, x-serverless-authorization
+```
+
+with empty message metadata and an unauthenticated principal. `x-serverless-authorization`
+is the **Discovery Engine service agent** — identical for every user. Never use
+it as an identity: that is the one value that genuinely collapses every user
+into a single memory scope.
+
+Two ways forward, and the choice is a product decision, not a technical one:
+
+- **Conversation-scoped (works immediately).** Accept ADK's
+  `A2A_USER_{context_id}`. `context_id` is a per-conversation UUID, so this
+  **fragments** the scope into one private bucket per conversation rather than
+  collapsing it. No user can see another's data; the cost is that a returning
+  user starts fresh, because their next conversation is a new id. Note the
+  asymmetry: fragmenting is forgetful, collapsing is a leak. Guard against the
+  *collapsing* values (`default-user-id`, empty) and let the fragmenting one
+  through — a guard that refuses the sentinel simply takes the agent offline.
+- **Real per-user identity.** Set `authorizationConfig.agentAuthorization` on
+  the GE registration. GE then runs a Google OAuth flow and forwards a user
+  access token — but it is **opaque**, so recovering the email needs token
+  introspection on every call.
+
+If a header ever does appear, lift it from `call_context.state['headers']`
+(populated at `a2a/server/apps/jsonrpc/jsonrpc_app.py:151`) via
+`A2aAgentExecutorConfig(request_converter=...)`, which both executor paths
+honour (`a2a_agent_executor.py:211`). Accept only proxy-managed names
+(`x-goog-*`) — a header like `x-user-email` is not stripped by any proxy, so any
+caller could assert someone else's identity with it.
+
+**GE does negotiate the A2UI extension**: the same call carried `a2a-extensions`
+and `x-a2a-extensions`.
 
 Sessions/Memory Bank both need an `agent_engine_id`, so the Agent Runtime
 instance stays provisioned as the store even after serving moves to Cloud Run.
@@ -333,4 +364,5 @@ Two consequences worth planning for:
 | `output_schema` + `google_search` → 400 | **live Gemini API error** | attach a schema to a search agent and call it |
 | missing `sse-starlette` | **live container crash** | deploy without `a2a-sdk[http-server]` |
 | in-memory runner defaults, `app_name`, `_get_user_id` | ADK source, cited above | read the cited lines |
+| GE forwards no end-user identity; negotiates the A2UI extension | **live GE call, 2026-07-28** | log header names in the request converter |
 | **GE actually painting the widget** | **NOT VERIFIED** | open the GE app and look |
