@@ -34,6 +34,10 @@ def parse_user_action(content: str) -> dict | None:
 # Keyword sets lifted from the prototype's own reply() so the demo answers the
 # same questions with the same surfaces.
 _INTENTS = [
+    # Demo affordance, checked first so "simulate 100%" cannot be swallowed by
+    # a later keyword. The prototype put this control in its own chrome; a GE
+    # agent has no chrome, so typing is the only place it can live.
+    ("simulate", ("simulate", "jump to", "pretend")),
     ("stragglers", ("nudge", "message", "who should")),
     ("leaderboard", ("rank", "leader")),
     ("rewards", ("reward", "badge", "credential", "unlock", "next")),
@@ -160,8 +164,32 @@ def route(state, action: dict) -> tuple[str, list[dict]]:
     return UNKNOWN_REPLY, []
 
 
+# Spoken forms -> phase. Longest match wins so "100" beats "0".
+_PHASE_WORDS = (
+    ("complete", "complete"), ("100", "complete"), ("full house", "complete"),
+    ("target", "target"), ("75", "target"),
+    ("live", "live"), ("start", "live"), ("reset", "live"),
+)
+
+
+def phase_from(question: str) -> str | None:
+    lowered = (question or "").lower()
+    for word, phase in _PHASE_WORDS:
+        if word in lowered:
+            return phase
+    return None
+
+
 def route_question(state, question: str) -> tuple[str, list[dict]]:
     intent = intent_for(question)
+    if intent == "simulate":
+        phase = phase_from(question)
+        if phase is None:
+            return ('Which one? Say "simulate live", "simulate 75%" or'
+                    ' "simulate 100%".'), []
+        data.set_phase(state, phase)
+        return (f"Demo: showing the section at the {phase} state."
+                f" {data.milestone_line(state)}"), surfaces.cohort_summary(state)
     if intent == "stragglers":
         return _stragglers_reply(state)
     if intent == "leaderboard":

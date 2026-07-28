@@ -567,6 +567,44 @@ def test_prototype_copy_reference_is_committed():
     assert ("Ranked on % of section activated · under-30 sections pooled"
             " · verified activations only") in cockpit
 
+
+def test_the_phase_simulator_is_reachable_by_typing():
+    """The demo's payoff must be reachable through the UI, not only via route().
+
+    Gemini Enterprise gives an agent no chrome, so the prototype's out-of-chat
+    simulate control has nowhere to live except typed input. Task 8 shipped the
+    action with no path to it: every phrasing hit the unknown-intent fallback.
+    """
+    from ambassador_agent.actions import intent_for, phase_from, route_question
+    from ambassador_agent.data import get_cohort
+
+    for said, expected in (("simulate complete", "complete"),
+                           ("simulate 100%", "complete"),
+                           ("jump to 75%", "target"),
+                           ("simulate target", "target"),
+                           ("simulate live", "live"),
+                           ("pretend we reset", "live")):
+        assert intent_for(said) == "simulate", said
+        assert phase_from(said) == expected, said
+
+    state = {}
+    reply, messages = route_question(state, "simulate 100%")
+    assert messages, "simulator drew nothing"
+    assert get_cohort(state)["stats"]["activated"] == 59
+    assert "Every student in Sec B is activated" in reply
+
+    reply, messages = route_question({}, "simulate")
+    assert "Which one?" in reply and messages == []
+
+
+def test_simulate_is_matched_before_other_intents():
+    from ambassador_agent.actions import intent_for
+
+    # "simulate 100%" contains no other keyword, but "jump to the next state"
+    # contains "next", which would otherwise route to rewards.
+    assert intent_for("jump to the next state") == "simulate"
+    assert intent_for("what unlocks next?") == "rewards"
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
