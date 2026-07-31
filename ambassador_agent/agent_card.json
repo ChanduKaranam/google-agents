@@ -1,0 +1,46 @@
+{
+  "protocolVersion": "0.3.0",
+  "name": "ambassador_agent",
+  "description": "Say hi to open your section cockpit \u2014 who needs a nudge, where you stand, what unlocks next.",
+  "url": "https://REPLACE-AT-RUNTIME/",
+  "version": "1.0.0",
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "capabilities": {
+    "streaming": true,
+    "extensions": [
+      {
+        "uri": "https://a2ui.org/a2a-extension/a2ui/v0.8",
+        "required": false,
+        "params": {
+          "supportedCatalogIds": [
+            "https://a2ui.org/specification/v0_8/standard_catalog_definition.json"
+          ]
+        }
+      }
+    ]
+  },
+  "skills": [
+    {
+      "id": "cohort",
+      "name": "Your section",
+      "description": "Who still needs activating, who has ignored the campaigns, and what to send them.",
+      "tags": [
+        "ambassador",
+        "cohort",
+        "outreach"
+      ],
+      "examples": [
+        "Who should I message?",
+        "Where do I stand?",
+        "How is my rank calculated?",
+        "What unlocks next?",
+        "Show my cohort"
+      ]
+    }
+  ]
+}

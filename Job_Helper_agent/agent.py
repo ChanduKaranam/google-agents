@@ -17,6 +17,7 @@ Two structural rules this file obeys, both learned the hard way:
 """
 
 from google.adk.agents.llm_agent import Agent
+from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.tools import google_search
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.load_artifacts_tool import load_artifacts_tool
@@ -96,9 +97,104 @@ profile_agent = Agent(
 )
 
 
-company_agent = Agent(
+# Structured output so the A2UI renderer can draw real cards. Plain dicts, not
+# Pydantic (rule 5). ADK exposes tools during the thought loop and enforces the
+# schema only on the final answer, so google_search still runs and the
+# one-built-in-per-agent rule is untouched.
+COMPANIES_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "companies": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "why_it_fits": {
+                        "type": "string",
+                        "description": "Names the specific overlapping skills.",
+                    },
+                    "fit": {
+                        "type": "string",
+                        "enum": ["Strong", "Moderate", "Stretch"],
+                    },
+                    "industry": {"type": "string"},
+                    "size_or_stage": {"type": "string"},
+                    "opening_title": {"type": "string"},
+                    "opening_url": {
+                        "type": "string",
+                        "description": (
+                            "Link to an opening you actually found. Omit it"
+                            " entirely rather than guessing a careers URL."
+                        ),
+                    },
+                },
+                "required": ["name", "why_it_fits", "fit"],
+            },
+        },
+        "note": {
+            "type": "string",
+            "description": (
+                "Anything the student must hear that is not a company -- e.g."
+                " that the profile is missing, or that they fit almost nothing"
+                " at a sensible level and should run a resume-gap check."
+            ),
+        },
+    },
+    "required": ["companies"],
+}
+
+# `profile_url` is required on purpose: a person we cannot link to is a person
+# we may not name (REAL_PEOPLE_RULES). The schema refuses to describe one, so
+# the guarantee survives even if the instruction is later edited badly.
+ALUMNI_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "alumni": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "role": {"type": "string"},
+                    "company": {"type": "string"},
+                    "college_and_year": {"type": "string"},
+                    "location": {"type": "string"},
+                    "profile_url": {
+                        "type": "string",
+                        "description": "The public profile link you found them through.",
+                    },
+                    "shared_context": {
+                        "type": "string",
+                        "description": "One phrase naming what they share with the student.",
+                    },
+                },
+                "required": ["name", "profile_url"],
+            },
+        },
+        "search_links": {
+            "type": "object",
+            "description": (
+                "Fill this from the alumni_search_links tool whenever the"
+                " alumni list is short or empty, so the student can run the"
+                " search on LinkedIn themselves."
+            ),
+            "properties": {
+                "people_search": {"type": "string"},
+                "people_search_with_role": {"type": "string"},
+                "school_page_search": {"type": "string"},
+            },
+        },
+        "verified_count": {"type": "integer"},
+        "note": {"type": "string"},
+    },
+    "required": ["alumni"],
+}
+
+
+company_search_agent = Agent(
     model=MODEL,
-    name="company_agent",
+    name="company_search_agent",
     description=(
         "Recommends companies that fit the student's profile and finds current"
         " openings. Call after the profile exists."
@@ -156,9 +252,9 @@ company_agent = Agent(
 )
 
 
-alumni_agent = Agent(
+alumni_search_agent = Agent(
     model=MODEL,
-    name="alumni_agent",
+    name="alumni_search_agent",
     description=(
         "Finds alumni and professionals at a target company who could plausibly"
         " give a referral. Call with the target company name."
@@ -193,6 +289,74 @@ alumni_agent = Agent(
     ),
     tools=[google_search],
     output_key="alumni",
+)
+
+
+# Structuring runs as a second step, not as a schema on the search agent:
+# Gemini rejects controlled generation together with the Search tool outright
+# ("400 INVALID_ARGUMENT: controlled generation is not supported with Search
+# tool"), whatever ADK's output_schema docstring implies. So the search half
+# keeps google_search and writes prose, and this half -- which holds no tools
+# at all -- turns that prose into the structure the A2UI renderer draws from.
+company_structure_agent = Agent(
+    model=MODEL,
+    name="company_structure_agent",
+    description="Turns the company shortlist prose into structured records.",
+    instruction=(
+        "Convert the company shortlist below into the required JSON.\n\n"
+        "Shortlist:\n{companies?}\n\n"
+        "Copy only what the shortlist already says. You are reformatting, not"
+        " researching: add no company, no opening, and no link that does not"
+        " appear above, and never repair a partial URL into a plausible one."
+        " Omit `opening_url` entirely when no real link was given. If the"
+        " shortlist is empty or says the profile is missing, return an empty"
+        " companies list and put the explanation in `note`."
+    ),
+    output_schema=COMPANIES_SCHEMA,
+    output_key="companies_data",
+)
+
+
+company_agent = SequentialAgent(
+    name="company_agent",
+    description=(
+        "Recommends companies that fit the student's profile and finds current"
+        " openings. Call after the profile exists."
+    ),
+    sub_agents=[company_search_agent, company_structure_agent],
+)
+
+
+alumni_structure_agent = Agent(
+    model=MODEL,
+    name="alumni_structure_agent",
+    description="Turns the alumni findings into structured records.",
+    instruction=(
+        "Convert the alumni findings below into the required JSON.\n\n"
+        "Findings:\n{alumni?}\n\n"
+        "Copy only what the findings already say -- you are reformatting, not"
+        " researching.\n\n"
+        "A person WITHOUT a real profile link found in the findings must be"
+        " left out entirely. Do not invent a link, do not guess a LinkedIn URL"
+        " from someone's name, and do not pad the list to make it look fuller."
+        " An empty alumni list is a normal, correct answer: public search"
+        " genuinely cannot tell who from a college works at a company.\n\n"
+        "Whenever the findings include LinkedIn search links, copy them into"
+        " `search_links` -- that is how the student checks for themselves when"
+        " we found nobody. Put any caveat in `note`."
+    ),
+    output_schema=ALUMNI_SCHEMA,
+    output_key="alumni_data",
+)
+
+
+alumni_agent = SequentialAgent(
+    name="alumni_agent",
+    description=(
+        "Finds alumni and professionals at a target company who could plausibly"
+        " give a referral. Call with the target company name."
+    ),
+    sub_agents=[alumni_search_agent, alumni_structure_agent],
 )
 
 
