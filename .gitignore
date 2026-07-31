@@ -11,4 +11,4 @@ __pycache__/
 
 # local adk session/artifact storage
 .adk/
-.claude/settings.local.json
+.claude/settings.local.json.DS_Store
