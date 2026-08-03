@@ -4,13 +4,13 @@ from google.adk.agents import Agent
 from google.adk.agents.callback_context import CallbackContext
 from google.genai import types
 
-from . import data
+from . import data, sethu
 from .a2ui import build_greeting, to_genai_parts
 from .actions import (chips_for, chips_for_action, intent_for,
                       parse_user_action, route, route_question)
 from .surfaces import (chips_surface, cohort_summary, leaderboard, rewards,
                        roster, straggler_list)
-from .tools import ALL_TOOLS
+from .tools import ALL_TOOLS, UNAVAILABLE
 
 logger = logging.getLogger(__name__)
 
@@ -180,6 +180,15 @@ def render_surface(callback_context: CallbackContext) -> types.Content | None:
         )
         return types.Content(role="model", parts=to_genai_parts(messages))
 
+    except sethu.SethuError:
+        # Sethu was unreachable. Swallowing this left her with the model's
+        # generic reply and NO card and NO chips -- measured in Gemini
+        # Enterprise, and it reads as a dead agent. Say so, and keep the
+        # options on screen so she can try again with one tap.
+        logger.warning("Sethu unreachable while drawing a surface")
+        return types.Content(
+            role="model",
+            parts=to_genai_parts(build_greeting(UNAVAILABLE, DEFAULT_CHIPS)))
     except Exception:  # noqa: BLE001 - a broken widget must not break the answer
         logger.warning("Could not render A2UI surface", exc_info=True)
         return None

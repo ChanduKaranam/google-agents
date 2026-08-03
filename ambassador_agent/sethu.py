@@ -43,7 +43,14 @@ AGENT_TOKEN_ENV = "SETHU_AGENT_TOKEN"
 
 # Sethu's dev API is on Render's free tier: a cold start measured 45s, and a
 # 20s timeout turned every first request of the day into a failed turn.
-TIMEOUT_SECONDS = 60
+TIMEOUT_SECONDS = 30
+
+# Sethu's dev API sleeps on Render's free tier. The request that wakes it
+# reliably times out, so one retry is the difference between a card and a
+# silent failure -- the second attempt lands on a warm server and returns in
+# about a second. Measured in Gemini Enterprise 2026-08-03: the first message
+# of a session drew no card at all because of this.
+RETRY_ON_TIMEOUT = 1
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +200,20 @@ def get(kind: str, student_id: str | None = None) -> dict:
 
 
 def _get_uncached(kind: str, student_id: str | None) -> dict:
+    last: SethuError | None = None
+    for attempt in range(RETRY_ON_TIMEOUT + 1):
+        try:
+            return _fetch(kind, student_id)
+        except SethuError as error:
+            last = error
+            if error.code:
+                raise           # a real API answer (401/403/404) -- do not retry
+            logger.info("Retrying %s after transport failure (attempt %d)",
+                        kind, attempt + 1)
+    raise last
+
+
+def _fetch(kind: str, student_id: str | None) -> dict:
     session = _agent_token()
     tenant = session["tenantId"]
     paths = {

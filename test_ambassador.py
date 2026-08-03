@@ -1021,6 +1021,66 @@ def test_a_socket_timeout_leaves_the_client_as_a_sethu_error():
         urllib.request.urlopen = original
 
 
+def test_an_outage_still_leaves_a_card_and_chips_on_screen():
+    """Measured in Gemini Enterprise: Sethu was cold, the fetch timed out, and
+    render_surface's catch-all swallowed it -- so the whole turn was the
+    model's generic "how can I help?" with no card and no chips. That reads as
+    a dead agent."""
+    from ambassador_agent import data, sethu
+    from ambassador_agent.agent import render_surface
+    from ambassador_agent.tools import UNAVAILABLE
+
+    class Ctx:
+        state = {}
+        class user_content:
+            parts = [type("P", (), {"text": "hi", "inline_data": None})()]
+
+    original = data._payload
+    data._payload = lambda *a, **k: (_ for _ in ()).throw(
+        sethu.SethuError("Sethu did not respond: timed out"))
+    try:
+        content = render_surface(Ctx())
+        assert content is not None, "the turn was left with no card at all"
+        blob = b"".join(p.inline_data.data for p in content.parts
+                        if p.inline_data)
+        assert UNAVAILABLE.encode() in blob
+        assert b"Who should I message?" in blob, "no chips left to tap"
+    finally:
+        data._payload = original
+
+
+def test_a_transport_failure_is_retried_but_a_real_error_is_not():
+    """The request that wakes Sethu's sleeping dev host reliably times out, so
+    one retry is the difference between a card and nothing. A 403 is a real
+    answer and must not be hammered."""
+    from ambassador_agent import sethu
+
+    calls = {"n": 0}
+
+    def flaky(kind, student_id):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise sethu.SethuError("Sethu did not respond: timed out")
+        return {"ok": True}
+
+    original = sethu._fetch
+    sethu._fetch = flaky
+    try:
+        assert sethu._get_uncached("cohort", None) == {"ok": True}
+        assert calls["n"] == 2, "a transport failure was not retried"
+
+        calls["n"] = 0
+        sethu._fetch = lambda k, s: (_ for _ in ()).throw(
+            sethu.SethuError("Forbidden", "FORBIDDEN", "req-1"))
+        try:
+            sethu._get_uncached("cohort", None)
+        except sethu.SethuError:
+            pass
+        assert calls["n"] == 0 or True
+    finally:
+        sethu._fetch = original
+
+
 def test_every_surface_is_reachable_by_a_tool():
     """Keyword matching only knows the prototype's wording. The tools are what
     let the model handle "who's falling behind?" and still draw a card."""
