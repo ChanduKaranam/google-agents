@@ -5,7 +5,7 @@ from google.adk.agents.callback_context import CallbackContext
 from google.genai import types
 
 from . import data, sethu
-from .a2ui import build_greeting, to_genai_parts
+from .a2ui import build_greeting, button, row, text, to_genai_parts
 from .actions import (DEFAULT_CHIPS, chips_for, chips_for_action, intent_for,
                       parse_user_action, route, route_question)
 from .surfaces import (chips_surface, cohort_summary, leaderboard, rewards,
@@ -79,11 +79,48 @@ def _with_chips(messages: list[dict], labels: list[str]) -> list[dict]:
 
     The prototype keeps one chip row in its chrome, always visible. Gemini
     Enterprise gives an agent no chrome, so the only way to keep options in
-    front of her is to put a row in each turn -- including replies that are
-    just a sentence, like a send confirmation. She should never have to type
-    to get moving again.
+    front of her is to put a row in each turn.
+
+    They must ride INSIDE the turn's card. Measured in GE 2026-08-03: a turn
+    carrying two surfaces renders only the first, so a chip row sent as its own
+    surface never appeared -- reported twice as "I don't see the 4 suggestions
+    after every message". With no card to attach to (a send confirmation), a
+    standalone chip surface is correct, because then it is the first one.
     """
-    return messages + chips_surface(labels)
+    if not messages:
+        return chips_surface(labels)
+
+    update = next((m["surfaceUpdate"] for m in messages if "surfaceUpdate" in m), None)
+    root = next((m["beginRendering"]["root"] for m in messages
+                 if "beginRendering" in m), None)
+    if update is None or root is None:
+        return messages + chips_surface(labels)
+
+    prefix = update["surfaceId"]
+    components = update["components"]
+    by_id = {c["id"]: c for c in components}
+
+    # The root is a Card wrapping a Column, or a Column already. Chips hang off
+    # the Column either way -- a Card takes a single child and cannot hold a
+    # sibling.
+    container = by_id.get(root)
+    spec = next(iter(container["component"].values())) if container else None
+    if spec and isinstance(spec.get("child"), str):
+        container = by_id.get(spec["child"])
+        spec = next(iter(container["component"].values())) if container else None
+    children = (spec or {}).get("children", {}).get("explicitList")
+    if children is None:
+        return messages + chips_surface(labels)   # nothing to attach to
+
+    chip_ids = []
+    for index, label in enumerate(labels):
+        label_id, button_id = f"{prefix}-chip{index}-label", f"{prefix}-chip{index}"
+        components.append(text(label_id, label))
+        components.append(button(button_id, label_id, "ask", {"question": label}))
+        chip_ids.append(button_id)
+    components.append(row(f"{prefix}-chiprow", chip_ids))
+    children.append(f"{prefix}-chiprow")
+    return messages
 
 
 def handle_click(callback_context: CallbackContext) -> types.Content | None:

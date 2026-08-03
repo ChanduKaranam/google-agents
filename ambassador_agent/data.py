@@ -301,6 +301,41 @@ def draft_for(state, student_id: str, angle_key: str = "examPanic") -> str:
     return angles.get(angle_key) or entry.get("draftMessage", "")
 
 
+def append_link(message: str, link: str) -> str:
+    """Add the /go/ link unless the draft already carries it.
+
+    Sethu's `draftMessage` ends with the link; her own edit may or may not.
+    Appending blindly showed the same url twice in the message she sends.
+    """
+    if not link or link in (message or ""):
+        return message
+    return f"{message}\n{link}"
+
+
+_LINK_WORDS = {"not_sent": "no link sent yet",
+               "sent": "link sent, not opened",
+               "opened": "opened the link, no sign-in"}
+
+
+def straggler_note(entry: dict) -> str:
+    """The one line under a student's name.
+
+    Live `contextNote` is the same sentence for every student in the cohort
+    ("Same cohort — EEE Yr4 Sec A"), which tells her nothing about who to chase
+    first. `rollNo`, `pendingDays` and `linkStatus` actually differ.
+    """
+    bits = []
+    if entry.get("rollNo"):
+        bits.append(entry["rollNo"])
+    days = entry.get("pendingDays")
+    if days:
+        bits.append(f"pending {plural(days, 'day')}")
+    status = _LINK_WORDS.get(entry.get("linkStatus"))
+    if status:
+        bits.append(status)
+    return " · ".join(bits) or entry.get("contextNote", "")
+
+
 def wa_link(state, student_id: str) -> str:
     """The /go/ attribution link. Her credit rides on this url."""
     entry = student(state, student_id)

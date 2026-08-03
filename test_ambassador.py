@@ -207,8 +207,9 @@ def test_straggler_list_draws_one_card_per_pending_student():
     assert names.count("open_student") == 3
     strings = _literals(messages)
     assert "Kavya S" in strings
-    # contextNote and the draft are the API's copy, rendered as sent
-    assert "Day 12 — first nudge window" in strings
+    # the per-student note is built from rollNo/pendingDays/linkStatus, since
+    # live contextNote is identical for everyone in the cohort
+    assert "21CS002 · pending 12 days · no link sent yet" in strings
     assert any("sethu.app/go/abc123" in s for s in strings)
     assert any("Circuits agent" in s for s in strings)
 
@@ -709,7 +710,13 @@ def test_every_turn_offers_the_options_again():
 
     with_card = {"name": "show_stragglers", "context": {}}
     _reply, messages = route({}, with_card)
-    assert len(_with_chips(messages, chips_for_action(with_card))) > len(messages)
+    # chips ride inside the card's own surface now, so the message COUNT does
+    # not grow -- what matters is that the labels are on screen
+    chipped = _with_chips(messages, chips_for_action(with_card))
+    labels = [c["component"]["Text"]["text"]["literalString"]
+              for m in chipped if "surfaceUpdate" in m
+              for c in m["surfaceUpdate"]["components"] if "Text" in c["component"]]
+    assert "Where do I stand?" in labels, labels
 
 
 def test_the_greeting_is_drawn_once_but_the_options_keep_coming():
@@ -1214,6 +1221,98 @@ def test_a_caller_with_no_sethu_account_is_told_so():
     message = sethu.message_for(sethu.NotRegistered("no account"))
     assert "ambassador" in message.lower(), message
     assert "can't reach" not in message.lower(), "wrong message: that is the outage one"
+
+
+def test_chips_ride_inside_the_card_not_in_a_second_surface():
+    """Measured in GE 2026-08-03: a turn carrying two surfaces rendered only
+    the first, so the chip row -- always sent second -- never appeared. Asked
+    for twice: the four prompts after EVERY reply."""
+    from ambassador_agent.actions import DEFAULT_CHIPS
+    from ambassador_agent.agent import _with_chips
+    from ambassador_agent.surfaces import cohort_summary, leaderboard
+
+    for builder in (cohort_summary, leaderboard):
+        messages = _with_chips(builder({}), DEFAULT_CHIPS)
+        surface_ids = {m["surfaceUpdate"]["surfaceId"]
+                       for m in messages if "surfaceUpdate" in m}
+        assert len(surface_ids) == 1, (builder.__name__, surface_ids)
+
+        comps = [c for m in messages if "surfaceUpdate" in m
+                 for c in m["surfaceUpdate"]["components"]]
+        labels = [c["component"]["Text"]["text"]["literalString"]
+                  for c in comps if "Text" in c["component"]]
+        for chip in DEFAULT_CHIPS:
+            assert chip in labels, (builder.__name__, chip)
+
+        # and the row is actually reachable from the rendered root
+        ids = {c["id"] for c in comps}
+        referenced = set()
+        for c in comps:
+            spec = next(iter(c["component"].values()))
+            if isinstance(spec.get("child"), str):
+                referenced.add(spec["child"])
+            referenced.update((spec.get("children") or {}).get("explicitList") or [])
+        row = [i for i in ids if i.endswith("-chiprow")]
+        assert row and row[0] in referenced, (builder.__name__, "chip row orphaned")
+
+
+def test_a_text_only_reply_still_gets_a_chip_surface():
+    """With no card to attach to -- a send confirmation -- the chips have to
+    travel as their own surface, which is fine: it is then the FIRST one."""
+    from ambassador_agent.actions import DEFAULT_CHIPS
+    from ambassador_agent.agent import _with_chips
+
+    messages = _with_chips([], DEFAULT_CHIPS)
+    labels = [c["component"]["Text"]["text"]["literalString"]
+              for m in messages if "surfaceUpdate" in m
+              for c in m["surfaceUpdate"]["components"] if "Text" in c["component"]]
+    assert all(chip in labels for chip in DEFAULT_CHIPS), labels
+
+
+def test_the_straggler_list_is_paged_to_stay_renderable():
+    """Abhishek's 11 stragglers built a 33KB, 145-component surface and Gemini
+    Enterprise silently dropped it -- he got the sentence and no cards, while
+    smaller surfaces in the same session rendered fine."""
+    import json
+
+    from ambassador_agent.surfaces import STRAGGLER_PAGE, straggler_list
+
+    messages = straggler_list({})
+    comps = [c for m in messages if "surfaceUpdate" in m
+             for c in m["surfaceUpdate"]["components"]]
+    names = [c["component"]["Text"]["text"]["literalString"]
+             for c in comps if c["id"].endswith("-name")]
+    assert len(names) <= STRAGGLER_PAGE, names
+    assert len(json.dumps(messages)) < 15000, len(json.dumps(messages))
+
+
+def test_the_go_link_is_not_pasted_twice():
+    """Live data: Sethu's draftMessage already ends with the /go/ link, and we
+    appended it again -- the ambassador saw the same url twice in the message
+    she was about to send."""
+    from ambassador_agent.data import append_link
+
+    link = "https://sethu.app/go/H8FoYc"
+    already = f"Hi Aarav, your agent is ready. Tap here: {link}"
+    assert append_link(already, link) == already
+    plain = "Hi Aarav, your agent is ready."
+    assert append_link(plain, link) == f"{plain}\n{link}"
+
+
+def test_the_straggler_note_says_something_per_student():
+    """Live contextNote is the same sentence for everyone ('Same cohort — EEE
+    Yr4 Sec A'), so a card built on it tells her nothing about who to chase
+    first. pendingDays and linkStatus differ per student."""
+    from ambassador_agent.data import straggler_note
+
+    note = straggler_note({"rollNo": "TIL112", "pendingDays": 4,
+                           "linkStatus": "not_sent",
+                           "contextNote": "Same cohort — EEE Yr4 Sec A"})
+    assert "TIL112" in note and "4 days" in note
+    assert "no link sent yet" in note, note
+    assert straggler_note({"pendingDays": 1, "linkStatus": "opened"}).count("1 day") == 1
+    # nothing useful from the API still yields a sentence, not an empty caption
+    assert straggler_note({"contextNote": "Same cohort"}) == "Same cohort"
 
 
 def test_every_surface_is_reachable_by_a_tool():

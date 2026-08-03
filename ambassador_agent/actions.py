@@ -80,7 +80,9 @@ def intent_for(question: str) -> str:
     return "unknown"
 
 
-def _stragglers_reply(state) -> tuple[str, list[dict]]:
+def _stragglers_reply(state, reset: bool = True) -> tuple[str, list[dict]]:
+    if reset:
+        state["strag_offset"] = 0      # asking again starts from the top
     pending = data.get_stragglers(state)
     if not pending:
         stats = data.get_cohort(state)["stats"]
@@ -126,6 +128,11 @@ def _route(state, action: dict) -> tuple[str, list[dict]]:
     if name == "show_stragglers":
         return _stragglers_reply(state)
 
+    if name == "more_stragglers":
+        state["strag_offset"] = (int(state.get("strag_offset", 0) or 0)
+                                 + surfaces.STRAGGLER_PAGE)
+        return "", surfaces.straggler_list(state)
+
     if name == "open_student":
         return "", surfaces.student_detail(state, student_id)
 
@@ -155,8 +162,7 @@ def _route(state, action: dict) -> tuple[str, list[dict]]:
         message = context.get("message") or data.draft_for(
             state, student_id, (state.get("angles", {}) or {}).get(
                 student_id, "examPanic"))
-        link = data.wa_link(state, student_id)
-        body = f"{message}\n{link}"
+        body = data.append_link(message, data.wa_link(state, student_id))
         deeplink = data.whatsapp_deeplink(state, student_id, body)
         data.mark_sent(state, student_id)
         # She asked for a button with the link in it. A2UI v0.8 cannot: the

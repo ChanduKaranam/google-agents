@@ -19,6 +19,15 @@ from .a2ui import (button, button_with_values, card, column, data_model, row,
 
 METER_WIDTH = 20
 
+# How many student cards one turn may draw.
+#
+# Abhishek's 11 stragglers built a 33KB, 145-component surface and Gemini
+# Enterprise dropped it silently -- he saw the sentence and no cards, while a
+# 5.6KB leaderboard in the same session rendered fine. Four cards keeps a turn
+# near 12KB, comfortably inside whatever the limit is, and reads better than a
+# wall of eleven.
+STRAGGLER_PAGE = 4
+
 
 def meter(pct: float) -> str:
     """Draw activation as text. A2UI v0.8 has no ProgressBar.
@@ -75,7 +84,11 @@ def cohort_summary(state) -> list[dict]:
 
 def straggler_list(state) -> list[dict]:
     prefix = "strag"
-    students = data.get_stragglers(state)
+    everyone = data.get_stragglers(state)
+    offset = max(int(state.get("strag_offset", 0) or 0), 0)
+    if offset >= len(everyone):
+        offset = 0
+    students = everyone[offset:offset + STRAGGLER_PAGE]
     components: list[dict] = []
     child_ids: list[str] = []
 
@@ -84,7 +97,7 @@ def straggler_list(state) -> list[dict]:
         base = f"{prefix}-{sid}"
         components.extend([
             text(f"{base}-name", entry["name"], "h5"),
-            text(f"{base}-meta", entry.get("contextNote", ""), "caption"),
+            text(f"{base}-meta", data.straggler_note(entry), "caption"),
             text(f"{base}-msg", data.draft_for(state, sid)),
             text(f"{base}-link", entry.get("goLink", ""), "caption"),
             text(f"{base}-send-label", "Send from my WhatsApp"),
@@ -106,9 +119,21 @@ def straggler_list(state) -> list[dict]:
         ])
         child_ids.append(f"{base}-card")
 
+    shown = offset + len(students)
+    remaining = len(everyone) - shown
+    if remaining > 0:
+        nxt = min(STRAGGLER_PAGE, remaining)
+        components.append(text(f"{prefix}-more-label",
+                               f"Show the next {nxt} of {remaining} left"))
+        components.append(button(f"{prefix}-more", f"{prefix}-more-label",
+                                 "more_stragglers"))
+        child_ids.append(f"{prefix}-more")
+
+    counted = (f"Showing {offset + 1}–{shown} of {len(everyone)}. "
+               if len(everyone) > STRAGGLER_PAGE else "")
     components.append(text(
         f"{prefix}-foot",
-        "You send from your own WhatsApp — I never send as you."
+        f"{counted}You send from your own WhatsApp — I never send as you."
         " Your link carries your credit.",
         "caption"))
     child_ids.append(f"{prefix}-foot")
