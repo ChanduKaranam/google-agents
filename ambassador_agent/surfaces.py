@@ -8,9 +8,12 @@ count are always shown together, with the ranking basis stated.
 
 Styling is two fields, `font` and `primaryColor`, so no row can be highlighted
 by colour. Meaning lives in the text.
+
+Every label here is built from Sethu's live response. Nothing is hardcoded to a
+section, a name or a number.
 """
 
-from . import data
+from . import data, fixtures
 from .a2ui import (button, button_with_values, card, column, data_model, row,
                    suggestions, surface, text, text_field)
 
@@ -22,8 +25,7 @@ def meter(pct: float) -> str:
 
     Clamped because an out-of-range percentage silently produces a meter of the
     wrong LENGTH rather than an error: `"█" * -1` is empty, while the remainder
-    term grows past METER_WIDTH. Unreachable from `data.py` today, but this
-    helper is the kind of thing a later caller passes a raw number to.
+    term grows past METER_WIDTH.
     """
     filled = round(max(0.0, min(100.0, pct)) / 100 * METER_WIDTH)
     return "█" * filled + "░" * (METER_WIDTH - filled)
@@ -33,23 +35,25 @@ def cohort_summary(state) -> list[dict]:
     prefix = "cohort"
     cohort = data.get_cohort(state)
     stats = cohort["stats"]
-    pending = len(cohort["stragglers"])
+    pending = len(data.get_stragglers(state))
     note = data.milestone_line(state)
     if pending:
-        plural = "student needs" if pending == 1 else "students need"
-        note += f" {pending} {plural} a personal message from you."
+        needs = "student needs" if pending == 1 else "students need"
+        note += f" {pending} {needs} a personal message from you."
 
     components = [
-        text(f"{prefix}-label", "EEE SEM 3 · SEC B — CERTIFIED", "caption"),
-        text(f"{prefix}-value", f"{stats['activated']} / {stats['size']}", "h2"),
+        text(f"{prefix}-label", f"{cohort['label'].upper()} — CERTIFIED",
+             "caption"),
+        text(f"{prefix}-value", f"{stats['activated']} / {stats['total']}", "h2"),
         text(f"{prefix}-meter", meter(stats["pct"])),
         text(f"{prefix}-pct", f"{stats['pct']}%"),
         text(f"{prefix}-note", note),
+        text(f"{prefix}-fresh", data.freshness_line(state), "caption"),
     ]
     components.append(row(f"{prefix}-meter-row",
                           [f"{prefix}-meter", f"{prefix}-pct"]))
     child_ids = [f"{prefix}-label", f"{prefix}-value", f"{prefix}-meter-row",
-                 f"{prefix}-note"]
+                 f"{prefix}-note", f"{prefix}-fresh"]
 
     primary_label = (f"Show the {pending} who need me" if pending
                      else "Show my cohort")
@@ -71,26 +75,29 @@ def cohort_summary(state) -> list[dict]:
 
 def straggler_list(state) -> list[dict]:
     prefix = "strag"
-    students = data.get_stragglers(state)["data"]
+    students = data.get_stragglers(state)
     components: list[dict] = []
     child_ids: list[str] = []
 
     for entry in students:
-        sid = entry["studentId"]
+        sid = entry["id"]
         base = f"{prefix}-{sid}"
-        draft = data.draft_for(sid)
         components.extend([
             text(f"{base}-name", entry["name"], "h5"),
-            text(f"{base}-meta", entry["context"], "caption"),
-            text(f"{base}-msg", draft),
-            text(f"{base}-link", entry["waLink"], "caption"),
+            text(f"{base}-meta", entry.get("contextNote", ""), "caption"),
+            text(f"{base}-msg", data.draft_for(state, sid)),
+            text(f"{base}-link", entry.get("goLink", ""), "caption"),
             text(f"{base}-send-label", "Send from my WhatsApp"),
             button(f"{base}-send", f"{base}-send-label", "send_whatsapp",
                    {"student_id": sid}),
             text(f"{base}-edit-label", "Edit"),
             button(f"{base}-edit", f"{base}-edit-label", "open_edit",
                    {"student_id": sid}),
-            row(f"{base}-actions", [f"{base}-send", f"{base}-edit"]),
+            text(f"{base}-open-label", "History"),
+            button(f"{base}-open", f"{base}-open-label", "open_student",
+                   {"student_id": sid}),
+            row(f"{base}-actions",
+                [f"{base}-send", f"{base}-edit", f"{base}-open"]),
             column(f"{base}-column", [
                 f"{base}-name", f"{base}-meta", f"{base}-msg",
                 f"{base}-link", f"{base}-actions",
@@ -110,6 +117,58 @@ def straggler_list(state) -> list[dict]:
     return surface(prefix, components, f"{prefix}-main-column")
 
 
+def history_lines(touches: list[str]) -> list[str]:
+    """One line per touch, or a sentence saying there are none.
+
+    Never returns an empty list: a history section that renders nothing looks
+    like a card that failed to load, which is the opposite of the reassurance
+    this surface exists to give.
+    """
+    return touches or ["No one has reached out yet — you'd be the first."]
+
+
+def student_detail(state, student_id: str) -> list[dict]:
+    """One student: where they stand, and everything that already reached them.
+
+    Draws `GET /cohorts/mine/students/{studentId}`. The question it answers is
+    "have I -- or Sethu -- already chased this person?", so the history is the
+    body of the card, not a footnote.
+    """
+    detail = data.get_student_detail(state, student_id)
+    prefix = f"stud-{student_id}"
+    first = detail["name"].split(" ")[0]
+    pending = detail.get("pendingDays")
+    status = (f"pending {pending} days" if pending else "pending")
+    if detail.get("statusReason"):
+        status += f" · {detail['statusReason']}"
+
+    components = [
+        text(f"{prefix}-name", detail["name"], "h5"),
+        text(f"{prefix}-status", status, "caption"),
+        text(f"{prefix}-link", detail.get("waLink") or "", "caption"),
+        text(f"{prefix}-history-label", "What has reached them", "caption"),
+    ]
+    child_ids = [f"{prefix}-name", f"{prefix}-status", f"{prefix}-link",
+                 f"{prefix}-history-label"]
+    for index, line in enumerate(history_lines(detail["touches"])):
+        components.append(text(f"{prefix}-t{index}", line, "caption"))
+        child_ids.append(f"{prefix}-t{index}")
+
+    components.extend([
+        text(f"{prefix}-msg-label", f"Message {first}"),
+        button(f"{prefix}-msg", f"{prefix}-msg-label", "open_edit",
+               {"student_id": student_id}),
+        text(f"{prefix}-back-label", "Back to the list"),
+        button(f"{prefix}-back", f"{prefix}-back-label", "show_stragglers"),
+        row(f"{prefix}-actions", [f"{prefix}-msg", f"{prefix}-back"]),
+    ])
+    child_ids.append(f"{prefix}-actions")
+
+    components.append(column(f"{prefix}-main-column", child_ids))
+    components.append(card(f"{prefix}-card", f"{prefix}-main-column"))
+    return surface(prefix, components, f"{prefix}-card")
+
+
 def _entry_card(prefix: str, key: str, lines: list[tuple[str, str]]) -> tuple[list[dict], str]:
     """One card per row. `lines` is (suffix, content), first line is the head."""
     components, child_ids = [], []
@@ -127,22 +186,22 @@ def leaderboard(state) -> list[dict]:
     prefix = "board"
     board = data.get_leaderboard(state)
     components, child_ids = [], []
-    for index, entry in enumerate(board["data"]):
-        # Her section rides along in the head so her row reads "#19  You —
-        # EEE Sem 3 · Sec B" -- the marker is text, never colour, per the
-        # fairness rule, so it has to sit next to the name that carries it.
-        head = f"#{entry['rank']}  {entry['name']} — {entry['cohortSection']}"
-        detail = f"{entry['pct']}% · {entry['activated']} / {entry['size']}"
+    for index, entry in enumerate(board["entries"]):
+        # Her row is marked in TEXT, never colour -- A2UI exposes no per-row
+        # styling, and the fairness rule requires the marker be readable.
+        who = "You" if entry.get("isMe") else entry["name"]
+        head = f"#{entry['rank']}  {who} — {entry['section']}"
+        detail = f"{entry['pct']}% · {entry['activated']} / {entry['total']}"
+        if entry.get("isPooled"):
+            detail += " · pooled"
         made, card_id = _entry_card(prefix, f"r{index}",
                                     [("head", head), ("detail", detail)])
         components.extend(made)
         child_ids.append(card_id)
 
-    components.append(text(f"{prefix}-basis",
-                           "Ranked on % of section activated"
-                           " · under-30 sections pooled"
-                           " · verified activations only", "caption"))
-    components.append(text(f"{prefix}-foot", fixtures_board_footnote(),
+    components.append(text(f"{prefix}-basis", board["basisNote"], "caption"))
+    components.append(text(f"{prefix}-foot",
+                           f"{board['total']} ambassadors on the board",
                            "caption"))
     child_ids.extend([f"{prefix}-basis", f"{prefix}-foot"])
     components.append(column(f"{prefix}-main-column", child_ids))
@@ -153,9 +212,8 @@ def rewards(state) -> list[dict]:
     prefix = "rew"
     components, child_ids = [], []
     for index, tier in enumerate(data.get_rewards(state)):
-        # Every tier states its threshold. "Starter" and "Half-way" do not
-        # carry a percentage in their names, so dropping "at 25%" from earned
-        # rows loses the column the prototype's table showed for all four.
+        # Every tier states its threshold, so a row is never ambiguous about
+        # what it costs to reach.
         detail = f"at {tier['at']} — {tier['status']}"
         made, card_id = _entry_card(prefix, f"t{index}", [
             ("head", tier["reward"]),
@@ -174,37 +232,24 @@ def rewards(state) -> list[dict]:
 
 def roster(state) -> list[dict]:
     prefix = "ros"
+    entries = data.get_roster(state)
     components, child_ids = [], []
-    for index, entry in enumerate(data.get_roster(state)):
+    for index, entry in enumerate(entries):
+        detail = entry["status"]
+        if entry["how"]:
+            detail += f" · {entry['how']}"
         made, card_id = _entry_card(prefix, f"s{index}", [
             ("head", entry["name"]),
-            ("detail", f"{entry['status']} · {entry['how']}"),
+            ("detail", detail),
         ])
         components.extend(made)
         child_ids.append(card_id)
-    components.append(text(f"{prefix}-foot", fixtures_roster_footnote(),
-                           "caption"))
+    total = data.get_cohort(state)["stats"]["total"]
+    components.append(text(f"{prefix}-foot",
+                           f"Showing {len(entries)} of {total}", "caption"))
     child_ids.append(f"{prefix}-foot")
     components.append(column(f"{prefix}-main-column", child_ids))
     return surface(prefix, components, f"{prefix}-main-column")
-
-
-def fixtures_board_footnote():
-    from . import fixtures
-    return fixtures.BOARD_FOOTNOTE
-
-
-def fixtures_roster_footnote():
-    from . import fixtures
-    return fixtures.ROSTER_FOOTNOTE
-
-
-def fixtures_angles():
-    # Kept as a function, not a module-level `from . import fixtures`, so
-    # surfaces.py never imports fixtures directly -- data.py is the only
-    # module allowed to know the backend is fixtures today.
-    from . import fixtures
-    return fixtures.ANGLES
 
 
 def chips_surface(labels: list[str]) -> list[dict]:
@@ -227,14 +272,14 @@ def chips_surface(labels: list[str]) -> list[dict]:
 
 def edit_form(state, student_id: str) -> list[dict]:
     prefix = f"edit-{student_id}"
-    entry = data.student(student_id)
+    entry = data.student(state, student_id)
     if entry is None:
         raise KeyError(student_id)
     first = entry["name"].split(" ")[0]
     sent = data.is_sent(state, student_id)
-    angle = (state.get("angles", {}) or {}).get(student_id, "Exam panic")
+    angle = (state.get("angles", {}) or {}).get(student_id, "examPanic")
     draft = (state.get("drafts", {}) or {}).get(student_id) \
-        or data.draft_for(student_id, angle)
+        or data.draft_for(state, student_id, angle)
 
     title = (f"Sent — {entry['name']}" if sent
              else f"Edit before sending — {entry['name']}")
@@ -245,12 +290,12 @@ def edit_form(state, student_id: str) -> list[dict]:
         text(f"{prefix}-angle-label", "Angle", "caption"),
     ]
     angle_ids = []
-    for index, (name, _hint) in enumerate(fixtures_angles()):
-        marker = "● " if name == angle else "○ "
-        components.append(text(f"{prefix}-a{index}-label", marker + name))
+    for index, (key, label) in enumerate(fixtures.ANGLES):
+        marker = "● " if key == angle else "○ "
+        components.append(text(f"{prefix}-a{index}-label", marker + label))
         components.append(button(f"{prefix}-a{index}", f"{prefix}-a{index}-label",
                                  "set_angle",
-                                 {"student_id": student_id, "angle": name}))
+                                 {"student_id": student_id, "angle": key}))
         angle_ids.append(f"{prefix}-a{index}")
     components.append(row(f"{prefix}-angles", angle_ids))
 

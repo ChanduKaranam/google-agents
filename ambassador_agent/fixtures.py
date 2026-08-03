@@ -1,74 +1,169 @@
-"""Sneha's world, verbatim from the GE Chat prototype.
+"""Recorded Sethu API responses, verbatim from the shapes Sethu documented.
 
-Pure data. Every user-facing string here appears in the prototype; the demo is
-judged against it, so paraphrase is a defect.
+These are SAMPLE RESPONSE BODIES, not our own invented data -- one per endpoint,
+in exactly the shape `sethu.py` receives over the wire. `data.py` maps them into
+what the surfaces render, so the mapping is exercised by every offline test and
+the live path differs only in where the dict came from.
+
+Source: Sethu's API usage pack (2026-08-03). Ambassador is Akhil Reddy, CSE Yr 3
+Sec A. The prototype's Sneha/EEE numbers are gone deliberately -- the demo now
+speaks whatever the backend says.
 """
 
-AMBASSADOR = {"name": "Sneha Reddy", "section": "EEE Sem 3 · Sec B"}
-COLLEGE = "SVEC Tirupati"
-SECTION_SIZE = 59
-
-# activated count per demo phase
-PHASES = {"live": 43, "target": 54, "complete": 59}
-
-STRAGGLERS = [
-    {"studentId": "pn", "phone": "919876543210", "name": "Priya Nandakumar",
-     "context": "ignored 2 campaigns · 11 days"},
-    {"studentId": "sk", "phone": "919876543211", "name": "Suresh Kumar",
-     "context": "ignored 2 campaigns · 9 days"},
-    {"studentId": "ar", "phone": "919876543212", "name": "Anjali Rao",
-     "context": "ignored 2 campaigns · 14 days"},
-    {"studentId": "vm", "phone": "919876543213", "name": "Vikram Mehta",
-     "context": "never opened a link · 16 days"},
-    {"studentId": "dg", "phone": "919876543214", "name": "Deepa Gowda",
-     "context": "ignored 2 campaigns · 8 days"},
-    {"studentId": "rt", "phone": "919876543215", "name": "Rahul Tiwari",
-     "context": "ignored 2 campaigns · 12 days"},
-]
-
-ROSTER = [
-    ("Aarti Sharma", "activated", "via your link · 4 Jul"),
-    ("Bharath Reddy", "activated", "via campaign · 6 Jul"),
-    ("Chandana M", "pending", "in campaign cycle"),
-    ("Divya Prakash", "activated", "via your link · 2 Jul"),
-    ("Eshwar Naidu", "pending", "ignored 2 campaigns"),
-    ("Farhan Ali", "activated", "via faculty agent · 8 Jul"),
-]
-ROSTER_FOOTNOTE = "Showing 6 of 59"
-
-# Other ambassadors on the board. Sneha's row is computed from live state.
-PEERS = [
-    {"name": "Ananya Nair", "cohortSection": "CSE Sem 5 · A",
-     "pct": 96.7, "activated": 58, "size": 60},
-    {"name": "Farhan Sheikh", "cohortSection": "ECE Sem 3 · A",
-     "pct": 94.9, "activated": 56, "size": 59},
-    {"name": "Divya Tripathi", "cohortSection": "IT Sem 3 · A",
-     "pct": 89.5, "activated": 51, "size": 57},
-]
-BOARD_FOOTNOTE = "178 qualifying sections · under-30 pooled"
-
-ANGLES = [
-    ("Exam panic", "internals are Tuesday"),
-    ("Placement", "final-year framing"),
-    ("Plain", "no angle"),
-]
-
-DRAFTS = {
-    "Exam panic": (
-        "Hey {first} — internals Tuesday. The Circuits agent makes practice"
-        " papers from ma’am’s actual notes. One tap, college login:"),
-    "Placement": (
-        "Hey {first} — the placement agent has the companies that actually"
-        " recruit here, with real interview questions. Two minutes to set up,"
-        " college login:"),
-    "Plain": (
-        "Hey {first} — your college study agents are ready. One tap, college"
-        " login, nothing to install:"),
+# GET /tenants/{tenantId}/cohorts/mine
+COHORT = {
+    "ambassadorName": "Akhil Reddy",
+    "label": "CSE · Yr 3 · Sec A",
+    "stats": {"total": 59, "activated": 14, "pct": 23.7, "daysLeft": 45,
+              "isPooled": False},
+    "nextMilestone": {"pct": 25, "activationsAway": 1, "label": "25% Club",
+                      "reward": "₹500 Amazon voucher"},
+    "myRank": 4,
+    "totalAmbassadors": 12,
+    "lastSyncedAt": "2026-08-03T04:30:00.000Z",
+    "students": [
+        {"id": "stu-001", "name": "Ravi Kumar", "rollNo": "21CS001",
+         "phone": "+919876543210", "activationStatus": "ACTIVATED"},
+        {"id": "stu-002", "name": "Kavya S", "rollNo": "21CS002",
+         "phone": "+919876543211", "activationStatus": "DORMANT"},
+        {"id": "stu-003", "name": "Arjun Nair", "rollNo": "21CS003",
+         "phone": "+919876543212", "activationStatus": "PENDING"},
+        {"id": "stu-004", "name": "Meera Joshi", "rollNo": "21CS004",
+         "phone": "+919876543213", "activationStatus": "DORMANT"},
+        {"id": "stu-005", "name": "Sanjay Patel", "rollNo": "21CS005",
+         "phone": "+919876543214", "activationStatus": "ACTIVATED"},
+        {"id": "stu-006", "name": "Nisha Verma", "rollNo": "21CS006",
+         "phone": "+919876543215", "activationStatus": "DORMANT"},
+    ],
 }
 
-REWARD_TIERS = [
-    ("25%", "Starter"),
-    ("50%", "Half-way"),
-    ("75%", "75% Club — tee + certificate"),
-    ("100%", "Full House — the 100% badge"),
+# GET /cohorts/mine/stragglers?page=1&limit=10
+# Note: no `phone` here -- the number lives on cohorts/mine.students[], so
+# `data.py` joins the two by student id to build the WhatsApp deeplink.
+STRAGGLERS = {
+    "items": [
+        {"id": "stu-002", "name": "Kavya S", "rollNo": "21CS002",
+         "pendingDays": 12, "linkStatus": "not_sent",
+         "goLink": "https://sethu.app/go/abc123",
+         "draftMessage": "Hi Kavya, have you tried Gemini yet?",
+         "contextNote": "Day 12 — first nudge window",
+         "angles": {
+             "examPanic": "Hi Kavya — internals are close. The Circuits agent"
+                          " builds practice papers from ma'am's actual notes."
+                          " One tap, college login:",
+             "placement": "Hi Kavya — the placement agent has the companies"
+                          " that actually recruit here, with real interview"
+                          " questions. Two minutes to set up:",
+             "friendlyRoast": "Hi Kavya — everyone in Sec A is using this"
+                              " except you. Don't make me send a third"
+                              " message. One tap:",
+         }},
+        {"id": "stu-004", "name": "Meera Joshi", "rollNo": "21CS004",
+         "pendingDays": 8, "linkStatus": "sent",
+         "goLink": "https://sethu.app/go/def456",
+         "draftMessage": "Hi Meera, have you tried Gemini yet?",
+         "contextNote": "Day 8 — link sent, not opened",
+         "angles": {
+             "examPanic": "Hi Meera — internals are close. The Circuits agent"
+                          " builds practice papers from ma'am's actual notes."
+                          " One tap, college login:",
+             "placement": "Hi Meera — the placement agent has the companies"
+                          " that actually recruit here, with real interview"
+                          " questions. Two minutes to set up:",
+             "friendlyRoast": "Hi Meera — everyone in Sec A is using this"
+                              " except you. Don't make me send a third"
+                              " message. One tap:",
+         }},
+        {"id": "stu-006", "name": "Nisha Verma", "rollNo": "21CS006",
+         "pendingDays": 15, "linkStatus": "opened",
+         "goLink": "https://sethu.app/go/ghi789",
+         "draftMessage": "Hi Nisha, have you tried Gemini yet?",
+         "contextNote": "Day 15 — opened the link, no sign-in",
+         "angles": {
+             "examPanic": "Hi Nisha — internals are close. The Circuits agent"
+                          " builds practice papers from ma'am's actual notes."
+                          " One tap, college login:",
+             "placement": "Hi Nisha — the placement agent has the companies"
+                          " that actually recruit here, with real interview"
+                          " questions. Two minutes to set up:",
+             "friendlyRoast": "Hi Nisha — everyone in Sec A is using this"
+                              " except you. Don't make me send a third"
+                              " message. One tap:",
+         }},
+    ],
+    "total": 3, "page": 1, "limit": 10,
+}
+
+# GET /tenants/{tenantId}/leaderboard?page=1&limit=10
+LEADERBOARD = {
+    "entries": [
+        {"rank": 1, "ambassadorId": "amb-1", "name": "Sneha Priya",
+         "section": "CSE · Yr 2 · Sec B", "activated": 22, "total": 55,
+         "pct": 40.0, "isPooled": False, "isMe": False},
+        {"rank": 2, "ambassadorId": "amb-2", "name": "Farhan Sheikh",
+         "section": "ECE · Yr 3 · Sec A", "activated": 19, "total": 58,
+         "pct": 32.8, "isPooled": False, "isMe": False},
+        {"rank": 3, "ambassadorId": "amb-3", "name": "Divya Tripathi",
+         "section": "IT · Yr 3 · Sec A", "activated": 16, "total": 57,
+         "pct": 28.1, "isPooled": False, "isMe": False},
+        {"rank": 4, "ambassadorId": "amb-4", "name": "Akhil Reddy",
+         "section": "CSE · Yr 3 · Sec A", "activated": 14, "total": 59,
+         "pct": 23.7, "isPooled": False, "isMe": True},
+    ],
+    "myRank": 4, "page": 1, "limit": 10, "total": 12,
+    "basisNote": "Ranked by % activation within cohort",
+}
+
+# GET /cohorts/mine/students/{studentId} -- newest first
+STUDENT_DETAIL = {
+    "stu-002": {
+        "id": "stu-002", "name": "Kavya S", "rollNo": "21CS002",
+        "pendingDays": 12,
+        "statusReason": "Same cohort — CSE Yr3 Sec A",
+        "waLink": "https://sethu.app/go/abc123",
+        "touchHistory": [
+            {"id": "attr:abc", "kind": "activation_touch",
+             "label": "Activation touch · WA_ME", "detail": "WA_ME",
+             "occurredAt": "2026-08-02T09:00:00Z"},
+            {"id": "gt-xyz:opened", "kind": "link_visited",
+             "label": "Student opened link", "detail": None,
+             "occurredAt": "2026-08-01T11:23:00Z"},
+            {"id": "gt-xyz:created", "kind": "link_shared",
+             "label": "Link shared by Akhil Reddy", "detail": "Akhil Reddy",
+             "occurredAt": "2026-08-01T10:00:00Z"},
+        ],
+    },
+    "stu-004": {
+        "id": "stu-004", "name": "Meera Joshi", "rollNo": "21CS004",
+        "pendingDays": 8,
+        "statusReason": "Same cohort — CSE Yr3 Sec A",
+        "waLink": "https://sethu.app/go/def456",
+        "touchHistory": [
+            {"id": "gt-def:created", "kind": "link_shared",
+             "label": "Link shared by Akhil Reddy", "detail": "Akhil Reddy",
+             "occurredAt": "2026-07-29T08:15:00Z"},
+        ],
+    },
+    # No touches yet -- exercises the empty-history path.
+    "stu-006": {
+        "id": "stu-006", "name": "Nisha Verma", "rollNo": "21CS006",
+        "pendingDays": 15,
+        "statusReason": "Same cohort — CSE Yr3 Sec A",
+        "waLink": "https://sethu.app/go/ghi789",
+        "touchHistory": [],
+    },
+}
+
+# The reward ladder is NOT served by the API -- `cohorts/mine.nextMilestone`
+# carries only the next rung. Until Sethu exposes the full ladder, the
+# thresholds live here and the reward text for the CURRENT rung is overlaid
+# from nextMilestone, so at least the tier she is chasing is always live.
+# ponytail: hardcoded ladder, replace when Sethu ships a tiers endpoint.
+REWARD_TIERS = [25, 50, 75, 100]
+
+# Angle keys as the API names them, paired with the label we show her.
+ANGLES = [
+    ("examPanic", "Exam panic"),
+    ("placement", "Placement"),
+    ("friendlyRoast", "Friendly roast"),
 ]

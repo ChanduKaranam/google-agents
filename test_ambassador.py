@@ -79,87 +79,109 @@ def test_parse_user_action_ignores_plain_text():
     from ambassador_agent.actions import parse_user_action
     assert parse_user_action("who should I message?") is None
 
-def test_live_phase_matches_the_prototype():
+def test_cohort_maps_sethus_payload():
+    """Every number and label comes from the API response, none from us."""
+    from ambassador_agent import fixtures
     from ambassador_agent.data import get_cohort
     cohort = get_cohort({})
-    assert cohort["stats"] == {"activated": 43, "size": 59, "pct": 72.9}
-    assert cohort["ambassador"] == {"name": "Sneha Reddy",
-                                    "section": "EEE Sem 3 · Sec B"}
+    raw = fixtures.COHORT
+    assert cohort["name"] == raw["ambassadorName"]
+    assert cohort["label"] == raw["label"]
+    assert cohort["stats"]["activated"] == raw["stats"]["activated"]
+    assert cohort["stats"]["total"] == raw["stats"]["total"]
+    assert cohort["lastSyncedAt"] == raw["lastSyncedAt"]
 
-def test_milestone_line_is_verbatim():
+def test_milestone_line_speaks_the_live_tier_and_reward():
+    """The tier name and prize are Sethu's, not ours -- a hardcoded "75% Club"
+    would contradict whatever the drive's incentive config actually says."""
     from ambassador_agent.data import milestone_line
-    assert milestone_line({}) == (
-        "2 more activations clear your 75% milestone.")
-    assert milestone_line({"phase": "target"}) == (
-        "Your 75% milestone is earned. 5 more makes Full House, "
-        "the 100% badge.")
+    line = milestone_line({})
+    assert "25% Club" in line and "₹500 Amazon voucher" in line
+    assert "1 more activation clears" in line, line
     assert milestone_line({"phase": "complete"}) == (
-        "Every student in Sec B is activated — nothing left to unlock.")
+        "Every student in CSE · Yr 3 · Sec A is activated —"
+        " nothing left to unlock.")
 
-def test_target_phase_leaves_two_stragglers():
+def test_stragglers_come_from_the_api_and_clear_at_complete():
     from ambassador_agent.data import get_stragglers
-    assert len(get_stragglers({})["data"]) == 6
-    ids = [s["studentId"] for s in get_stragglers({"phase": "target"})["data"]]
-    assert ids == ["dg", "rt"]
-    assert get_stragglers({"phase": "complete"})["data"] == []
+    ids = [s["id"] for s in get_stragglers({})]
+    assert ids == ["stu-002", "stu-004", "stu-006"]
+    assert get_stragglers({"phase": "complete"}) == []
+
+
+def test_stragglers_are_joined_to_their_phone_number():
+    """Straggler items carry no phone; the WhatsApp deeplink needs one, so
+    data.py joins them to cohorts/mine.students[] by id."""
+    from ambassador_agent.data import _wa_number, get_stragglers
+    for entry in get_stragglers({}):
+        assert entry["phone"], entry
+    # Live rows carry bare 10-digit numbers; wa.me opens an empty chat without
+    # a country code, so both forms have to normalise to the same link.
+    assert _wa_number("9876501041") == "919876501041"
+    assert _wa_number("+91 98765 01041") == "919876501041"
+
+
+def test_simulate_target_is_computed_from_the_live_total():
+    """The simulator can no longer swap fixtures -- it overrides the count."""
+    from ambassador_agent.data import get_cohort
+    total = get_cohort({})["stats"]["total"]
+    assert get_cohort({"phase": "target"})["stats"]["activated"] == 45  # ceil(59*.75)
+    assert get_cohort({"phase": "complete"})["stats"]["activated"] == total
 
 def test_sent_students_drop_out_of_the_pending_list():
     from ambassador_agent.data import get_stragglers, mark_sent
     state = {}
-    mark_sent(state, "pn")
-    ids = [s["studentId"] for s in get_stragglers(state)["data"]]
-    assert "pn" not in ids and len(ids) == 5
+    mark_sent(state, "stu-002")
+    ids = [s["id"] for s in get_stragglers(state)]
+    assert "stu-002" not in ids and len(ids) == 2
 
-def test_drafts_change_with_the_angle():
+def test_drafts_come_from_the_apis_angles():
+    """The copy is Sethu's now, so their team can tune it without a redeploy."""
+    from ambassador_agent import fixtures
     from ambassador_agent.data import draft_for
-    assert draft_for("pn", "Exam panic").startswith(
-        "Hey Priya — internals Tuesday.")
-    assert draft_for("pn", "Placement").startswith(
-        "Hey Priya — the placement agent")
-    assert draft_for("pn", "Plain").startswith(
-        "Hey Priya — your college study agents are ready.")
+    angles = fixtures.STRAGGLERS["items"][0]["angles"]
+    for key in ("examPanic", "placement", "friendlyRoast"):
+        assert draft_for({}, "stu-002", key) == angles[key]
 
-def test_leaderboard_shows_percent_and_count_together():
+def test_leaderboard_maps_the_api_and_marks_her_row():
     from ambassador_agent.data import get_leaderboard
     board = get_leaderboard({})
-    assert board["myRank"] == 19
-    me = [r for r in board["data"] if r["name"] == "You"][0]
-    assert me["pct"] == 72.9 and me["activated"] == 43 and me["size"] == 59
-    assert [r["rank"] for r in board["data"]] == [1, 2, 3, 19]
+    assert board["myRank"] == 4
+    mine = [r for r in board["entries"] if r["isMe"]]
+    assert len(mine) == 1 and mine[0]["rank"] == 4
+    assert board["basisNote"]
 
-def test_get_leaderboard_does_not_mutate_fixtures():
+def test_get_leaderboard_does_not_mutate_the_recorded_payload():
+    import copy
     from ambassador_agent import fixtures
     from ambassador_agent.data import get_leaderboard
-    get_leaderboard({})
-    assert all("rank" not in p for p in fixtures.PEERS)
+    before = copy.deepcopy(fixtures.LEADERBOARD)
+    board = get_leaderboard({})
+    board["entries"][0]["name"] = "mutated"
+    assert fixtures.LEADERBOARD == before
 
-def test_leaderboard_at_complete_puts_sneha_first():
-    from ambassador_agent.data import get_leaderboard
-    board = get_leaderboard({"phase": "complete"})
-    assert board["myRank"] == 1
-    me = [r for r in board["data"] if r["name"] == "You"][0]
-    assert me["rank"] == 1 and me["pct"] == 100.0
-    assert [r["rank"] for r in board["data"]] == [1, 2, 3, 4]
+
 
 def test_mark_sent_is_idempotent():
     from ambassador_agent.data import get_stragglers, mark_sent
     state = {}
-    mark_sent(state, "pn")
-    mark_sent(state, "pn")
-    assert state["sent"] == ["pn"]
-    ids = [s["studentId"] for s in get_stragglers(state)["data"]]
-    assert "pn" not in ids and len(ids) == 5
+    mark_sent(state, "stu-002")
+    mark_sent(state, "stu-002")
+    assert state["sent"] == ["stu-002"]
+    ids = [s["id"] for s in get_stragglers(state)]
+    assert "stu-002" not in ids and len(ids) == 2
 
 def test_cohort_card_carries_the_certified_label_and_both_numbers():
     from ambassador_agent.surfaces import cohort_summary
     strings = _literals(cohort_summary({}))
-    assert "EEE SEM 3 · SEC B — CERTIFIED" in strings
-    assert "43 / 59" in strings
-    assert "72.9%" in strings
-    assert any("2 more activations clear your 75% milestone." in s
-               for s in strings)
-    assert "Show the 6 who need me" in strings
+    assert "CSE · YR 3 · SEC A — CERTIFIED" in strings
+    assert "14 / 59" in strings
+    assert "23.7%" in strings
+    assert any("25% Club" in s for s in strings)
+    assert "Show the 3 who need me" in strings
     assert "How is my rank calculated?" in strings
+    # activation numbers lag Google by up to ~6h, so freshness is always shown
+    assert any("last synced" in s for s in strings), strings
 
 def test_cohort_card_button_names_are_routable():
     from ambassador_agent.surfaces import cohort_summary
@@ -180,12 +202,15 @@ def test_straggler_list_draws_one_card_per_pending_student():
     from ambassador_agent.surfaces import straggler_list
     messages = straggler_list({})
     names = _action_names(messages)
-    assert names.count("send_whatsapp") == 6
-    assert names.count("open_edit") == 6
+    assert names.count("send_whatsapp") == 3
+    assert names.count("open_edit") == 3
+    assert names.count("open_student") == 3
     strings = _literals(messages)
-    assert "Priya Nandakumar" in strings
-    assert "ignored 2 campaigns · 11 days" in strings
-    assert any("sethu.app/go/pn8x2" in s for s in strings)
+    assert "Kavya S" in strings
+    # contextNote and the draft are the API's copy, rendered as sent
+    assert "Day 12 — first nudge window" in strings
+    assert any("sethu.app/go/abc123" in s for s in strings)
+    assert any("Circuits agent" in s for s in strings)
 
 def test_send_buttons_carry_the_student_id():
     from ambassador_agent.surfaces import straggler_list
@@ -195,16 +220,16 @@ def test_send_buttons_carry_the_student_id():
              and c["component"]["Button"]["action"]["name"] == "send_whatsapp"]
     ids = [ctx["value"]["literalString"]
            for a in sends for ctx in a["context"] if ctx["key"] == "student_id"]
-    assert ids == ["pn", "sk", "ar", "vm", "dg", "rt"]
+    assert ids == ["stu-002", "stu-004", "stu-006"]
 
 def test_sent_students_leave_the_list():
     from ambassador_agent.data import mark_sent
     from ambassador_agent.surfaces import straggler_list
     state = {}
-    mark_sent(state, "pn")
-    assert "Priya Nandakumar" not in _literals(straggler_list(state))
+    mark_sent(state, "stu-002")
+    assert "Kavya S" not in _literals(straggler_list(state))
 
-def test_ids_stay_unique_across_six_student_cards():
+def test_ids_stay_unique_across_every_student_card():
     from ambassador_agent.surfaces import straggler_list
     ids = [c["id"] for c in _components(straggler_list({}))]
     assert len(ids) == len(set(ids))
@@ -225,7 +250,7 @@ _RESERVED = {"body", "root", "title", "head", "html", "main"}
 _USAGE_HINTS = {"h1", "h2", "h3", "h4", "h5", "caption", "body"}
 
 # Surfaces needing more than `state`. Extend as builders are added.
-_EXTRA_ARGS = {"edit_form": ("pn",)}
+_EXTRA_ARGS = {"edit_form": ("stu-002",), "student_detail": ("stu-002",)}
 
 
 def _all_surface_cases():
@@ -318,20 +343,21 @@ def test_each_card_binds_both_buttons_to_its_own_student():
 
     Task 8 routes every per-student action on this context value. An id that
     is wrong-but-consistently-ordered would satisfy an order-based assertion
-    and still send Priya's message to Rahul.
+    and still send Kavya's message to Meera.
     """
     from ambassador_agent.surfaces import straggler_list
 
     components = _components(straggler_list({}))
     by_id = {c["id"]: c for c in components}
     expected = {
-        "pn": "Priya Nandakumar", "sk": "Suresh Kumar", "ar": "Anjali Rao",
-        "vm": "Vikram Mehta", "dg": "Deepa Gowda", "rt": "Rahul Tiwari",
+        "stu-002": "Kavya S", "stu-004": "Meera Joshi",
+        "stu-006": "Nisha Verma",
     }
     for sid, name in expected.items():
         shown = by_id[f"strag-{sid}-name"]["component"]["Text"]["text"]
         assert shown["literalString"] == name, (sid, shown)
-        for suffix, action in (("send", "send_whatsapp"), ("edit", "open_edit")):
+        for suffix, action in (("send", "send_whatsapp"), ("edit", "open_edit"),
+                               ("open", "open_student")):
             spec = by_id[f"strag-{sid}-{suffix}"]["component"]["Button"]["action"]
             assert spec["name"] == action, (sid, suffix, spec)
             carried = {c["key"]: c["value"]["literalString"]
@@ -341,15 +367,15 @@ def test_each_card_binds_both_buttons_to_its_own_student():
 
 def test_edit_form_offers_three_angles_and_a_send():
     from ambassador_agent.surfaces import edit_form
-    messages = edit_form({}, "pn")
+    messages = edit_form({}, "stu-002")
     strings = _literals(messages)
-    assert "Edit before sending — Priya Nandakumar" in strings
+    assert "Edit before sending — Kavya S" in strings
     # Angles render with a selection marker ("● Exam panic"), so match on
     # substring. An exact assertion here would push the implementer to
     # restructure the card just to satisfy the test.
-    for angle in ("Exam panic", "Placement", "Plain"):
+    for angle in ("Exam panic", "Placement", "Friendly roast"):
         assert any(angle in s for s in strings)
-    assert "Send to Priya" in strings
+    assert "Send to Kavya" in strings
     names = _action_names(messages)
     assert names.count("set_angle") == 3
     assert "send_whatsapp" in names
@@ -358,11 +384,11 @@ def test_edit_form_offers_three_angles_and_a_send():
 def test_send_carries_the_edited_text_by_path():
     from ambassador_agent.surfaces import edit_form
     send = [c["component"]["Button"]["action"]
-            for c in _components(edit_form({}, "pn"))
+            for c in _components(edit_form({}, "stu-002"))
             if "Button" in c["component"]
             and c["component"]["Button"]["action"]["name"] == "send_whatsapp"][0]
     by_key = {ctx["key"]: ctx["value"] for ctx in send["context"]}
-    assert by_key["student_id"] == {"literalString": "pn"}
+    assert by_key["student_id"] == {"literalString": "stu-002"}
     assert by_key["message"] == {"path": "/draft/text"}
 
 
@@ -370,10 +396,10 @@ def test_sent_form_locks_and_relabels():
     from ambassador_agent.data import mark_sent
     from ambassador_agent.surfaces import edit_form
     state = {}
-    mark_sent(state, "pn")
-    strings = _literals(edit_form(state, "pn"))
-    assert "Sent — Priya Nandakumar" in strings
-    assert "Sent to Priya ✓" in strings
+    mark_sent(state, "stu-002")
+    strings = _literals(edit_form(state, "stu-002"))
+    assert "Sent — Kavya S" in strings
+    assert "Sent to Kavya ✓" in strings
 
 
 
@@ -386,41 +412,45 @@ def test_edit_form_keeps_an_in_flight_edit():
     """
     from ambassador_agent.surfaces import edit_form
 
-    typed = "Priya please just open it, it takes two minutes 🙏"
-    messages = edit_form({"drafts": {"pn": typed}}, "pn")
+    typed = "Kavya please just open it, it takes two minutes 🙏"
+    messages = edit_form({"drafts": {"stu-002": typed}}, "stu-002")
     seeded = [m for m in messages if "dataModelUpdate" in m][0]
     assert seeded["dataModelUpdate"]["contents"]["draft"]["text"] == typed
 
 def test_leaderboard_always_shows_percent_and_count_and_the_basis():
     from ambassador_agent.surfaces import leaderboard
     strings = _literals(leaderboard({}))
-    assert any("96.7%" in s and "58 / 60" in s for s in strings)
-    assert any("72.9%" in s and "43 / 59" in s for s in strings)
-    assert any(s.startswith("#19") for s in strings)
-    assert "178 qualifying sections · under-30 pooled" in strings
+    assert any("40.0%" in s and "22 / 55" in s for s in strings)
+    assert any("23.7%" in s and "14 / 59" in s for s in strings)
+    assert any(s.startswith("#4") for s in strings)
+    # the ranking basis is the API's sentence, not ours
+    assert "Ranked by % activation within cohort" in strings
+    assert "12 ambassadors on the board" in strings
 
 def test_leaderboard_marks_her_row_in_text_not_colour():
     from ambassador_agent.surfaces import leaderboard
-    assert any("You" in s and "EEE Sem 3 · Sec B" in s
+    assert any("You" in s and "CSE · Yr 3 · Sec A" in s
                for s in _literals(leaderboard({})))
 
-def test_rewards_lists_four_tiers_with_status():
+def test_rewards_lists_four_tiers_and_names_only_the_live_one():
+    """Sethu serves only the NEXT rung, so the tier she is chasing carries the
+    real prize and the rest say so plainly rather than inventing one."""
     from ambassador_agent.surfaces import rewards
     strings = _literals(rewards({}))
-    assert "75% Club — tee + certificate" in strings
-    assert "Full House — the 100% badge" in strings
-    assert any("2 more" in s for s in strings)  # renders as "at 75% — 2 more"
-    # Count the rows whose status is earned, not bare occurrences of the word
-    # -- an exact-count assertion pushed an earlier build to drop "at 25%"
-    # from those rows entirely just to make the number come out right.
-    assert len([s for s in strings if s.endswith("— earned")]) == 2
-    assert "at 25% — earned" in strings and "at 50% — earned" in strings
+    assert "₹500 Amazon voucher" in strings           # the live 25% rung
+    assert strings.count("reward to be announced") == 3
+    for at, need in (("25%", "1 more"), ("50%", "16 more"),
+                     ("75%", "31 more"), ("100%", "45 more")):
+        assert f"at {at} — {need}" in strings, (at, strings)
 
-def test_roster_shows_six_of_fiftynine():
+def test_roster_shows_what_it_has_against_the_true_total():
     from ambassador_agent.surfaces import roster
     strings = _literals(roster({}))
-    assert "Aarti Sharma" in strings
+    assert "Ravi Kumar" in strings
     assert "Showing 6 of 59" in strings
+    # DORMANT is API jargon; she reads plain words
+    assert any("gone quiet" in s for s in strings), strings
+    assert not any("DORMANT" in s for s in strings), strings
 
 
 
@@ -478,18 +508,19 @@ def test_send_marks_the_student_and_returns_the_link():
     from ambassador_agent.actions import route
     state = {}
     reply, _messages = route(state, {"name": "send_whatsapp",
-                                     "context": {"student_id": "pn"}})
-    assert "Opened WhatsApp with the message for Priya." in reply
-    assert "sethu.app/go/pn8x2" in reply
-    assert state["sent"] == ["pn"]
+                                     "context": {"student_id": "stu-002"}})
+    assert "Opened WhatsApp with the message for Kavya." in reply
+    assert "sethu.app/go/abc123" in reply
+    assert state["sent"] == ["stu-002"]
 
 def test_set_angle_redrafts_and_keeps_the_link():
     from ambassador_agent.actions import route
     state = {}
     route(state, {"name": "set_angle",
-                  "context": {"student_id": "pn", "angle": "Placement"}})
-    assert state["angles"]["pn"] == "Placement"
-    assert "placement agent" in state["drafts"]["pn"]
+                  "context": {"student_id": "stu-002",
+                              "angle": "placement"}})
+    assert state["angles"]["stu-002"] == "placement"
+    assert "placement agent" in state["drafts"]["stu-002"]
 
 def test_simulate_phase_moves_the_numbers():
     from ambassador_agent.actions import route
@@ -508,9 +539,9 @@ def test_no_stragglers_message_when_none_are_pending_yet():
     from ambassador_agent.actions import route
     from ambassador_agent.data import mark_sent
     state = {}
-    # live phase always has 6 stragglers in fixtures, so this path is only
-    # reachable once everyone in the pool has been sent to; simulate that.
-    for sid in ("pn", "sk", "ar", "vm", "dg", "rt"):
+    # the API's first page always has stragglers, so this path is only
+    # reachable once she has sent to everyone on it; simulate that.
+    for sid in ("stu-002", "stu-004", "stu-006"):
         mark_sent(state, sid)
     reply, _ = route(state, {"name": "show_stragglers", "context": {}})
     assert reply == (
@@ -521,7 +552,7 @@ def test_ask_routes_a_typed_question_to_the_same_surface():
     from ambassador_agent.actions import route
     reply, messages = route({}, {"name": "ask",
                                  "context": {"question": "who should I message?"}})
-    assert "ignored two campaigns" in reply
+    assert "gone quiet on the campaigns" in reply
     assert any("surfaceUpdate" in m for m in messages)
 
 def test_unknown_action_falls_through_without_raising():
@@ -591,7 +622,7 @@ def test_the_phase_simulator_is_reachable_by_typing():
     reply, messages = route_question(state, "simulate 100%")
     assert messages, "simulator drew nothing"
     assert get_cohort(state)["stats"]["activated"] == 59
-    assert "Every student in Sec B is activated" in reply
+    assert "Every student in CSE · Yr 3 · Sec A is activated" in reply
 
     reply, messages = route_question({}, "simulate")
     assert "Which one?" in reply and messages == []
@@ -621,8 +652,9 @@ def test_typed_intents_are_answered_by_the_router_not_the_model():
     """The demo is judged on the prototype's wording.
 
     Measured live before this was wired: asked "who should I message?", the
-    model answered "Sneha Reddy, for EEE Sem 3, Sec B." while the router says
-    "6 students have ignored two campaigns — a broadcast won't move them…".
+    model answered with the ambassador's name alone, while the router says
+    "3 students have gone quiet on the campaigns — a broadcast won't move
+    them…".
     Letting the model narrate made the copy vary turn to turn.
     """
     from ambassador_agent.agent import handle_click
@@ -630,7 +662,7 @@ def test_typed_intents_are_answered_by_the_router_not_the_model():
     out = handle_click(_ctx("who should I message?"))
     assert out is not None, "typed intent fell through to the model"
     prose = next((p.text for p in out.parts if p.text), "")
-    assert prose.startswith("6 students have ignored two campaigns")
+    assert prose.startswith("3 students have gone quiet on the campaigns")
     assert sum(1 for p in out.parts if p.inline_data) >= 2
 
 
@@ -649,9 +681,10 @@ def test_send_confirmation_carries_a_tappable_whatsapp_link():
     from ambassador_agent.actions import route
 
     reply, _ = route({}, {"name": "send_whatsapp",
-                          "context": {"student_id": "pn"}})
-    assert "https://wa.me/919876543210?text=" in reply
-    assert "sethu.app/go/pn8x2" in reply          # credit still rides along
+                          "context": {"student_id": "stu-002"}})
+    # phone comes from cohorts/mine.students[], joined on by data.py
+    assert "https://wa.me/919876543211?text=" in reply
+    assert "sethu.app/go/abc123" in reply         # credit still rides along
     assert "Circuits%20agent" in reply            # message really is pre-filled
 
 
@@ -666,7 +699,7 @@ def test_every_turn_offers_the_options_again():
     from ambassador_agent.actions import chips_for_action, route
     from ambassador_agent.agent import _with_chips
 
-    text_only = {"name": "send_whatsapp", "context": {"student_id": "pn"}}
+    text_only = {"name": "send_whatsapp", "context": {"student_id": "stu-002"}}
     reply, messages = route({}, text_only)
     assert reply and not messages          # a bare sentence...
     assert _with_chips(messages, chips_for_action(text_only)), (
@@ -702,17 +735,22 @@ def test_the_greeting_is_drawn_once_but_the_options_keep_coming():
     assert surfaces_of(render_surface(again)) == ["chips"]
 
 
-def test_the_opening_greeting_matches_the_prototype():
+def test_the_opening_greeting_is_built_from_live_numbers():
     """Sethu's greet() runs on mount; GE gives an agent no "conversation
-    opened" event, so this rides on her first turn instead."""
+    opened" event, so this rides on her first turn instead.
+
+    Every value here is read from the API response — the old verbatim
+    prototype string is gone deliberately, because the demo now speaks
+    whatever the backend says.
+    """
     from ambassador_agent.data import greeting_line
 
-    assert greeting_line({}) == (
-        "Hi Sneha — I look after EEE Sem 3, Sec B with you.\n\n"
-        "Right now 43 of your 59 classmates are activated (72.9%), from"
-        " Google’s certified reporting. 2 more activations clear your 75%"
-        " milestone.")
-    # and it tracks the live numbers, not a frozen string
+    greeting = greeting_line({})
+    assert "Hi Akhil — I look after CSE · Yr 3 · Sec A with you." in greeting
+    assert "14 of your 59 classmates are activated (23.7%)" in greeting
+    assert "25% Club" in greeting
+    assert "3 students need a personal message from you." in greeting
+    # and it tracks the numbers rather than freezing them
     assert "59 of your 59" in greeting_line({"phase": "complete"})
     assert "nothing left to unlock" in greeting_line({"phase": "complete"})
 
@@ -740,12 +778,200 @@ def test_a_chip_press_echoes_which_chip():
     reply, _ = route({}, {"name": "ask",
                           "context": {"question": "Who should I message?"}})
     assert reply.startswith("**Who should I message?**")
-    assert "6 students have ignored two campaigns" in reply
+    assert "3 students have gone quiet on the campaigns" in reply
 
     # a surface with no prose of its own still says what was picked
     reply, _ = route({}, {"name": "ask",
                           "context": {"question": "Where do I stand?"}})
     assert reply == "**Where do I stand?**"
+
+
+def test_student_detail_reports_status_and_every_touch():
+    """The point of the surface: has anyone reached this student already?
+
+    Backs `GET /cohorts/mine/students/{studentId}` (student detail + touch
+    history). Without it she re-nudges someone Sethu messaged yesterday.
+    """
+    from ambassador_agent.surfaces import student_detail
+
+    texts = _literals(student_detail({}, "stu-002"))
+    assert "Kavya S" in texts
+    assert any("pending 12 days" in t for t in texts), texts
+    assert any("Same cohort" in t for t in texts), texts
+    # every touch the backend knows about is drawn, none summarised away
+    from ambassador_agent import data, fixtures
+
+    raw = fixtures.STUDENT_DETAIL["stu-002"]["touchHistory"]
+    assert len(data.get_student_detail({}, "stu-002")["touches"]) == len(raw)
+    for touch in raw:
+        assert any(touch["occurredAt"][:10] in t for t in texts), (touch, texts)
+    # the API's vocabulary is translated, not echoed
+    assert any("opened the link" in t for t in texts), texts
+    assert not any("link_visited" in t for t in texts), texts
+
+
+def test_student_detail_carries_the_attribution_link():
+    """Her credit rides on the /go/ link, so it belongs on the detail card too."""
+    from ambassador_agent.surfaces import student_detail
+
+    assert any("sethu.app/go/abc123" in t
+               for t in _literals(student_detail({}, "stu-002")))
+
+
+def test_history_reads_as_empty_rather_than_blank():
+    """A student the campaigns have not reached yet must not render an empty
+    gap that looks like a loading failure."""
+    from ambassador_agent.surfaces import history_lines
+
+    assert history_lines([]) == ["No one has reached out yet — you'd be the first."]
+
+
+def test_a_send_this_session_shows_up_in_the_history():
+    """Sending is recorded in session state only (no backend write endpoint
+    exists yet), so the detail surface must merge it in — otherwise she sends,
+    reopens the student, and sees no trace of what she just did."""
+    from ambassador_agent import data
+    from ambassador_agent.surfaces import student_detail
+
+    state = {}
+    before = len(data.get_student_detail(state, "stu-002")["touches"])
+    data.mark_sent(state, "stu-002")
+    after = data.get_student_detail(state, "stu-002")["touches"]
+    assert len(after) == before + 1, after
+    assert any("you" in t.lower() for t in _literals(student_detail(state, "stu-002")))
+
+
+def test_student_detail_offers_a_way_to_message_and_back_out():
+    from ambassador_agent.surfaces import student_detail
+
+    actions = {}
+    for component in _components(student_detail({}, "stu-002")):
+        spec = component["component"].get("Button")
+        if spec:
+            actions[spec["action"]["name"]] = {
+                c["key"]: c["value"]["literalString"]
+                for c in spec["action"].get("context", [])
+            }
+    assert actions.get("open_edit") == {"student_id": "stu-002"}, actions
+    assert "show_stragglers" in actions, actions
+
+
+def test_unknown_student_raises_rather_than_drawing_a_blank_card():
+    from ambassador_agent import data
+    from ambassador_agent.surfaces import student_detail
+
+    for call in (lambda: data.get_student_detail({}, "zz"),
+                 lambda: student_detail({}, "zz")):
+        try:
+            call()
+        except KeyError:
+            continue
+        raise AssertionError("expected KeyError for an unknown student")
+
+
+def test_every_straggler_card_opens_its_own_student():
+    from ambassador_agent.surfaces import straggler_list
+
+    by_id = {c["id"]: c for c in _components(straggler_list({}))}
+    for sid in ("stu-002", "stu-004", "stu-006"):
+        spec = by_id[f"strag-{sid}-open"]["component"]["Button"]["action"]
+        assert spec["name"] == "open_student", (sid, spec)
+        carried = {c["key"]: c["value"]["literalString"] for c in spec["context"]}
+        assert carried == {"student_id": sid}, (sid, carried)
+
+
+def test_open_student_routes_to_the_detail_surface():
+    from ambassador_agent.actions import route
+
+    reply, messages = route({}, {"name": "open_student",
+                                 "context": {"student_id": "stu-002"}})
+    ids = [c["id"] for m in messages if "surfaceUpdate" in m
+           for c in m["surfaceUpdate"]["components"]]
+    assert any(i.startswith("stud-stu-002-") for i in ids), ids
+    assert reply == ""
+
+
+def test_a_stale_card_does_not_cost_her_the_turn():
+    """A straggler card outlives its student: they activate, or fall off the
+    paged list. Tapping Send then looked up nothing and raised, which
+    handle_click swallows -- so she got no reply at all."""
+    from ambassador_agent.actions import route
+
+    reply, messages = route({}, {"name": "send_whatsapp",
+                                 "context": {"student_id": "stu-does-not-exist"}})
+    assert "no longer on your list" in reply
+    assert messages == []
+
+
+def test_the_edit_form_still_opens_after_she_has_sent():
+    """`get_stragglers` hides a student once she has messaged them, but the
+    form must still render for that person -- it is what shows "Sent ✓"."""
+    from ambassador_agent.data import mark_sent, student
+
+    state = {}
+    mark_sent(state, "stu-002")
+    assert student(state, "stu-002")["name"] == "Kavya S"
+
+
+def test_counts_survive_a_cohort_of_one():
+    """Dev seeds a cohort of exactly 1, which produced "1 students". Any real
+    section can hit n == 1 for stragglers too."""
+    from ambassador_agent.data import plural
+
+    assert plural(1, "student") == "1 student"
+    assert plural(0, "student") == "0 students"
+    assert plural(2, "student") == "2 students"
+    assert plural(1, "classmate") == "1 classmate"
+
+
+def test_only_the_authorization_header_is_accepted_as_identity():
+    """x-serverless-authorization is the Discovery Engine service agent and is
+    identical for every student; x-user-email is unstripped by any proxy.
+    Trusting either serves one student another student's cohort."""
+    from ambassador_agent.identity import bearer_from_headers
+
+    assert bearer_from_headers({"Authorization": "Bearer ya29.abc"}) == "ya29.abc"
+    assert bearer_from_headers({"authorization": b"Bearer ya29.xyz"}) == "ya29.xyz"
+    for spoof in ({"x-serverless-authorization": "Bearer svc"},
+                  {"x-user-email": "someone@else.com"},
+                  {"x-goog-authenticated-user-email": "a@b.c"},
+                  {"Authorization": "Basic abc"},
+                  {"Authorization": "Bearer   "},
+                  {}, None):
+        assert bearer_from_headers(spoof) is None, spoof
+
+
+def test_the_caller_token_is_per_request_not_global():
+    """Cloud Run serves requests concurrently in one process. A module global
+    would let two overlapping ambassadors read each other's cohort."""
+    import asyncio
+
+    from ambassador_agent import sethu
+
+    async def as_user(token):
+        sethu.set_user_token(token)
+        await asyncio.sleep(0)          # yield so the tasks interleave
+        return sethu._user_token()
+
+    async def both():
+        return await asyncio.gather(
+            asyncio.create_task(as_user("token-a")),
+            asyncio.create_task(as_user("token-b")))
+
+    assert asyncio.run(both()) == ["token-a", "token-b"]
+
+
+def test_the_a2a_app_binds_the_identity_interceptor():
+    """to_a2a builds its own executor and drops the inbound headers unless we
+    hand it a factory -- in which case every request looks anonymous."""
+    # Read as text: importing main_a2a builds the runner, which demands the
+    # deploy-time env this suite deliberately runs without.
+    import pathlib
+
+    source = (pathlib.Path(__file__).parent / "ambassador_agent"
+              / "main_a2a.py").read_text(encoding="utf-8")
+    assert "agent_executor_factory=_executor" in source
+    assert "ExecuteInterceptor(before_agent=identity.install(sethu))" in source
 
 
 def test_every_surface_is_reachable_by_a_tool():

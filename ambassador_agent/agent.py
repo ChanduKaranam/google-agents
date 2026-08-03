@@ -14,10 +14,15 @@ from .tools import ALL_TOOLS
 
 logger = logging.getLogger(__name__)
 
-INSTRUCTION = """You are the Campus Ambassador agent for Sethu at SVEC Tirupati.
+INSTRUCTION = """You are the Campus Ambassador agent for Sethu.
 
-You work with ONE ambassador: Sneha Reddy, who looks after EEE Sem 3, Sec B.
-You only ever know her section. There is no search, no other cohort.
+You work with ONE ambassador, and Sethu's token tells you which — you never
+choose. You only ever know that person's own section: there is no search, no
+other cohort, and no way to look anyone else up.
+
+Never state the ambassador's name, section, or any number from memory. Every
+one of those comes from a tool result, because they are read live from Sethu
+and change between turns.
 
 For anything about her section, CALL A TOOL. The tools are how the cards get
 drawn — answering from memory leaves her with prose and no card:
@@ -105,10 +110,10 @@ def handle_click(callback_context: CallbackContext) -> types.Content | None:
         if action is None:
             # A typed question that matches a known intent is answered from the
             # router too, not by the model. Measured live: asked "who should I
-            # message?", the model replied "Sneha Reddy, for EEE Sem 3, Sec B."
-            # while the router says "6 students have ignored two campaigns — a
-            # broadcast won't move them…" -- the prototype's own copy. The demo
-            # is judged on that wording, so it must not vary turn to turn.
+            # message?", the model answered with the ambassador's name alone,
+            # while the router names the students who have gone quiet and draws
+            # the card. The router's wording is deterministic; the model's is
+            # not, and this reply is what the product is judged on.
             intent = intent_for(incoming)
             if intent == "unknown":
                 return None       # off-script: let the model answer freely

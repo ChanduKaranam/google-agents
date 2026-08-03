@@ -31,19 +31,22 @@ def show_stragglers(tool_context: ToolContext) -> dict:
     falling behind, stalling, ignoring campaigns, or not signing in.
     """
     _pick(tool_context, "stragglers")
-    pending = data.get_stragglers(tool_context.state)["data"]
+    state = tool_context.state
+    pending = data.get_stragglers(state)
     if not pending:
-        if tool_context.state.get("phase") == "complete":
-            return {"say": "Nobody left to chase — all 59 are activated."}
+        stats = data.get_cohort(state)["stats"]
+        if stats["activated"] >= stats["total"]:
+            return {"say": f"Nobody left to chase — all {stats['total']} are"
+                           " activated."}
         return {"say": "Nobody is waiting on you. Everyone still pending is"
                        " inside Sethu’s campaign cycle; they escalate to you"
                        " only after ignoring two."}
     count = len(pending)
     verb = "student has" if count == 1 else "students have"
     return {
-        "say": (f"{count} {verb} ignored two campaigns — a broadcast won’t"
-                " move them. I’ve drafted one message each, in the angle that"
-                " converts best this week."),
+        "say": (f"{count} {verb} gone quiet on the campaigns — a broadcast"
+                " won’t move them. I’ve drafted one message each, in the angle"
+                " that converts best this week."),
         "students": [s["name"] for s in pending],
     }
 
@@ -59,7 +62,7 @@ def show_progress(tool_context: ToolContext) -> dict:
     return {
         "say": data.milestone_line(tool_context.state),
         "activated": stats["activated"],
-        "size": stats["size"],
+        "size": stats["total"],
         "percent": stats["pct"],
     }
 
@@ -71,13 +74,15 @@ def show_leaderboard(tool_context: ToolContext) -> dict:
     or how the ranking is calculated.
     """
     _pick(tool_context, "leaderboard")
-    board = data.get_leaderboard(tool_context.state)
-    stats = data.get_cohort(tool_context.state)["stats"]
+    state = tool_context.state
+    board = data.get_leaderboard(state)
+    cohort = data.get_cohort(state)
+    stats = cohort["stats"]
     return {
-        "say": (f"You’re ranked on % of your section activated — sections"
-                f" under 30 students are pooled. Sec B is at"
-                f" {stats['activated']} of {stats['size']}"
-                f" ({stats['pct']}%). {data.milestone_line(tool_context.state)}"),
+        "say": (f"{board['basisNote']}. {cohort['label']} is at"
+                f" {stats['activated']} of {stats['total']} ({stats['pct']}%),"
+                f" ranked #{board['myRank']} of {board['total']}."
+                f" {data.milestone_line(state)}"),
         "my_rank": board["myRank"],
     }
 
@@ -102,19 +107,22 @@ def show_roster(tool_context: ToolContext) -> dict:
     already activated.
     """
     _pick(tool_context, "roster")
-    activated = data.get_cohort(tool_context.state)["stats"]["activated"]
+    cohort = data.get_cohort(tool_context.state)
+    stats = cohort["stats"]
     return {
-        "say": (f"EEE Sem 3, Sec B — 59 students from the college roster,"
-                f" {activated} activated."),
+        "say": (f"{cohort['label']} —"
+                f" {data.plural(stats['total'], 'student')} from the college"
+                f" roster, {stats['activated']} activated."),
     }
 
 
 def simulate_phase(phase: str, tool_context: ToolContext) -> dict:
     """Demo control: jump the section to a different state.
 
-    `phase` must be "live" (43 activated), "target" (54, the 75% milestone
-    earned) or "complete" (59, every student activated). Use only when she
-    explicitly asks to simulate, jump to, or pretend a state for the demo.
+    `phase` must be "live" (the real activation count), "target" (75% of the
+    section, so the milestone is earned) or "complete" (every student
+    activated). Use only when she explicitly asks to simulate, jump to, or
+    pretend a state for the demo.
     """
     try:
         data.set_phase(tool_context.state, phase)

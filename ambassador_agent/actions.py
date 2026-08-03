@@ -65,6 +65,9 @@ _ACTION_SURFACE = {
     "show_rewards": "rewards",
     "show_roster": "roster",
     "simulate_phase": "cohort",
+    # The detail card is a step inside the chase-the-stragglers flow, so it
+    # keeps that flow's chips rather than the generic four.
+    "open_student": "stragglers",
 }
 
 UNKNOWN_REPLY = (
@@ -94,18 +97,20 @@ def chips_for_action(action: dict) -> list[str]:
 
 
 def _stragglers_reply(state) -> tuple[str, list[dict]]:
-    pending = data.get_stragglers(state)["data"]
+    pending = data.get_stragglers(state)
     if not pending:
-        if state.get("phase") == "complete":
-            return "Nobody left to chase — all 59 are activated.", []
+        stats = data.get_cohort(state)["stats"]
+        if stats["activated"] >= stats["total"]:
+            return (f"Nobody left to chase — all {stats['total']} are"
+                    " activated."), []
         return ("Nobody is waiting on you. Everyone still pending is inside"
                 " Sethu’s campaign cycle; they escalate to you only after"
                 " ignoring two."), []
     count = len(pending)
     verb = "student has" if count == 1 else "students have"
-    return (f"{count} {verb} ignored two campaigns — a broadcast won’t move"
-            " them. I’ve drafted one message each, in the angle that converts"
-            " best this week.",
+    return (f"{count} {verb} gone quiet on the campaigns — a broadcast won’t"
+            " move them. I’ve drafted one message each, in the angle that"
+            " converts best this week.",
             surfaces.straggler_list(state))
 
 
@@ -118,28 +123,39 @@ def route(state, action: dict) -> tuple[str, list[dict]]:
     if name == "show_stragglers":
         return _stragglers_reply(state)
 
+    if name == "open_student":
+        return "", surfaces.student_detail(state, student_id)
+
     if name == "open_edit":
         return "", surfaces.edit_form(state, student_id)
 
     if name == "set_angle":
-        angle = context.get("angle", "Exam panic")
+        angle = context.get("angle", "examPanic")
         angles = dict(state.get("angles", {}) or {})
         angles[student_id] = angle
         state["angles"] = angles
         drafts = dict(state.get("drafts", {}) or {})
-        drafts[student_id] = data.draft_for(student_id, angle)
+        drafts[student_id] = data.draft_for(state, student_id, angle)
         state["drafts"] = drafts
         return "", surfaces.edit_form(state, student_id)
 
     if name == "send_whatsapp":
-        entry = data.student(student_id)
+        entry = data.student(state, student_id)
+        if entry is None:
+            # A card can outlive its student: they activate, or drop off the
+            # paged straggler list, and the button she taps is now stale.
+            # Crashing here costs her the whole turn.
+            return ("That student is no longer on your list — they may have"
+                    " activated since this card was drawn. Ask me who needs a"
+                    " message and I'll pull a fresh list."), []
         first = entry["name"].split(" ")[0]
         message = context.get("message") or data.draft_for(
-            student_id, (state.get("angles", {}) or {}).get(
-                student_id, "Exam panic"))
+            state, student_id, (state.get("angles", {}) or {}).get(
+                student_id, "examPanic"))
+        link = data.wa_link(state, student_id)
+        body = f"{message}\n{link}"
+        deeplink = data.whatsapp_deeplink(state, student_id, body)
         data.mark_sent(state, student_id)
-        body = f"{message}\n{data.wa_link(student_id)}"
-        deeplink = data.whatsapp_deeplink(student_id, body)
         # The link goes in prose, not the card: A2UI v0.8 Text excludes links
         # and Button dispatches an action rather than navigating. This wa.me
         # url is what actually keeps the promise that Sethu pre-fills and she
@@ -206,17 +222,22 @@ def route_question(state, question: str) -> tuple[str, list[dict]]:
     if intent == "stragglers":
         return _stragglers_reply(state)
     if intent == "leaderboard":
-        cohort = data.get_cohort(state)["stats"]
-        return (f"You’re ranked on % of your section activated — sections under"
-                f" 30 students are pooled. Sec B is at {cohort['activated']} of"
-                f" 59 ({cohort['pct']}%). {data.milestone_line(state)}",
+        cohort = data.get_cohort(state)
+        stats = cohort["stats"]
+        board = data.get_leaderboard(state)
+        return (f"{board['basisNote']}. {cohort['label']} is at"
+                f" {stats['activated']} of {stats['total']} ({stats['pct']}%),"
+                f" ranked #{board['myRank']} of {board['total']}."
+                f" {data.milestone_line(state)}",
                 surfaces.leaderboard(state))
     if intent == "rewards":
         return data.milestone_line(state), surfaces.rewards(state)
     if intent == "roster":
-        activated = data.get_cohort(state)["stats"]["activated"]
-        return (f"EEE Sem 3, Sec B — 59 students from the college roster,"
-                f" {activated} activated.", surfaces.roster(state))
+        cohort = data.get_cohort(state)
+        stats = cohort["stats"]
+        return (f"{cohort['label']} — {data.plural(stats['total'], 'student')}"
+                f" from the college roster, {stats['activated']} activated.",
+                surfaces.roster(state))
     if intent == "cohort":
         return "", surfaces.cohort_summary(state)
     return UNKNOWN_REPLY, []

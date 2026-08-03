@@ -1,17 +1,45 @@
-"""Accessors returning the ambassador API's documented response shapes.
+"""Maps Sethu API responses into what the surfaces render.
 
-This module is the backend seam. Today every function reads `fixtures`; when the
-API lands, each body becomes an HTTP call and nothing else in the agent moves.
-Shapes follow `ambassador-flow.pdf` (2026-07-28).
+This module is the backend seam. `_payload()` is the only place that decides
+where a response comes from: the live Sethu API when the agent is configured for
+it, otherwise the recorded samples in `fixtures`. Every mapping below runs
+identically either way, so the offline tests exercise the real mapping.
 
-Mutations write to ADK session state so progress is real inside a conversation:
-the sent count climbs as she works through the list.
+Shapes follow Sethu's API usage pack (2026-08-03). Field names on the left of
+each mapping are theirs; the names we hand to `surfaces` are ours.
+
+Mutations (which students she has messaged) write to ADK session state: Sethu
+exposes no write endpoint for recording a nudge, so a send is conversation-local
+until the /go/ link is clicked and their sync picks it up.
 """
 
 import math
 import urllib.parse
 
-from . import fixtures
+from . import fixtures, sethu
+
+
+def _payload(kind: str, student_id: str | None = None) -> dict:
+    """The one place that chooses live API vs recorded sample."""
+    if sethu.enabled():
+        return sethu.get(kind, student_id)
+    if kind == "student":
+        detail = fixtures.STUDENT_DETAIL.get(student_id)
+        if detail is None:
+            raise KeyError(student_id)
+        return detail
+    return {"cohort": fixtures.COHORT, "stragglers": fixtures.STRAGGLERS,
+            "leaderboard": fixtures.LEADERBOARD}[kind]
+
+
+def plural(count: int, singular: str, plural_form: str = "") -> str:
+    """"1 student", not "1 students".
+
+    Real cohorts are any size -- dev seeds one of exactly 1 -- so every count
+    the agent speaks has to survive n == 1.
+    """
+    word = singular if count == 1 else (plural_form or singular + "s")
+    return f"{count} {word}"
 
 
 def _get(state, key, default=None):
@@ -19,22 +47,31 @@ def _get(state, key, default=None):
     return state.get(key, default) if state is not None else default
 
 
+# --- demo phase -------------------------------------------------------------
+# The simulator can no longer swap in a different fixture: the numbers are
+# Sethu's now. It overrides the activated COUNT instead, so "simulate 75%"
+# still moves the meter and the milestone copy without touching the backend.
+PHASES = ("live", "target", "complete")
+
+
+def set_phase(state, phase: str) -> None:
+    if phase not in PHASES:
+        raise ValueError(f"unknown phase {phase!r}")
+    state["phase"] = phase
+
+
 def _phase(state) -> str:
     return _get(state, "phase", "live")
 
 
-def _activated(state) -> int:
-    return fixtures.PHASES[_phase(state)]
-
-
-def _pct(activated: int) -> float:
-    return round(activated / fixtures.SECTION_SIZE * 100, 1)
-
-
-def set_phase(state, phase: str) -> None:
-    if phase not in fixtures.PHASES:
-        raise ValueError(f"unknown phase {phase!r}")
-    state["phase"] = phase
+def _activated(state, raw: dict) -> int:
+    total = raw["stats"]["total"]
+    phase = _phase(state)
+    if phase == "complete":
+        return total
+    if phase == "target":
+        return math.ceil(total * 0.75)
+    return raw["stats"]["activated"]
 
 
 def mark_sent(state, student_id: str) -> None:
@@ -48,124 +85,235 @@ def is_sent(state, student_id: str) -> bool:
     return student_id in (_get(state, "sent", []) or [])
 
 
-def get_stragglers(state) -> dict:
-    """GET /api/v1/cohorts/mine/stragglers"""
-    phase = _phase(state)
-    if phase == "complete":
-        pool = []
-    elif phase == "target":
-        pool = fixtures.STRAGGLERS[4:]
-    else:
-        pool = fixtures.STRAGGLERS
-    pending = [s for s in pool if not is_sent(state, s["studentId"])]
-    data = [
-        {**s, "waLink": f"sethu.app/go/{s['studentId']}8x2"}
-        for s in pending
-    ]
-    return {"data": data, "total": len(data), "page": 1, "limit": 20}
-
+# --- cohort -----------------------------------------------------------------
 
 def get_cohort(state) -> dict:
-    """GET /api/v1/cohorts/mine"""
-    activated = _activated(state)
+    """GET /tenants/{tenantId}/cohorts/mine"""
+    raw = _payload("cohort")
+    total = raw["stats"]["total"]
+    activated = _activated(state, raw)
+    pct = round(activated / total * 100, 1) if total else 0.0
     return {
-        "ambassador": dict(fixtures.AMBASSADOR),
-        "stats": {"activated": activated, "size": fixtures.SECTION_SIZE,
-                  "pct": _pct(activated)},
-        "nextMilestone": _next_milestone(state),
-        "stragglers": get_stragglers(state)["data"],
-        "fullRoster": get_roster(state),
+        "name": raw["ambassadorName"],
+        "label": raw["label"],
+        "stats": {"activated": activated, "total": total, "pct": pct,
+                  "daysLeft": raw["stats"].get("daysLeft"),
+                  "isPooled": raw["stats"].get("isPooled", False)},
+        "nextMilestone": raw.get("nextMilestone"),
+        "myRank": raw.get("myRank"),
+        "totalAmbassadors": raw.get("totalAmbassadors"),
+        "lastSyncedAt": raw.get("lastSyncedAt"),
+        "students": raw.get("students", []),
     }
+
+
+# Their status vocabulary, in her words. DORMANT is the one that matters -- it
+# is what makes a student a straggler -- so it must not read as jargon.
+_STATUS_WORDS = {
+    "ACTIVATED": "activated",
+    "PENDING": "pending",
+    "DORMANT": "gone quiet",
+}
 
 
 def get_roster(state) -> list[dict]:
+    """The full cohort, from `cohorts/mine.students[]` -- never paginated."""
     return [
-        {"name": name, "status": status, "how": how}
-        for name, status, how in fixtures.ROSTER
+        {"name": s["name"],
+         "status": _STATUS_WORDS.get(s["activationStatus"], s["activationStatus"].lower()),
+         "how": s.get("rollNo", "")}
+        for s in get_cohort(state)["students"]
     ]
 
 
-def get_leaderboard(state) -> dict:
-    """GET /api/v1/tenants/:id/leaderboard"""
-    activated = _activated(state)
-    mine = {"name": "You", "cohortSection": fixtures.AMBASSADOR["section"],
-            "pct": _pct(activated), "activated": activated,
-            "size": fixtures.SECTION_SIZE}
-    rows = sorted([{**p} for p in fixtures.PEERS] + [mine], key=lambda r: -r["pct"])
-    # Live, she sits at #19 of 178; once she climbs, the visible slot is her
-    # sorted position. The prototype shows the same four rows either way.
-    slots = [1, 2, 3, 19] if _phase(state) == "live" else [1, 2, 3, 4]
-    for slot, row in zip(slots, rows):
-        row["rank"] = slot
-    my_rank = [r["rank"] for r in rows if r["name"] == "You"][0]
-    return {"data": rows, "myRank": my_rank}
+def _phone_by_id(state) -> dict:
+    """Straggler items carry no phone; `cohorts/mine.students[]` does."""
+    return {s["id"]: s.get("phone", "")
+            for s in get_cohort(state)["students"]}
 
 
-def _needed_for_75(state) -> int:
-    target = math.ceil(fixtures.SECTION_SIZE * 0.75)
-    return max(target - _activated(state), 0)
+def get_stragglers(state) -> list[dict]:
+    """GET /cohorts/mine/stragglers
 
-
-def _next_milestone(state) -> dict:
-    if _phase(state) == "complete":
-        return {"target": 100, "reward": "Full House — the 100% badge"}
-    if _phase(state) == "target":
-        return {"target": 100, "reward": "Full House — the 100% badge"}
-    return {"target": 75, "reward": "75% Club — tee + certificate"}
-
-
-def milestone_line(state) -> str:
+    Filtered by what she has already sent this conversation, so the list
+    shortens as she works down it.
+    """
     phase = _phase(state)
     if phase == "complete":
-        return "Every student in Sec B is activated — nothing left to unlock."
-    remaining = fixtures.SECTION_SIZE - _activated(state)
-    if phase == "target":
-        return (f"Your 75% milestone is earned. {remaining} more makes Full"
-                " House, the 100% badge.")
-    need = _needed_for_75(state)
-    # need == 1 is unreachable with today's fixed three phases (always 2 at
-    # "live"); kept for when PHASES is driven by real activation counts.
+        return []
+    raw = _payload("stragglers")
+    phones = _phone_by_id(state)
+    return [
+        {**item, "phone": phones.get(item["id"], "")}
+        for item in raw.get("items", [])
+        if not is_sent(state, item["id"])
+    ]
+
+
+def straggler_total(state) -> int:
+    """The true count behind a paged first page."""
+    if _phase(state) == "complete":
+        return 0
+    return _payload("stragglers").get("total", 0)
+
+
+# --- leaderboard ------------------------------------------------------------
+
+def get_leaderboard(state) -> dict:
+    """GET /tenants/{tenantId}/leaderboard"""
+    raw = _payload("leaderboard")
+    return {
+        "entries": [dict(e) for e in raw.get("entries", [])],
+        "myRank": raw.get("myRank"),
+        "total": raw.get("total"),
+        "basisNote": raw.get("basisNote", ""),
+    }
+
+
+# --- milestones and rewards -------------------------------------------------
+
+def milestone_line(state) -> str:
+    cohort = get_cohort(state)
+    stats = cohort["stats"]
+    if stats["activated"] >= stats["total"]:
+        return (f"Every student in {cohort['label']} is activated —"
+                " nothing left to unlock.")
+    milestone = cohort["nextMilestone"]
+    if not milestone:
+        remaining = stats["total"] - stats["activated"]
+        return f"{remaining} more to go in {cohort['label']}."
+    # activationsAway is theirs, but it is computed against the live count --
+    # the demo simulator moves ours, so recompute to stay consistent.
+    need = max(math.ceil(stats["total"] * milestone["pct"] / 100)
+               - stats["activated"], 0)
+    if need == 0:
+        remaining = stats["total"] - stats["activated"]
+        return (f"Your {milestone['label']} is earned. {remaining} more"
+                " activations makes it every student in the section.")
     verb = "activation clears" if need == 1 else "activations clear"
-    return f"{need} more {verb} your 75% milestone."
+    reward = milestone.get("reward")
+    tail = f" — {reward}" if reward else ""
+    return f"{need} more {verb} your {milestone['label']}{tail}."
 
 
 def get_rewards(state) -> list[dict]:
-    activated = _activated(state)
-    phase = _phase(state)
-    remaining = fixtures.SECTION_SIZE - activated
-    statuses = {
-        "25%": "earned",
-        "50%": "earned",
-        "75%": f"{_needed_for_75(state)} more" if phase == "live" else "earned",
-        "100%": "earned" if phase == "complete" else f"{remaining} more",
-    }
-    return [
-        {"at": at, "reward": reward, "status": statuses[at]}
-        for at, reward in fixtures.REWARD_TIERS
-    ]
+    """The tier ladder.
+
+    Sethu serves only the NEXT rung (`nextMilestone`), so the thresholds come
+    from `fixtures.REWARD_TIERS` and the live reward text is overlaid on the
+    rung she is currently chasing. Rungs above that read as "not yet named"
+    rather than inventing a prize she will not receive.
+    """
+    cohort = get_cohort(state)
+    stats = cohort["stats"]
+    milestone = cohort["nextMilestone"] or {}
+    rows = []
+    for at in fixtures.REWARD_TIERS:
+        need = max(math.ceil(stats["total"] * at / 100) - stats["activated"], 0)
+        if at == milestone.get("pct"):
+            reward = milestone.get("reward") or "reward to be announced"
+        elif need == 0:
+            reward = "earned"
+        else:
+            reward = "reward to be announced"
+        rows.append({"at": f"{at}%", "reward": reward,
+                     "status": "earned" if need == 0 else f"{need} more"})
+    return rows
 
 
-def student(student_id: str) -> dict | None:
-    for entry in fixtures.STRAGGLERS:
-        if entry["studentId"] == student_id:
-            return entry
+# --- students ---------------------------------------------------------------
+
+def student(state, student_id: str) -> dict | None:
+    """Look one student up, sent or not.
+
+    Deliberately NOT filtered by `is_sent`: `get_stragglers` hides someone once
+    she has messaged them, but the edit form still has to render for that
+    person afterwards -- it is what shows the "Sent ✓" state.
+    """
+    if _phase(state) == "complete":
+        return None
+    phones = _phone_by_id(state)
+    for item in _payload("stragglers").get("items", []):
+        if item["id"] == student_id:
+            return {**item, "phone": phones.get(student_id, "")}
     return None
 
 
-def draft_for(student_id: str, angle: str = "Exam panic") -> str:
-    entry = student(student_id)
+_KIND_WORDS = {
+    "link_shared": "link shared",
+    "link_visited": "opened the link",
+    "campaign_link": "campaign link",
+    "activation_touch": "activation",
+}
+
+_CHANNEL_WORDS = {"WABA": "WhatsApp broadcast", "WA_ME": "your WhatsApp",
+                  "SELF_SERVE": "signed in on their own"}
+
+
+def _touch_line(touch: dict) -> str:
+    """One history row, in her language rather than the API's."""
+    when = (touch.get("occurredAt") or "")[:10]
+    what = _KIND_WORDS.get(touch.get("kind"), touch.get("kind", ""))
+    detail = touch.get("detail")
+    if touch.get("kind") == "activation_touch":
+        detail = _CHANNEL_WORDS.get(detail, detail)
+    return f"{when} · {what}" + (f" · {detail}" if detail else "")
+
+
+def get_student_detail(state, student_id: str) -> dict:
+    """GET /cohorts/mine/students/:studentId
+
+    `touches` merges Sethu's history with anything she has sent in THIS
+    conversation: Sethu records a send only once the /go/ link is clicked, so
+    without the merge she sends a message, reopens the student, and sees no
+    trace of what she just did.
+    """
+    raw = _payload("student", student_id)
+    touches = [_touch_line(t) for t in raw.get("touchHistory", [])]
+    if is_sent(state, student_id):
+        touches.insert(0, "just now · your WhatsApp · sent by you")
+    return {
+        "id": raw["id"],
+        "name": raw["name"],
+        "rollNo": raw.get("rollNo", ""),
+        "pendingDays": raw.get("pendingDays"),
+        "statusReason": raw.get("statusReason", ""),
+        "waLink": raw.get("waLink"),
+        "touches": touches,
+    }
+
+
+def draft_for(state, student_id: str, angle_key: str = "examPanic") -> str:
+    """The pre-written message, straight from the API's `angles`."""
+    entry = student(state, student_id)
     if entry is None:
         raise KeyError(student_id)
-    first = entry["name"].split(" ")[0]
-    return fixtures.DRAFTS[angle].format(first=first)
+    angles = entry.get("angles") or {}
+    return angles.get(angle_key) or entry.get("draftMessage", "")
 
 
-def wa_link(student_id: str) -> str:
-    """The /go/ attribution link she sends. Credit rides on this url."""
-    return f"sethu.app/go/{student_id}8x2"
+def wa_link(state, student_id: str) -> str:
+    """The /go/ attribution link. Her credit rides on this url."""
+    entry = student(state, student_id)
+    if entry is None:
+        raise KeyError(student_id)
+    return entry.get("goLink", "")
 
 
-def whatsapp_deeplink(student_id: str, message: str) -> str:
+# Sethu's dev rows carry bare 10-digit numbers ("9876501041") while the guide's
+# sample showed "+91…". wa.me needs a country code or it opens an empty chat, so
+# a bare Indian mobile is normalised rather than trusted either way.
+_INDIA = "91"
+
+
+def _wa_number(phone: str) -> str:
+    digits = "".join(c for c in (phone or "") if c.isdigit())
+    if len(digits) == 10:
+        return _INDIA + digits
+    return digits
+
+
+def whatsapp_deeplink(state, student_id: str, message: str) -> str:
     """A tappable wa.me url that opens WhatsApp with the message pre-filled.
 
     A2UI v0.8 cannot put a link on a card -- Button dispatches an action and
@@ -174,25 +322,36 @@ def whatsapp_deeplink(student_id: str, message: str) -> str:
     ("Sethu never sends from your number -- it pre-fills, you send") is not
     kept: she would have to retype the message into WhatsApp herself.
     """
-    entry = student(student_id)
-    phone = (entry or {}).get("phone", "")
-    return (f"https://wa.me/{phone}"
+    entry = student(state, student_id) or {}
+    return (f"https://wa.me/{_wa_number(entry.get('phone'))}"
             f"?text={urllib.parse.quote(message, safe='')}")
 
-def greeting_line(state) -> str:
-    """The prototype's opening message, from live numbers.
 
-    Sethu's own `greet()` runs on mount; Gemini Enterprise gives an agent no
-    "conversation opened" event, so this fires on her first turn instead --
-    the closest the platform allows.
+def freshness_line(state) -> str:
+    """Sethu's activation numbers lag Google by 15 min to ~6h, so the card
+    always says when they were last certified rather than implying live."""
+    synced = get_cohort(state).get("lastSyncedAt")
+    if not synced:
+        return "Not synced with Google yet."
+    return f"Certified by Google, last synced {synced[:16].replace('T', ' ')} UTC."
+
+
+def greeting_line(state) -> str:
+    """The opening message, from live numbers.
+
+    Gemini Enterprise gives an agent no "conversation opened" event, so this
+    fires on her first turn instead -- the closest the platform allows.
     """
     cohort = get_cohort(state)
-    who = cohort["ambassador"]
     stats = cohort["stats"]
-    # The prototype speaks the section with a comma here ("EEE Sem 3, Sec B")
-    # though it labels it with a middle dot everywhere else. Keep both.
-    section = who["section"].replace(" · ", ", ")
-    return (f"Hi {who['name'].split(' ')[0]} — I look after {section}"
-            f" with you.\n\nRight now {stats['activated']} of your"
-            f" {stats['size']} classmates are activated ({stats['pct']}%),"
-            f" from Google’s certified reporting. {milestone_line(state)}")
+    first = cohort["name"].split(" ")[0]
+    pending = straggler_total(state)
+    classmates = plural(stats["total"], "classmate")
+    line = (f"Hi {first} — I look after {cohort['label']} with you."
+            f"\n\nRight now {stats['activated']} of your {classmates}"
+            f" are activated ({stats['pct']}%),"
+            f" from Google's certified reporting. {milestone_line(state)}")
+    if pending:
+        needs = "student needs" if pending == 1 else "students need"
+        line += f" {pending} {needs} a personal message from you."
+    return line
