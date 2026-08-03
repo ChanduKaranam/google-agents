@@ -41,7 +41,9 @@ AGENT_SECRET_ENV = "SETHU_AGENT_SECRET"
 # ponytail: remove once GE forwards a user token; the exchange path is the real one.
 AGENT_TOKEN_ENV = "SETHU_AGENT_TOKEN"
 
-TIMEOUT_SECONDS = 20
+# Sethu's dev API is on Render's free tier: a cold start measured 45s, and a
+# 20s timeout turned every first request of the day into a failed turn.
+TIMEOUT_SECONDS = 60
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +113,13 @@ def _request(method: str, path: str, headers: dict,
     except urllib.error.URLError as error:
         logger.warning("Sethu %s %s unreachable: %s", method, path, error)
         raise SethuError(f"Sethu unreachable: {error.reason}") from error
+    except (TimeoutError, OSError) as error:
+        # urlopen(timeout=) raises TimeoutError directly -- NOT wrapped in
+        # URLError -- so this escaped as a raw exception, killed the whole turn
+        # and surfaced to the ambassador as the words "The read operation timed
+        # out". Every transport failure has to leave here as a SethuError.
+        logger.warning("Sethu %s %s failed at transport: %s", method, path, error)
+        raise SethuError(f"Sethu did not respond: {error}") from error
     # Sethu wraps everything as {data, error, meta}; callers want `data`.
     return parsed.get("data") or {}
 

@@ -974,6 +974,53 @@ def test_the_a2a_app_binds_the_identity_interceptor():
     assert "ExecuteInterceptor(before_agent=identity.install(sethu))" in source
 
 
+def test_a_backend_outage_costs_an_answer_not_the_turn():
+    """Deployed, a Sethu timeout escaped the tool, ADK failed the node, and the
+    ambassador's reply was the literal text "The read operation timed out"."""
+    from ambassador_agent import data, sethu
+    from ambassador_agent.actions import route, route_question
+    from ambassador_agent.tools import ALL_TOOLS, UNAVAILABLE
+
+    original = data._payload
+    data._payload = lambda *a, **k: (_ for _ in ()).throw(
+        sethu.SethuError("Sethu did not respond: timed out"))
+    try:
+        reply, messages = route_question({}, "where do I stand?")
+        assert reply == UNAVAILABLE and messages == []
+        reply, messages = route({}, {"name": "show_stragglers", "context": {}})
+        assert reply == UNAVAILABLE and messages == []
+
+        class Ctx:
+            state = {}
+        for tool in ALL_TOOLS:
+            result = (tool("live", Ctx()) if tool.__name__ == "simulate_phase"
+                      else tool(Ctx()))
+            assert result["say"] == UNAVAILABLE, tool.__name__
+    finally:
+        data._payload = original
+
+
+def test_a_socket_timeout_leaves_the_client_as_a_sethu_error():
+    """urlopen(timeout=) raises TimeoutError directly, NOT wrapped in URLError,
+    so the original except clause missed it entirely."""
+    import urllib.request
+
+    from ambassador_agent import sethu
+
+    original = urllib.request.urlopen
+    urllib.request.urlopen = lambda *a, **k: (_ for _ in ()).throw(
+        TimeoutError("The read operation timed out"))
+    try:
+        try:
+            sethu._request("GET", "/anything", {})
+        except sethu.SethuError as error:
+            assert "did not respond" in str(error)
+        else:
+            raise AssertionError("a socket timeout escaped as a raw exception")
+    finally:
+        urllib.request.urlopen = original
+
+
 def test_every_surface_is_reachable_by_a_tool():
     """Keyword matching only knows the prototype's wording. The tools are what
     let the model handle "who's falling behind?" and still draw a card."""

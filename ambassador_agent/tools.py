@@ -14,9 +14,31 @@ instruction tells the model to lead with it — so the copy the team is judging
 stays fixed while the phrasing that reaches it can be anything.
 """
 
+import functools
+
 from google.adk.tools import ToolContext
 
-from . import data
+from . import data, sethu
+
+# What she is told when Sethu cannot be reached. Honest about the cause, and it
+# never shows a stale or invented number in place of a live one.
+UNAVAILABLE = ("I can't reach Sethu right now, so I don't want to quote you"
+               " numbers that might be wrong. Try again in a moment.")
+
+
+def _survives_an_outage(tool):
+    """A backend failure must cost her an answer, not the whole turn.
+
+    Without this a timeout propagated out of the tool, ADK failed the node, and
+    the reply she saw was the text "The read operation timed out".
+    """
+    @functools.wraps(tool)
+    def guarded(*args, **kwargs):
+        try:
+            return tool(*args, **kwargs)
+        except sethu.SethuError:
+            return {"say": UNAVAILABLE}
+    return guarded
 
 
 def _pick(tool_context: ToolContext, surface: str) -> None:
@@ -135,10 +157,12 @@ def simulate_phase(phase: str, tool_context: ToolContext) -> dict:
 
 
 ALL_TOOLS = [
-    show_stragglers,
-    show_progress,
-    show_leaderboard,
-    show_rewards,
-    show_roster,
-    simulate_phase,
+    _survives_an_outage(tool) for tool in (
+        show_stragglers,
+        show_progress,
+        show_leaderboard,
+        show_rewards,
+        show_roster,
+        simulate_phase,
+    )
 ]

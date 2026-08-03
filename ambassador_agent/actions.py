@@ -10,7 +10,7 @@ pressed.
 import json
 import re
 
-from . import data, surfaces
+from . import data, sethu, surfaces
 
 _TAGGED = re.compile(r"<a2a_datapart_json>(.*?)</a2a_datapart_json>", re.S)
 
@@ -114,8 +114,27 @@ def _stragglers_reply(state) -> tuple[str, list[dict]]:
             surfaces.straggler_list(state))
 
 
+# Kept identical to tools.UNAVAILABLE so she gets one voice whichever path
+# answered her.
+from .tools import UNAVAILABLE  # noqa: E402
+
+
 def route(state, action: dict) -> tuple[str, list[dict]]:
     """Handle one button press. Returns (prose reply, A2UI messages)."""
+    try:
+        return _route(state, action)
+    except sethu.SethuError:
+        return UNAVAILABLE, []
+
+
+def route_question(state, question: str) -> tuple[str, list[dict]]:
+    try:
+        return _route_question(state, question)
+    except sethu.SethuError:
+        return UNAVAILABLE, []
+
+
+def _route(state, action: dict) -> tuple[str, list[dict]]:
     name = action.get("name")
     context = action.get("context") or {}
     student_id = context.get("student_id")
@@ -180,7 +199,7 @@ def route(state, action: dict) -> tuple[str, list[dict]]:
 
     if name == "ask":
         question = context.get("question", "")
-        reply, messages = route_question(state, question)
+        reply, messages = _route_question(state, question)
         # Echo what she picked. Gemini Enterprise renders its own placeholder
         # for a click -- the literal string "User action triggered." -- and
         # nothing an agent sends can change that bubble. Without this the
@@ -209,7 +228,7 @@ def phase_from(question: str) -> str | None:
     return None
 
 
-def route_question(state, question: str) -> tuple[str, list[dict]]:
+def _route_question(state, question: str) -> tuple[str, list[dict]]:
     intent = intent_for(question)
     if intent == "simulate":
         phase = phase_from(question)
