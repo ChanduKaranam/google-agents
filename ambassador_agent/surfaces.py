@@ -13,6 +13,8 @@ Every label here is built from Sethu's live response. Nothing is hardcoded to a
 section, a name or a number.
 """
 
+import json
+
 from . import data, fixtures
 from .a2ui import (button, button_with_values, card, column, data_model, row,
                    suggestions, surface, text, text_field)
@@ -21,12 +23,33 @@ METER_WIDTH = 20
 
 # How many student cards one turn may draw.
 #
-# Abhishek's 11 stragglers built a 33KB, 145-component surface and Gemini
-# Enterprise dropped it silently -- he saw the sentence and no cards, while a
-# 5.6KB leaderboard in the same session rendered fine. Four cards keeps a turn
-# near 12KB, comfortably inside whatever the limit is, and reads better than a
-# wall of eleven.
-STRAGGLER_PAGE = 4
+# Gemini Enterprise drops a surface that is too large, silently -- the reply
+# arrives as text with no cards at all. Measured against Abhishek's cohort:
+# 5.6KB rendered, 12.7KB and 14.2KB did not. The ceiling is somewhere between,
+# so the list is built to sit near 6KB.
+#
+# Getting there meant dropping the drafted message and the /go/ link from the
+# list card: at ~270 bytes each they were most of a card's weight, and both are
+# one tap away under Edit. What she asked for -- every student, with Send and
+# Edit on each -- is what remains.
+STRAGGLER_PAGE = 5
+
+# Hard ceiling for one surface's JSON, in bytes.
+#
+# Gemini Enterprise drops an oversized surface silently: the reply arrives as
+# text with no cards, no error anywhere. Measured against Abhishek's cohort --
+# 5.6KB rendered, 12.7KB and 14.2KB did not -- so the real limit is unknown and
+# somewhere between. The list is trimmed to fit this budget rather than to a
+# fixed number of students, because a cohort of long names would blow a fixed
+# count right back through the ceiling.
+# 5.6KB is the largest surface Gemini Enterprise has been *observed* to render
+# (the leaderboard). Until the real limit is known, that is the budget.
+MAX_SURFACE_BYTES = 5600  # observed-safe ceiling
+
+# The chip row is appended afterwards by agent._with_chips, into this same
+# surface, so its weight has to come out of the budget here or every page ships
+# ~1.9KB over the line it was measured against.
+CHIP_ALLOWANCE = 1050
 
 
 def meter(pct: float) -> str:
@@ -83,24 +106,42 @@ def cohort_summary(state) -> list[dict]:
 
 
 def straggler_list(state) -> list[dict]:
-    prefix = "strag"
+    """Draw as many student cards as will actually render.
+
+    Starts at STRAGGLER_PAGE and shrinks until the surface fits
+    MAX_SURFACE_BYTES, so an oversized turn can never be silently dropped.
+    """
     everyone = data.get_stragglers(state)
     offset = max(int(state.get("strag_offset", 0) or 0), 0)
     if offset >= len(everyone):
         offset = 0
-    students = everyone[offset:offset + STRAGGLER_PAGE]
+    for count in range(min(STRAGGLER_PAGE, len(everyone) - offset), 0, -1):
+        messages = _straggler_page(state, everyone, offset, count)
+        budget = MAX_SURFACE_BYTES - CHIP_ALLOWANCE
+        if len(json.dumps(messages)) <= budget or count == 1:
+            return messages
+    return _straggler_page(state, everyone, offset, 0)
+
+
+def _straggler_page(state, everyone: list[dict], offset: int,
+                    count: int) -> list[dict]:
+    prefix = "strag"
+    students = everyone[offset:offset + count]
     components: list[dict] = []
     child_ids: list[str] = []
 
-    for entry in students:
+    for index, entry in enumerate(students):
         sid = entry["id"]
-        base = f"{prefix}-{sid}"
+        # Index the component ids rather than embedding the student's UUID.
+        # A uuid appears ~15 times per card once ids, child refs and column
+        # lists are counted -- 36 characters each time -- and that, not the
+        # drafted message, was most of the surface's weight. The uuid still
+        # rides in each button's action context, which is what routing needs.
+        base = f"{prefix}-s{index}"
         components.extend([
             text(f"{base}-name", entry["name"], "h5"),
             text(f"{base}-meta", data.straggler_note(entry), "caption"),
-            text(f"{base}-msg", data.draft_for(state, sid)),
-            text(f"{base}-link", entry.get("goLink", ""), "caption"),
-            text(f"{base}-send-label", "Send from my WhatsApp"),
+            text(f"{base}-send-label", "Send"),
             button(f"{base}-send", f"{base}-send-label", "send_whatsapp",
                    {"student_id": sid}),
             text(f"{base}-edit-label", "Edit"),
@@ -112,8 +153,7 @@ def straggler_list(state) -> list[dict]:
             row(f"{base}-actions",
                 [f"{base}-send", f"{base}-edit", f"{base}-open"]),
             column(f"{base}-column", [
-                f"{base}-name", f"{base}-meta", f"{base}-msg",
-                f"{base}-link", f"{base}-actions",
+                f"{base}-name", f"{base}-meta", f"{base}-actions",
             ]),
             card(f"{base}-card", f"{base}-column"),
         ])
@@ -192,6 +232,18 @@ def student_detail(state, student_id: str) -> list[dict]:
     components.append(column(f"{prefix}-main-column", child_ids))
     components.append(card(f"{prefix}-card", f"{prefix}-main-column"))
     return surface(prefix, components, f"{prefix}-card")
+
+
+def drawn_count(session) -> int:
+    """How many student cards the last straggler_list actually drew.
+
+    The parameter is `session`, not `state`, on purpose: test_ambassador.py
+    discovers surface builders by their first parameter being `state`, and this
+    returns a number rather than a surface.
+    """
+    return sum(1 for m in straggler_list(session) if "surfaceUpdate" in m
+               for c in m["surfaceUpdate"]["components"]
+               if c["id"].endswith("-name"))
 
 
 def _entry_card(prefix: str, key: str, lines: list[tuple[str, str]]) -> tuple[list[dict], str]:

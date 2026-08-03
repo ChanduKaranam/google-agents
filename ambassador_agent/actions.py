@@ -129,8 +129,11 @@ def _route(state, action: dict) -> tuple[str, list[dict]]:
         return _stragglers_reply(state)
 
     if name == "more_stragglers":
+        # Advance by however many cards actually fitted, not by a constant --
+        # the page shrinks to stay renderable, and a fixed step would skip
+        # whoever was trimmed off the end.
         state["strag_offset"] = (int(state.get("strag_offset", 0) or 0)
-                                 + surfaces.STRAGGLER_PAGE)
+                                 + surfaces.drawn_count(state))
         return "", surfaces.straggler_list(state)
 
     if name == "open_student":
