@@ -1,3 +1,4 @@
+import logging
 import os
 
 from google.adk.a2a.executor.a2a_agent_executor import A2aAgentExecutor
@@ -9,6 +10,14 @@ from . import identity, sethu
 from .agent import root_agent
 from .card import load_agent_card, require_public_host
 from .runtime import build_runner
+
+# Uvicorn leaves the root logger at WARNING, so every logger.info in this
+# package was silently dropped -- including the one line that says whether
+# Gemini Enterprise forwarded an end-user token, which is the only way to
+# verify the OAuth wiring from outside. Without this the runbook's log check
+# finds nothing and reads as "identity is broken".
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("ambassador_agent").setLevel(logging.INFO)
 
 PUBLIC_HOST = require_public_host(
     os.environ.get("PUBLIC_HOST"), os.environ.get("K_SERVICE")
