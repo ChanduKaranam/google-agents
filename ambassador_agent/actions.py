@@ -159,14 +159,20 @@ def _route(state, action: dict) -> tuple[str, list[dict]]:
         body = f"{message}\n{link}"
         deeplink = data.whatsapp_deeplink(state, student_id, body)
         data.mark_sent(state, student_id)
-        # The link goes in prose, not the card: A2UI v0.8 Text excludes links
-        # and Button dispatches an action rather than navigating. This wa.me
-        # url is what actually keeps the promise that Sethu pre-fills and she
-        # sends -- without it she would retype the message herself.
-        return (f"Opened WhatsApp with the message for {first}. Once that"
-                " sign-in lands, the activation is credited to you — usually"
-                f" within the hour.\n\nTap to send it:\n{deeplink}\n\n"
-                f"{body}"), []
+        # She asked for a button with the link in it. A2UI v0.8 cannot: the
+        # Button schema is additionalProperties:false over {child, primary,
+        # action} with no url field, and Text excludes links (checked against
+        # the standard catalog, 2026-08-03 -- v0.8 is the only version
+        # published). The nearest thing the platform allows is a markdown link
+        # wearing a button's label, which the chat surface renders as a single
+        # tap. It leads the reply, and the raw url is gone: a wa.me link with
+        # the whole message percent-encoded into it ran to several lines of
+        # noise she had to read past.
+        return (f"**[📲 Send to {first} on WhatsApp]({deeplink})**\n\n"
+                "One tap opens WhatsApp with this message already written —"
+                " you press send, never me. Once that sign-in lands, the"
+                " activation is credited to you, usually within the hour."
+                f"\n\n---\n\n{body}"), []
 
     if name == "show_leaderboard":
         return "", surfaces.leaderboard(state)

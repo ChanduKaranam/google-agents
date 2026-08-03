@@ -512,7 +512,8 @@ def test_send_marks_the_student_and_returns_the_link():
     state = {}
     reply, _messages = route(state, {"name": "send_whatsapp",
                                      "context": {"student_id": "stu-002"}})
-    assert "Opened WhatsApp with the message for Kavya." in reply
+    assert "Send to Kavya on WhatsApp" in reply
+    # the /go/ link still rides in the message body -- her credit depends on it
     assert "sethu.app/go/abc123" in reply
     assert state["sent"] == ["stu-002"]
 
@@ -1080,6 +1081,27 @@ def test_a_transport_failure_is_retried_but_a_real_error_is_not():
         assert calls["n"] == 0 or True
     finally:
         sethu._fetch = original
+
+
+def test_the_whatsapp_link_is_a_labelled_tap_target_not_a_raw_url():
+    """Ambassador feedback: she wanted a button with the link in it.
+
+    A2UI v0.8 cannot do that -- Button's schema is additionalProperties:false
+    over {child, primary, action} with no url field, and Text excludes links
+    (verified against the standard catalog 2026-08-03). The closest the
+    platform allows is a markdown link carrying a button-style label, which GE
+    renders as one tap. It leads the reply so she never hunts for it.
+    """
+    from ambassador_agent.actions import route
+
+    reply, _ = route({}, {"name": "send_whatsapp",
+                          "context": {"student_id": "stu-002"}})
+    first_line = reply.strip().splitlines()[0]
+    assert first_line.startswith("**[") and "](https://wa.me/" in first_line, reply
+    assert "Send to Kavya on WhatsApp" in first_line, first_line
+    # the bare url must not also be dumped as text -- that is what she asked
+    # to be rid of
+    assert "\nhttps://wa.me/" not in reply, reply
 
 
 def test_every_surface_is_reachable_by_a_tool():
