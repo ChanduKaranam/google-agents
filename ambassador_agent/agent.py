@@ -6,7 +6,7 @@ from google.genai import types
 
 from . import data, sethu
 from .a2ui import build_greeting, to_genai_parts
-from .actions import (chips_for, chips_for_action, intent_for,
+from .actions import (DEFAULT_CHIPS, chips_for, chips_for_action, intent_for,
                       parse_user_action, route, route_question)
 from .surfaces import (chips_surface, cohort_summary, leaderboard, rewards,
                        roster, straggler_list)
@@ -52,14 +52,6 @@ _SURFACE_BUILDERS = {
     "rewards": rewards,
     "roster": roster,
 }
-
-DEFAULT_CHIPS = [
-    "Who should I message?",
-    "Where do I stand?",
-    "How is my rank calculated?",
-    "What unlocks next?",
-]
-
 
 def _incoming_text(callback_context: CallbackContext) -> str:
     """Join the user turn's text and inline-data parts into one string.

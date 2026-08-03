@@ -494,15 +494,18 @@ def test_intents_match_the_prototype_keywords():
     assert intent_for("where do I stand?") == "cohort"
     assert intent_for("what is the weather") == "unknown"
 
-def test_chips_change_with_the_surface():
-    from ambassador_agent.actions import chips_for
-    assert chips_for("stragglers") == [
-        "Where do I stand?", "What unlocks next?", "Show my cohort"]
-    assert chips_for("leaderboard") == [
-        "Who should I message?", "What unlocks next?"]
-    assert chips_for("rewards") == [
-        "Who should I message?", "Where do I stand?"]
-    assert len(chips_for("cohort")) == 4
+def test_every_reply_ends_with_the_same_four_starter_prompts():
+    """Asked for directly: the default prompts after EVERY reply, so she never
+    scrolls back up to find them.
+
+    They used to vary by surface -- the leaderboard reply offered two, the
+    rewards reply a different two -- so the option she wanted was often absent
+    and only reachable by scrolling."""
+    from ambassador_agent.actions import DEFAULT_CHIPS, chips_for
+
+    for surface in ("stragglers", "leaderboard", "rewards", "roster",
+                    "cohort", "", "anything-unmapped"):
+        assert chips_for(surface) == DEFAULT_CHIPS, surface
 
 def test_send_marks_the_student_and_returns_the_link():
     from ambassador_agent.actions import route
@@ -574,15 +577,13 @@ def test_chips_surface_builds_a_standalone_chip_row():
              if "Button" in c["component"]]
     assert names == ["ask", "ask"]
 
-def test_chips_for_action_maps_the_action_name_to_its_surface():
-    from ambassador_agent.actions import chips_for_action
-    assert chips_for_action({"name": "show_stragglers"}) == [
-        "Where do I stand?", "What unlocks next?", "Show my cohort"]
-    assert chips_for_action({"name": "show_leaderboard"}) == [
-        "Who should I message?", "What unlocks next?"]
-    assert chips_for_action({"name": "show_rewards"}) == [
-        "Who should I message?", "Where do I stand?"]
-    assert len(chips_for_action({"name": "send_whatsapp"})) == 4
+def test_every_action_ends_with_the_same_four_starter_prompts():
+    from ambassador_agent.actions import DEFAULT_CHIPS, chips_for_action
+
+    for name in ("show_stragglers", "show_leaderboard", "show_rewards",
+                 "show_roster", "send_whatsapp", "open_edit", "open_student",
+                 "simulate_phase", "ask", "something_unmapped"):
+        assert chips_for_action({"name": name}) == DEFAULT_CHIPS, name
 
 def test_prototype_copy_reference_is_committed():
     """Copy fidelity must be checkable by someone who only has this repo.

@@ -45,34 +45,31 @@ _INTENTS = [
     ("cohort", ("how many", "progress", "pace", "left", "stand")),
 ]
 
-_CHIPS = {
-    "stragglers": ["Where do I stand?", "What unlocks next?", "Show my cohort"],
-    "leaderboard": ["Who should I message?", "What unlocks next?"],
-    "rewards": ["Who should I message?", "Where do I stand?"],
-}
-_DEFAULT_CHIPS = [
+# The starter prompts, shown after EVERY reply.
+#
+# These used to vary by surface -- the leaderboard reply offered two chips, the
+# rewards reply a different two -- which meant the option she wanted was often
+# not on screen and she had to scroll back up to the greeting to find it. Asked
+# for directly by the ambassador: the same four, every time.
+DEFAULT_CHIPS = [
     "Who should I message?",
     "Where do I stand?",
     "How is my rank calculated?",
     "What unlocks next?",
 ]
 
-# Maps a button's action name to the surface it just drew, so the chip row
-# that follows matches what's on screen rather than always the default four.
-_ACTION_SURFACE = {
-    "show_stragglers": "stragglers",
-    "show_leaderboard": "leaderboard",
-    "show_rewards": "rewards",
-    "show_roster": "roster",
-    "simulate_phase": "cohort",
-    # The detail card is a step inside the chase-the-stragglers flow, so it
-    # keeps that flow's chips rather than the generic four.
-    "open_student": "stragglers",
-}
-
 UNKNOWN_REPLY = (
     'I only know your section. Try "who should I message?", "where do I'
     ' stand?", "how is my rank calculated?" or "what unlocks next?"')
+
+
+def chips_for(_surface_name: str = "") -> list[str]:
+    """The starter prompts. Takes a surface only so callers need not change."""
+    return list(DEFAULT_CHIPS)
+
+
+def chips_for_action(_action: dict | None = None) -> list[str]:
+    return list(DEFAULT_CHIPS)
 
 
 def intent_for(question: str) -> str:
@@ -81,19 +78,6 @@ def intent_for(question: str) -> str:
         if any(keyword in lowered for keyword in keywords):
             return name
     return "unknown"
-
-
-def chips_for(surface_name: str) -> list[str]:
-    return list(_CHIPS.get(surface_name, _DEFAULT_CHIPS))
-
-
-def chips_for_action(action: dict) -> list[str]:
-    name = action.get("name")
-    if name == "ask":
-        surface_name = intent_for((action.get("context") or {}).get("question", ""))
-    else:
-        surface_name = _ACTION_SURFACE.get(name, "")
-    return chips_for(surface_name)
 
 
 def _stragglers_reply(state) -> tuple[str, list[dict]]:
