@@ -21,6 +21,15 @@
             "https://a2ui.org/specification/v0_8/standard_catalog_definition.json"
           ]
         }
+      },
+      {
+        "uri": "https://a2ui.org/a2a-extension/a2ui/v0.9.1",
+        "required": false,
+        "params": {
+          "supportedCatalogIds": [
+            "https://a2ui.org/specification/v0_9_1/catalogs/basic/catalog.json"
+          ]
+        }
       }
     ]
   },

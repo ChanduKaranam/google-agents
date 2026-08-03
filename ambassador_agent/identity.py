@@ -68,7 +68,15 @@ def install(sethu_module):
     """Build the `before_agent` interceptor that binds the caller's token."""
 
     async def before_agent(context):
-        token = bearer_from_headers(headers_of(context))
+        headers = headers_of(context)
+        # Which A2UI version did Gemini Enterprise actually activate? The card
+        # advertises v0.8 and v0.9.1; GE's docs claim v0.8 only, and this is
+        # the measurement that settles it. v0.9.1 is the one with `openUrl`,
+        # the client function that turns the WhatsApp link into a real button.
+        logger.info("A2UI negotiated: %s",
+                    {k: v for k, v in (headers or {}).items()
+                     if "extension" in str(k).lower()} or "none offered")
+        token = bearer_from_headers(headers)
         sethu_module.set_user_token(token)
         if token:
             logger.info("Request carried an end-user token (%d chars)",
