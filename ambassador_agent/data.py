@@ -20,9 +20,18 @@ from . import fixtures, sethu
 
 
 def _payload(kind: str, student_id: str | None = None) -> dict:
-    """The one place that chooses live API vs recorded sample."""
+    """The one place that chooses live API vs recorded sample.
+
+    Deployed, there is no third option: either we know who is asking and read
+    their section, or we refuse. Falling back to the samples in production
+    would put invented students, with invented phone numbers, in front of a
+    real ambassador as though they were her class.
+    """
     if sethu.enabled():
         return sethu.get(kind, student_id)
+    if sethu.deployed():
+        raise sethu.NoIdentity(
+            "No end-user identity, so there is no section to show")
     if kind == "student":
         detail = fixtures.STUDENT_DETAIL.get(student_id)
         if detail is None:

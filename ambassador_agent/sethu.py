@@ -56,6 +56,8 @@ logger = logging.getLogger(__name__)
 
 
 class SethuError(RuntimeError):
+    """Base for every Sethu failure. Subclasses carry what to tell her."""
+
     """A Sethu call failed. Carries their requestId so they can trace it."""
 
     def __init__(self, message: str, code: str = "", request_id: str = ""):
@@ -64,15 +66,57 @@ class SethuError(RuntimeError):
         self.request_id = request_id
 
 
-def enabled() -> bool:
-    """True when the agent is configured to call Sethu at all.
+class NoIdentity(SethuError):
+    """Nobody told us who is asking, so there is no section to show.
 
-    Both halves are required: the server-to-server secret, and an end-user
-    Google token to exchange. Without either, `data.py` serves the recorded
-    samples -- so a missing secret degrades the demo to sample data instead of
-    taking the agent offline.
+    Answering anyway would mean showing one ambassador's cohort to whoever
+    opened the agent -- students, other ambassadors, anyone. A refusal is the
+    only correct answer.
     """
-    if os.environ.get(AGENT_TOKEN_ENV):
+
+
+class NotRegistered(SethuError):
+    """The signed-in person has no Sethu account, or is not an ambassador."""
+
+
+UNAVAILABLE = ("I can't reach Sethu right now, so I don't want to quote you"
+               " numbers that might be wrong. Try again in a moment.")
+
+NO_IDENTITY = ("I can't tell who you are yet — Gemini Enterprise hasn't shared"
+               " your sign-in with me, so I don't know whose section to open."
+               " I won't show you someone else's. Ask your admin to finish the"
+               " agent's sign-in setup.")
+
+NOT_REGISTERED = ("You're signed in, but that account isn't registered as an"
+                  " ambassador in Sethu, so there's no section for me to show"
+                  " you. If that's wrong, ask your placement office to add"
+                  " you.")
+
+
+def message_for(error: Exception) -> str:
+    """What she is told, chosen by why it failed."""
+    if isinstance(error, NoIdentity):
+        return NO_IDENTITY
+    if isinstance(error, NotRegistered):
+        return NOT_REGISTERED
+    return UNAVAILABLE
+
+
+def deployed() -> bool:
+    """True when running on Cloud Run. Cloud Run always sets K_SERVICE."""
+    return bool(os.environ.get("K_SERVICE"))
+
+
+def enabled() -> bool:
+    """True when we know who is asking and can call Sethu as them.
+
+    The pre-minted token is honoured ONLY off Cloud Run. Reported from the live
+    agent: signed in as one person, the reply described a different
+    ambassador's section, because the token resolved every caller to whoever it
+    was minted for. That is a data leak, so in production the only way in is
+    the end user's own Google token.
+    """
+    if os.environ.get(AGENT_TOKEN_ENV) and not deployed():
         return True
     return bool(os.environ.get(AGENT_SECRET_ENV) and _user_token())
 
@@ -115,8 +159,10 @@ def _request(method: str, path: str, headers: dict,
         request_id = (parsed.get("meta") or {}).get("requestId", "")
         logger.warning("Sethu %s %s failed: %s %s (requestId=%s)", method, path,
                        error.code, detail.get("code", ""), request_id)
-        raise SethuError(detail.get("message", str(error)),
-                         detail.get("code", ""), request_id) from error
+        failure = (NotRegistered if error.code in (403, 404)
+                   else SethuError)
+        raise failure(detail.get("message", str(error)),
+                      detail.get("code", ""), request_id) from error
     except urllib.error.URLError as error:
         logger.warning("Sethu %s %s unreachable: %s", method, path, error)
         raise SethuError(f"Sethu unreachable: {error.reason}") from error
@@ -151,14 +197,14 @@ def _claims(token: str) -> dict:
 
 def _agent_token() -> dict:
     """Exchange the end user's Google access token for a Sethu agent token."""
-    preminted = os.environ.get(AGENT_TOKEN_ENV)
+    preminted = os.environ.get(AGENT_TOKEN_ENV) if not deployed() else None
     if preminted:
         claims = _claims(preminted)
         return {"token": preminted, "tenantId": claims["tenantId"],
                 "role": claims.get("role"), "userId": claims.get("sub")}
     user_token = _user_token()
     if not user_token:
-        raise SethuError("No end-user Google token on this request")
+        raise NoIdentity("No end-user Google token on this request")
     cached = _token_cache.get(user_token)
     if cached:
         return cached

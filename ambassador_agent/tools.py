@@ -20,10 +20,10 @@ from google.adk.tools import ToolContext
 
 from . import data, sethu
 
-# What she is told when Sethu cannot be reached. Honest about the cause, and it
-# never shows a stale or invented number in place of a live one.
-UNAVAILABLE = ("I can't reach Sethu right now, so I don't want to quote you"
-               " numbers that might be wrong. Try again in a moment.")
+# What she is told when a Sethu call fails. The wording depends on WHY -- an
+# outage, an unknown caller, and a caller who is not an ambassador are three
+# different problems and only one of them is worth retrying.
+UNAVAILABLE = sethu.UNAVAILABLE
 
 
 def _survives_an_outage(tool):
@@ -36,8 +36,8 @@ def _survives_an_outage(tool):
     def guarded(*args, **kwargs):
         try:
             return tool(*args, **kwargs)
-        except sethu.SethuError:
-            return {"say": UNAVAILABLE}
+        except sethu.SethuError as error:
+            return {"say": sethu.message_for(error)}
     return guarded
 
 

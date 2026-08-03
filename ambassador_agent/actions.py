@@ -107,15 +107,15 @@ def route(state, action: dict) -> tuple[str, list[dict]]:
     """Handle one button press. Returns (prose reply, A2UI messages)."""
     try:
         return _route(state, action)
-    except sethu.SethuError:
-        return UNAVAILABLE, []
+    except sethu.SethuError as error:
+        return sethu.message_for(error), []
 
 
 def route_question(state, question: str) -> tuple[str, list[dict]]:
     try:
         return _route_question(state, question)
-    except sethu.SethuError:
-        return UNAVAILABLE, []
+    except sethu.SethuError as error:
+        return sethu.message_for(error), []
 
 
 def _route(state, action: dict) -> tuple[str, list[dict]]:

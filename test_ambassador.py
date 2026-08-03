@@ -1121,6 +1121,71 @@ def test_the_card_advertises_only_the_a2ui_version_we_render():
     assert uris == ["https://a2ui.org/a2a-extension/a2ui/v0.8"], uris
 
 
+def test_deployed_without_an_identity_it_refuses_rather_than_guessing():
+    """Reported: signed in as purna@tilicho.in, the agent answered with Akhil's
+    section. Serving one person's cohort to every caller is a data leak and it
+    defeats the point of the agent.
+
+    Deployed, with no end-user identity, the only correct answers are 'I can't
+    tell who you are' or 'you are not an ambassador' -- never someone else's
+    data, and never the recorded samples dressed up as real students.
+    """
+    import os
+
+    from ambassador_agent import data, sethu
+
+    sethu.set_user_token(None)
+    was = os.environ.get("K_SERVICE")
+    os.environ["K_SERVICE"] = "ambassador-a2a"      # pretend we are on Cloud Run
+    os.environ.pop("SETHU_AGENT_TOKEN", None)
+    try:
+        try:
+            data.get_cohort({})
+        except sethu.NoIdentity as error:
+            told = sethu.message_for(error)
+            assert "can't tell who you are" in told, told
+            # and never the recorded samples dressed up as her class
+            assert "Kavya" not in told and "Akhil" not in told, told
+        else:
+            raise AssertionError("served data to an unidentified caller")
+    finally:
+        if was is None:
+            os.environ.pop("K_SERVICE", None)
+        else:
+            os.environ["K_SERVICE"] = was
+
+
+def test_a_pre_minted_token_cannot_be_used_in_production():
+    """The demo token is how everyone became Akhil. It stays available for
+    local work and is ignored the moment the code is running on Cloud Run."""
+    import os
+
+    from ambassador_agent import sethu
+
+    was = os.environ.get("K_SERVICE")
+    os.environ["K_SERVICE"] = "ambassador-a2a"
+    os.environ["SETHU_AGENT_TOKEN"] = "pre.minted.token"
+    sethu.set_user_token(None)
+    try:
+        assert not sethu.enabled(), "a pre-minted token was honoured in production"
+    finally:
+        os.environ.pop("SETHU_AGENT_TOKEN", None)
+        if was is None:
+            os.environ.pop("K_SERVICE", None)
+        else:
+            os.environ["K_SERVICE"] = was
+
+
+def test_a_caller_with_no_sethu_account_is_told_so():
+    """Sethu answers 404 when the signed-in email is not one of its users."""
+    from ambassador_agent import sethu
+
+    assert issubclass(sethu.NotRegistered, sethu.SethuError)
+    message = sethu.message_for(sethu.NotRegistered("no account"))
+    assert "ambassador" in message.lower(), message
+    assert "can't reach" not in message.lower(), "wrong message: that is the outage one"
+
+
 def test_every_surface_is_reachable_by_a_tool():
     """Keyword matching only knows the prototype's wording. The tools are what
     let the model handle "who's falling behind?" and still draw a card."""

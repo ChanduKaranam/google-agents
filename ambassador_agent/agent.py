@@ -172,15 +172,17 @@ def render_surface(callback_context: CallbackContext) -> types.Content | None:
         )
         return types.Content(role="model", parts=to_genai_parts(messages))
 
-    except sethu.SethuError:
-        # Sethu was unreachable. Swallowing this left her with the model's
+    except sethu.SethuError as error:
+        # Sethu was unreachable, or we do not know who is asking. Swallowing
+        # this left her with the model's
         # generic reply and NO card and NO chips -- measured in Gemini
         # Enterprise, and it reads as a dead agent. Say so, and keep the
         # options on screen so she can try again with one tap.
-        logger.warning("Sethu unreachable while drawing a surface")
+        logger.warning("Cannot draw a surface: %s", type(error).__name__)
         return types.Content(
             role="model",
-            parts=to_genai_parts(build_greeting(UNAVAILABLE, DEFAULT_CHIPS)))
+            parts=to_genai_parts(build_greeting(sethu.message_for(error),
+                                                DEFAULT_CHIPS)))
     except Exception:  # noqa: BLE001 - a broken widget must not break the answer
         logger.warning("Could not render A2UI surface", exc_info=True)
         return None
