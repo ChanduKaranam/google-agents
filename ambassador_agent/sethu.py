@@ -82,10 +82,10 @@ class NotRegistered(SethuError):
 UNAVAILABLE = ("I can't reach Sethu right now, so I don't want to quote you"
                " numbers that might be wrong. Try again in a moment.")
 
-NO_IDENTITY = ("I can't tell who you are yet — Gemini Enterprise hasn't shared"
-               " your sign-in with me, so I don't know whose section to open."
-               " I won't show you someone else's. Ask your admin to finish the"
-               " agent's sign-in setup.")
+NO_IDENTITY = ("I can't confirm who you are, so I don't know whose section to"
+               " open — and I won't show you someone else's. If you've just"
+               " signed in, ask your admin to finish the agent's sign-in"
+               " setup.")
 
 NOT_REGISTERED = ("You're signed in, but that account isn't registered as an"
                   " ambassador in Sethu, so there's no section for me to show"
@@ -159,8 +159,16 @@ def _request(method: str, path: str, headers: dict,
         request_id = (parsed.get("meta") or {}).get("requestId", "")
         logger.warning("Sethu %s %s failed: %s %s (requestId=%s)", method, path,
                        error.code, detail.get("code", ""), request_id)
-        failure = (NotRegistered if error.code in (403, 404)
-                   else SethuError)
+        # Which failure it is depends on the endpoint as well as the status.
+        # A 401 from `exchange` means Google would not vouch for the token we
+        # presented -- an identity problem, not an outage, and telling her to
+        # "try again in a moment" would send her round a loop that never ends.
+        if "/auth/agent-tokens/exchange" in path:
+            failure = NotRegistered if error.code == 404 else NoIdentity
+        elif error.code in (401, 403):
+            failure = NotRegistered      # authenticated, but not this cohort
+        else:
+            failure = SethuError
         raise failure(detail.get("message", str(error)),
                       detail.get("code", ""), request_id) from error
     except urllib.error.URLError as error:

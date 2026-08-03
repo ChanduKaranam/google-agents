@@ -1143,7 +1143,7 @@ def test_deployed_without_an_identity_it_refuses_rather_than_guessing():
             data.get_cohort({})
         except sethu.NoIdentity as error:
             told = sethu.message_for(error)
-            assert "can't tell who you are" in told, told
+            assert "confirm who you are" in told, told
             # and never the recorded samples dressed up as her class
             assert "Kavya" not in told and "Akhil" not in told, told
         else:
@@ -1174,6 +1174,36 @@ def test_a_pre_minted_token_cannot_be_used_in_production():
             os.environ.pop("K_SERVICE", None)
         else:
             os.environ["K_SERVICE"] = was
+
+
+def test_a_rejected_sign_in_is_an_identity_problem_not_an_outage():
+    """Live, a caller whose token Google would not vouch for was told 'I can't
+    reach Sethu, try again in a moment' -- a loop that never resolves. A 401
+    from exchange is about who you are; only a transport failure is an outage.
+    """
+    import urllib.error
+    import urllib.request
+
+    from ambassador_agent import sethu
+
+    class Fake401(urllib.error.HTTPError):
+        def __init__(self):
+            super().__init__("u", 401, "Unauthorized", {}, None)
+
+        def read(self):
+            return b'{"error":{"code":"UNAUTHORIZED","message":"Invalid token"}}'
+
+    original = urllib.request.urlopen
+    urllib.request.urlopen = lambda *a, **k: (_ for _ in ()).throw(Fake401())
+    try:
+        try:
+            sethu._request("POST", "/auth/agent-tokens/exchange", {}, {})
+        except sethu.NoIdentity as error:
+            assert "confirm who you are" in sethu.message_for(error)
+        else:
+            raise AssertionError("a rejected sign-in was reported as an outage")
+    finally:
+        urllib.request.urlopen = original
 
 
 def test_a_caller_with_no_sethu_account_is_told_so():
