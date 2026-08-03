@@ -1104,6 +1104,23 @@ def test_the_whatsapp_link_is_a_labelled_tap_target_not_a_raw_url():
     assert "\nhttps://wa.me/" not in reply, reply
 
 
+def test_the_card_advertises_only_the_a2ui_version_we_render():
+    """Advertising a version we cannot emit is a live trap: GE negotiates the
+    highest it supports, so the day it adds v0.9.1 it would activate that and
+    every v0.8 payload we send would fail to render.
+
+    Measured 2026-08-03: GE activates v0.8 only. Raise this to v0.9.1 in the
+    same commit that rewrites a2ui.py for the v0.9 schema, never before.
+    """
+    import json
+    import pathlib
+
+    card = json.loads((pathlib.Path(__file__).parent / "ambassador_agent"
+                       / "agent_card.json").read_text())
+    uris = [e["uri"] for e in card["capabilities"]["extensions"]]
+    assert uris == ["https://a2ui.org/a2a-extension/a2ui/v0.8"], uris
+
+
 def test_every_surface_is_reachable_by_a_tool():
     """Keyword matching only knows the prototype's wording. The tools are what
     let the model handle "who's falling behind?" and still draw a card."""

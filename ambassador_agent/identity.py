@@ -69,10 +69,12 @@ def install(sethu_module):
 
     async def before_agent(context):
         headers = headers_of(context)
-        # Which A2UI version did Gemini Enterprise actually activate? The card
-        # advertises v0.8 and v0.9.1; GE's docs claim v0.8 only, and this is
-        # the measurement that settles it. v0.9.1 is the one with `openUrl`,
-        # the client function that turns the WhatsApp link into a real button.
+        # Which A2UI version did Gemini Enterprise activate? Measured
+        # 2026-08-03 with the card advertising both v0.8 and v0.9.1: GE
+        # activated **v0.8 only** and ignored v0.9.1, matching its docs. That
+        # is why the WhatsApp link cannot be a button -- `openUrl` arrived in
+        # v0.9. Kept logging so the day GE starts offering v0.9.1, we see it in
+        # the first request rather than guessing.
         logger.info("A2UI negotiated: %s",
                     {k: v for k, v in (headers or {}).items()
                      if "extension" in str(k).lower()} or "none offered")
