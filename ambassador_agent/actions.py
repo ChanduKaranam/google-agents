@@ -54,13 +54,13 @@ _INTENTS = [
 DEFAULT_CHIPS = [
     "Who should I message?",
     "Where do I stand?",
-    "How is my rank calculated?",
+    "Show the leaderboard",
     "What unlocks next?",
 ]
 
 UNKNOWN_REPLY = (
     'I only know your section. Try "who should I message?", "where do I'
-    ' stand?", "how is my rank calculated?" or "what unlocks next?"')
+    ' stand?", "show the leaderboard" or "what unlocks next?"')
 
 
 def chips_for(_surface_name: str = "") -> list[str]:

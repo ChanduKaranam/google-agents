@@ -179,7 +179,7 @@ def test_cohort_card_carries_the_certified_label_and_both_numbers():
     assert "23.7%" in strings
     assert any("25% Club" in s for s in strings)
     assert "Show the 3 who need me" in strings
-    assert "How is my rank calculated?" in strings
+    assert "Show the leaderboard" in strings
     # activation numbers lag Google by up to ~6h, so freshness is always shown
     assert any("last synced" in s for s in strings), strings
 
@@ -498,6 +498,8 @@ def test_intents_match_the_prototype_keywords():
     assert intent_for("who should I message?") == "stragglers"
     assert intent_for("time to nudge someone") == "stragglers"
     assert intent_for("how is my rank calculated?") == "leaderboard"
+    # the renamed prompt reaches the same place, on "leader"
+    assert intent_for("Show the leaderboard") == "leaderboard"
     assert intent_for("what unlocks next?") == "rewards"
     assert intent_for("show my cohort") == "roster"
     assert intent_for("where do I stand?") == "cohort"
@@ -1412,6 +1414,30 @@ def test_a_next_button_carries_the_offset_it_belongs_to():
     state = {}
     route(state, {"name": "more_stragglers", "context": first})
     assert state["strag_offset"] == int(first["offset"])
+
+
+def test_the_leaderboard_prompt_says_what_it_does():
+    """Renamed on request: "How is my rank calculated?" described an
+    explanation, but tapping it opens the board. The keyword router still
+    reaches the leaderboard, on "leader"."""
+    import json
+    import pathlib
+
+    from ambassador_agent.actions import DEFAULT_CHIPS, intent_for
+    from ambassador_agent.surfaces import cohort_summary
+
+    assert "Show the leaderboard" in DEFAULT_CHIPS
+    assert not any("rank calculated" in c for c in DEFAULT_CHIPS), DEFAULT_CHIPS
+    assert intent_for("Show the leaderboard") == "leaderboard"
+
+    strings = _literals(cohort_summary({}))
+    assert "Show the leaderboard" in strings
+    assert not any("rank calculated" in s for s in strings), strings
+
+    card = json.loads((pathlib.Path(__file__).parent / "ambassador_agent"
+                       / "agent_card.json").read_text())
+    examples = card["skills"][0]["examples"]
+    assert "Show the leaderboard" in examples, examples
 
 
 def test_every_surface_is_reachable_by_a_tool():

@@ -96,9 +96,9 @@ def cohort_summary(state) -> list[dict]:
     components.append(button(f"{prefix}-cta0", f"{prefix}-cta0-label",
                              "show_stragglers" if pending else "show_roster"))
     components.append(text(f"{prefix}-cta1-label",
-                           "How is my rank calculated?"))
+                           "Show the leaderboard"))
     components.append(button(f"{prefix}-cta1", f"{prefix}-cta1-label", "ask",
-                             {"question": "how is my rank calculated?"}))
+                             {"question": "Show the leaderboard"}))
     components.append(row(f"{prefix}-ctas",
                           [f"{prefix}-cta0", f"{prefix}-cta1"]))
     child_ids.append(f"{prefix}-ctas")
