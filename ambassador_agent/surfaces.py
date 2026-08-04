@@ -44,12 +44,15 @@ STRAGGLER_PAGE = 5
 # count right back through the ceiling.
 # 5.6KB is the largest surface Gemini Enterprise has been *observed* to render
 # (the leaderboard). Until the real limit is known, that is the budget.
-MAX_SURFACE_BYTES = 5600  # observed-safe ceiling
+# 5453 bytes rendered in Gemini Enterprise (verified from a live session);
+# 12725 and 14163 did not. This budget puts two student cards plus the chip row
+# at ~5.5KB -- the largest shape we have actually watched render.
+MAX_SURFACE_BYTES = 6200
 
 # The chip row is appended afterwards by agent._with_chips, into this same
 # surface, so its weight has to come out of the budget here or every page ships
 # ~1.9KB over the line it was measured against.
-CHIP_ALLOWANCE = 1050
+CHIP_ALLOWANCE = 1500
 
 
 def meter(pct: float) -> str:
@@ -125,7 +128,12 @@ def straggler_list(state) -> list[dict]:
 
 def _straggler_page(state, everyone: list[dict], offset: int,
                     count: int) -> list[dict]:
-    prefix = "strag"
+    # A fresh surfaceId per page. A2UI treats a repeated surfaceId as an update
+    # to that surface, so reusing "strag" rewrote the card already on screen
+    # and left the new turn blank -- and the students she had just been shown
+    # vanished. Paging now adds a card instead of replacing one, and every page
+    # stays on screen and tappable.
+    prefix = f"strag{offset}"
     students = everyone[offset:offset + count]
     components: list[dict] = []
     child_ids: list[str] = []
@@ -165,8 +173,11 @@ def _straggler_page(state, everyone: list[dict], offset: int,
         nxt = min(STRAGGLER_PAGE, remaining)
         components.append(text(f"{prefix}-more-label",
                                f"Show the next {nxt} of {remaining} left"))
+        # The button carries the offset it leads to, so an older page's button
+        # still advances from ITS place in the list rather than from wherever
+        # she has since moved to.
         components.append(button(f"{prefix}-more", f"{prefix}-more-label",
-                                 "more_stragglers"))
+                                 "more_stragglers", {"offset": str(shown)}))
         child_ids.append(f"{prefix}-more")
 
     counted = (f"Showing {offset + 1}–{shown} of {len(everyone)}. "

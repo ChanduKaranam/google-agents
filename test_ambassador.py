@@ -363,11 +363,11 @@ def test_each_card_binds_both_buttons_to_its_own_student():
     drawn = sum(1 for c in components if c["id"].endswith("-name"))
     assert drawn >= 1, "no student cards drawn at all"
     for index, (sid, name) in enumerate(list(zip(ids, expected))[:drawn]):
-        shown = by_id[f"strag-s{index}-name"]["component"]["Text"]["text"]
+        shown = by_id[f"strag0-s{index}-name"]["component"]["Text"]["text"]
         assert shown["literalString"] == name, (index, shown)
         for suffix, action in (("send", "send_whatsapp"), ("edit", "open_edit"),
                                ("open", "open_student")):
-            spec = by_id[f"strag-s{index}-{suffix}"]["component"]["Button"]["action"]
+            spec = by_id[f"strag0-s{index}-{suffix}"]["component"]["Button"]["action"]
             assert spec["name"] == action, (index, suffix, spec)
             carried = {c["key"]: c["value"]["literalString"]
                        for c in spec["context"]}
@@ -892,7 +892,7 @@ def test_every_straggler_card_opens_its_own_student():
     by_id = {c["id"]: c for c in _components(straggler_list({}))}
     drawn = sum(1 for i in by_id if i.endswith("-name"))
     for index, sid in list(enumerate(("stu-002", "stu-004", "stu-006")))[:drawn]:
-        spec = by_id[f"strag-s{index}-open"]["component"]["Button"]["action"]
+        spec = by_id[f"strag0-s{index}-open"]["component"]["Button"]["action"]
         assert spec["name"] == "open_student", (sid, spec)
         carried = {c["key"]: c["value"]["literalString"] for c in spec["context"]}
         assert carried == {"student_id": sid}, (sid, carried)
@@ -1374,6 +1374,44 @@ def test_a_missing_student_is_not_reported_as_you_are_not_an_ambassador():
     assert error is sethu.StaleStudent, error
     told = sethu.message_for(sethu.StaleStudent("gone"))
     assert "no longer" in told.lower() and "ambassador" not in told.lower(), told
+
+
+def test_each_straggler_page_is_its_own_surface():
+    """Reported: tapping 'show the next N' rewrote the card already on screen
+    and the new turn came back blank. A2UI treats a repeated surfaceId as an
+    update to that surface, so every page has to carry a fresh one -- then the
+    students she has already seen stay in the transcript, still tappable."""
+    from ambassador_agent.surfaces import straggler_list
+
+    first = {m["surfaceUpdate"]["surfaceId"] for m in straggler_list({})
+             if "surfaceUpdate" in m}
+    second = {m["surfaceUpdate"]["surfaceId"]
+              for m in straggler_list({"strag_offset": 2})
+              if "surfaceUpdate" in m}
+    assert first and second and first != second, (first, second)
+
+
+def test_a_next_button_carries_the_offset_it_belongs_to():
+    """With pages persisting, an older page's button is still on screen. It has
+    to advance from ITS place in the list, not from wherever she has since
+    scrolled to."""
+    from ambassador_agent.actions import route
+    from ambassador_agent.surfaces import straggler_list
+
+    def next_action(state):
+        for c in (c for m in straggler_list(state) if "surfaceUpdate" in m
+                  for c in m["surfaceUpdate"]["components"]):
+            spec = c["component"].get("Button")
+            if spec and spec["action"]["name"] == "more_stragglers":
+                return {ctx["key"]: ctx["value"]["literalString"]
+                        for ctx in spec["action"].get("context", [])}
+        return None
+
+    first = next_action({})
+    assert first and int(first["offset"]) > 0, first
+    state = {}
+    route(state, {"name": "more_stragglers", "context": first})
+    assert state["strag_offset"] == int(first["offset"])
 
 
 def test_every_surface_is_reachable_by_a_tool():
