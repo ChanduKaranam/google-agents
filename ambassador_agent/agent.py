@@ -84,8 +84,15 @@ def scrub_model_output(text: str) -> str:
     return cleaned.strip()
 
 
-def strip_a2ui_from_response(_callback_context, llm_response):
-    """after_model_callback: scrub every text part before it is emitted."""
+def strip_a2ui_from_response(callback_context=None, llm_response=None):
+    """after_model_callback: scrub every text part before it is emitted.
+
+    ADK invokes this with KEYWORD arguments (callback_context=,
+    llm_response=), so the parameter names are part of the contract -- naming
+    the first one `_callback_context` raised
+    "got an unexpected keyword argument 'callback_context'" on every model
+    turn.
+    """
     content = getattr(llm_response, "content", None)
     if content is None or not getattr(content, "parts", None):
         return llm_response

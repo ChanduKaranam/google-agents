@@ -1715,7 +1715,8 @@ def test_the_model_response_is_scrubbed_in_place():
             types.Part(text='ok'),
             types.Part(text='<a2a_datapart_json>{"data":{}}</a2a_datapart_json>')])
 
-    out = strip_a2ui_from_response(None, Resp())
+    # ADK calls it with keyword arguments; the names are the contract
+    out = strip_a2ui_from_response(callback_context=None, llm_response=Resp())
     texts = [p.text for p in out.content.parts if p.text is not None]
     assert texts == ["ok"], texts
 
