@@ -1,0 +1,302 @@
+"""HTTP client for the Sethu Faculty API.
+
+Two families of endpoints, with different credentials:
+
+  /auth/agent-tokens/*   header: X-Agent-Secret       (server-to-server)
+  /faculty/*             header: Authorization: Bearer (per-person agent token)
+
+Built against sethu_openapi.json ("Sethu Faculty API 1.0.0"), with the token
+reuse/revocation endpoints from the Agentic Team Guide, which the OpenAPI
+document does not cover.
+"""
+
+from urllib.parse import quote
+
+import requests
+
+from . import config
+
+
+class SethuError(RuntimeError):
+    """Sethu was unreachable, or returned an error we cannot act on."""
+
+    def __init__(
+        self,
+        message: str,
+        status_code: int | None = None,
+        request_id: str | None = None,
+    ):
+        super().__init__(message)
+        self.status_code = status_code
+        # Sethu returns meta.requestId on every response; their team can trace
+        # it, so it is worth carrying on every failure.
+        self.request_id = request_id
+
+
+class NoIdentityError(SethuError):
+    """We could not establish who is asking. Retrying cannot change that."""
+
+
+class NotRegisteredError(SethuError):
+    """The caller is authenticated but is not faculty Sethu will act for."""
+
+
+def _unwrap(payload):
+    """Sethu wraps successful responses in {"data": ...}."""
+    if isinstance(payload, dict) and 'data' in payload:
+        return payload['data']
+    return payload
+
+
+def _request_id(response) -> str | None:
+    try:
+        return (response.json().get('meta') or {}).get('requestId')
+    except (ValueError, AttributeError):
+        return None
+
+
+def _request(method: str, path: str, *, headers: dict, **kwargs):
+    if not config.SETHU_API_BASE_URL:
+        raise SethuError('SETHU_API_BASE_URL is not set.')
+
+    url = f'{config.SETHU_API_BASE_URL}{path}'
+    # One retry, and only for transport failures — the dev API sleeps on
+    # Render and the waking request times out. A real answer (401/403/404) is
+    # never retried; retrying cannot change it.
+    last_exc = None
+    for _ in range(2):
+        try:
+            response = requests.request(
+                method,
+                url,
+                headers=headers,
+                timeout=config.REQUEST_TIMEOUT_SECONDS,
+                **kwargs,
+            )
+            break
+        except requests.RequestException as exc:
+            last_exc = exc
+    else:
+        raise SethuError(
+            f'Could not reach Sethu: {last_exc}'
+        ) from last_exc
+
+    if response.status_code >= 400:
+        raise _classify_error(path, response)
+
+    if not response.content:
+        return None
+    try:
+        return _unwrap(response.json())
+    except ValueError as exc:
+        raise SethuError('Sethu returned a non-JSON response.') from exc
+
+
+def _classify_error(path: str, response) -> SethuError:
+    """Turn a Sethu error into the right class, because the answer differs.
+
+    The distinction that matters to a professor: we do not know who you are
+    (nothing they can do), versus we know you but Sethu will not act for you
+    (someone must register them), versus Sethu is down (try again).
+    """
+    code = response.status_code
+    request_id = _request_id(response)
+
+    if path.startswith('/auth/agent-tokens/exchange'):
+        if code == 401:
+            return NoIdentityError(
+                'Sethu rejected the sign-in — the access token has expired, or '
+                'the agent secret is missing or wrong.',
+                code,
+                request_id,
+            )
+        if code == 404:
+            return NotRegisteredError(
+                'This Google account has no Sethu record, so it is not '
+                'registered as faculty.',
+                code,
+                request_id,
+            )
+        if code == 400:
+            return NotRegisteredError(
+                'This Sethu account exists but is not active yet.',
+                code,
+                request_id,
+            )
+    elif code in (401, 403):
+        return NotRegisteredError(
+            f'Sethu refused this account access to {path}. The account may not '
+            'have the role that endpoint requires.',
+            code,
+            request_id,
+        )
+
+    if code == 404:
+        return SethuError('Sethu could not find that record.', code, request_id)
+    return SethuError(
+        f'Sethu returned {code}: {response.text[:300]}', code, request_id
+    )
+
+
+# --- Agent-token endpoints (X-Agent-Secret) --------------------------------
+
+
+def _secret_headers() -> dict:
+    headers = {'Content-Type': 'application/json'}
+    if config.AGENT_AUTH_SECRET:
+        headers['X-Agent-Secret'] = config.AGENT_AUTH_SECRET
+    return headers
+
+
+def exchange_google_access_token(google_access_token: str) -> dict:
+    """Trade the caller's Google OAuth access token for a Sethu agent token.
+
+    An access token, not an ID token: Gemini Enterprise forwards an opaque
+    OAuth token and never a signed OIDC one, so the ID-token path Sethu's
+    original guide describes is unreachable from a GE agent.
+
+    Returns {token, tokenId, expiresAt, userId, role, tenantId}.
+    """
+    return _request(
+        'POST',
+        '/auth/agent-tokens/exchange',
+        headers=_secret_headers(),
+        json={'googleAccessToken': google_access_token},
+    )
+
+
+def list_agent_tokens(user_id: str) -> list:
+    """List a user's agent token records, newest first.
+
+    Metadata only — measured 2026-08-03, entries carry `id`, `userId`, `role`,
+    `tenantId`, `label`, `createdAt`, `expiresAt` and `revoked`, and never the
+    token string itself. So this cannot be used to reuse a live token; it is
+    good for auditing and for finding an `id` to revoke.
+
+    The payload nests one level deeper than the rest of the API:
+    `{"data": {"tokens": [...]}}`.
+
+    Documented in the team guide; absent from the OpenAPI document.
+    """
+    payload = _request(
+        'GET',
+        f'/auth/agent-tokens?userId={user_id}',
+        headers=_secret_headers(),
+    )
+    if isinstance(payload, dict):
+        payload = payload.get('tokens')
+    return payload or []
+
+
+def revoke_agent_token(token_id: str) -> None:
+    """Revoke a token immediately."""
+    _request(
+        'POST',
+        f'/auth/agent-tokens/{token_id}/revoke',
+        headers=_secret_headers(),
+    )
+
+
+# --- Faculty endpoints (Bearer agent token) --------------------------------
+
+
+def _bearer_headers(token: str) -> dict:
+    return {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+
+
+def get_me(token: str) -> dict:
+    """Who Sethu thinks this token belongs to. The best smoke test there is."""
+    return _request('GET', '/auth/me', headers=_bearer_headers(token)) or {}
+
+
+def list_faculty_sections(token: str) -> list:
+    """List the sections that exist in this college.
+
+    Not the caller's own sections — professors are not assigned sections, and
+    any of them can send an agent college-wide. Measured 2026-08-03: 55
+    sections across 7 departments, while the caller's own department is CSE.
+    This is the roster to validate a professor's stated section against.
+
+    Like `/auth/agent-tokens`, the payload nests one level deeper than the rest
+    of the API: `{"data": {"department": "CSE", "sections": [...]}}`. The
+    caller's department is dropped here; only the roster is returned.
+
+    Each entry is an object, not a string:
+
+        {"department": "CSE", "year": 1, "section": "A",
+         "label": "CSE · Year 1 · Sec A", "students": 1}
+
+    `section` alone ("A") is ambiguous — it repeats across every department and
+    year — so `label` is the only field that identifies a section on its own.
+
+    Requires a token carrying an `email` claim. A token without one gets 403,
+    which is what blocked this endpoint all morning.
+    """
+    payload = _request('GET', '/faculty/sections', headers=_bearer_headers(token))
+    if isinstance(payload, dict):
+        payload = payload.get('sections')
+    return payload or []
+
+
+def list_faculty_agents(token: str) -> list:
+    """List the GE agents this faculty member owns."""
+    return _request('GET', '/faculty/agents', headers=_bearer_headers(token)) or []
+
+
+def publish_faculty_agent(
+    token: str, ge_url: str, name: str, semester: str, sections: list
+) -> dict:
+    """Publish a GE agent to sections. The only write path Sethu implements.
+
+    Measured against the running API on 2026-08-03. Both the OpenAPI document
+    and the team guide describe `{name, description, whoCanUse}` plus separate
+    `claim` and `PUT .../sections` calls; none of that exists. One POST carries
+    the share link and the sections together, and comes back `status: "live"`.
+
+    `sections` is a list of section *names* as plain strings — a list of
+    objects is rejected with "Expected string, received object".
+
+    Publishing does not message anyone. Only `notify_agent_sections` does.
+    """
+    return _request(
+        'POST',
+        '/faculty/agents',
+        headers=_bearer_headers(token),
+        json={
+            'geUrl': ge_url,
+            'name': name,
+            'semester': semester,
+            'sections': sections,
+        },
+    )
+
+
+def get_faculty_agent(token: str, agent_id: str) -> dict:
+    """Fetch one agent record. There is no GET-by-id, so filter the list."""
+    for agent in list_faculty_agents(token):
+        if agent.get('id') == agent_id:
+            return agent
+    raise SethuError('Sethu no longer lists that agent.')
+
+
+def notify_agent_sections(token: str, agent_id: str) -> dict:
+    """Fire the notification to the agent's assigned sections."""
+    return _request(
+        'POST',
+        f'/faculty/agents/{agent_id}/notify',
+        headers=_bearer_headers(token),
+    )
+
+
+def get_section_recipient(token: str, section: str) -> dict:
+    """Recipient lookup for a section. Query param is `section`.
+
+    Not used for counting: against dev this returns a single arbitrary name for
+    any input, including sections that do not exist, so it cannot be trusted to
+    size a send. Kept for when the real endpoint lands.
+    """
+    return _request(
+        'GET',
+        f'/faculty/section-recipient?section={quote(str(section))}',
+        headers=_bearer_headers(token),
+    ) or {}
