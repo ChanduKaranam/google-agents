@@ -277,6 +277,10 @@ def drawn_count(session) -> int:
     return int((session or {}).get("strag_drawn", 0) or 0)
 
 
+def _fits(messages: list[dict]) -> bool:
+    return len(json.dumps(messages)) <= MAX_SURFACE_BYTES - CHIP_ALLOWANCE
+
+
 def _entry_card(prefix: str, key: str, lines: list[tuple[str, str]]) -> tuple[list[dict], str]:
     """One card per row. `lines` is (suffix, content), first line is the head."""
     components, child_ids = [], []
@@ -291,10 +295,32 @@ def _entry_card(prefix: str, key: str, lines: list[tuple[str, str]]) -> tuple[li
 
 
 def leaderboard(state) -> list[dict]:
-    prefix = uid(state, "board")
+    """The board, trimmed to what will render.
+
+    A 20-ambassador college came to 12KB with the chip row -- well past the
+    ceiling, so GE would have dropped the whole card. Rows are dropped from the
+    bottom until it fits, and her own row is always kept: it is the row she
+    opened the board to find.
+    """
     board = data.get_leaderboard(state)
+    entries = board["entries"]
+    for count in range(len(entries), 0, -1):
+        shown = entries[:count]
+        if not any(e.get("isMe") for e in shown):
+            mine = next((e for e in entries if e.get("isMe")), None)
+            if mine is not None:
+                shown = shown[:-1] + [mine]
+        messages = _leaderboard_page(state, board, shown, len(entries))
+        if _fits(messages) or count == 1:
+            return messages
+    return _leaderboard_page(state, board, [], len(entries))
+
+
+def _leaderboard_page(state, board: dict, entries: list[dict],
+                      total_rows: int) -> list[dict]:
+    prefix = uid(state, "board")
     components, child_ids = [], []
-    for index, entry in enumerate(board["entries"]):
+    for index, entry in enumerate(entries):
         # Her row is marked in TEXT, never colour -- A2UI exposes no per-row
         # styling, and the fairness rule requires the marker be readable.
         who = "You" if entry.get("isMe") else entry["name"]
@@ -308,8 +334,10 @@ def leaderboard(state) -> list[dict]:
         child_ids.append(card_id)
 
     components.append(text(f"{prefix}-basis", board["basisNote"], "caption"))
+    seen = len(entries)
+    tail = (f"Showing {seen} of {total_rows} · " if seen < total_rows else "")
     components.append(text(f"{prefix}-foot",
-                           f"{board['total']} ambassadors on the board",
+                           f"{tail}{board['total']} ambassadors on the board",
                            "caption"))
     child_ids.extend([f"{prefix}-basis", f"{prefix}-foot"])
     components.append(column(f"{prefix}-main-column", child_ids))
@@ -339,8 +367,17 @@ def rewards(state) -> list[dict]:
 
 
 def roster(state) -> list[dict]:
+    """The class list, trimmed to what will render."""
+    everyone = data.get_roster(state)
+    for count in range(len(everyone), 0, -1):
+        messages = _roster_page(state, everyone[:count], len(everyone))
+        if _fits(messages) or count == 1:
+            return messages
+    return _roster_page(state, [], len(everyone))
+
+
+def _roster_page(state, entries: list[dict], total_rows: int) -> list[dict]:
     prefix = uid(state, "ros")
-    entries = data.get_roster(state)
     components, child_ids = [], []
     for index, entry in enumerate(entries):
         detail = entry["status"]
@@ -354,7 +391,8 @@ def roster(state) -> list[dict]:
         child_ids.append(card_id)
     total = data.get_cohort(state)["stats"]["total"]
     components.append(text(f"{prefix}-foot",
-                           f"Showing {len(entries)} of {total}", "caption"))
+                           f"Showing {len(entries)} of {max(total, total_rows)}",
+                           "caption"))
     child_ids.append(f"{prefix}-foot")
     components.append(column(f"{prefix}-main-column", child_ids))
     return surface(prefix, components, f"{prefix}-main-column")

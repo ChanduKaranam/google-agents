@@ -1472,6 +1472,82 @@ def test_showing_the_list_twice_draws_two_cards():
     assert len({tuple(first), tuple(again), tuple(forward), tuple(back)}) == 4
 
 
+def test_no_surface_is_built_bigger_than_ge_will_render():
+    """Only the straggler list was size-checked. A 20-ambassador leaderboard
+    plus the embedded chip row came to 7117 bytes and the roster to 6716, both
+    over the largest surface GE has been seen to draw -- and an oversized
+    surface is dropped silently, leaving the turn blank."""
+    import json
+
+    from ambassador_agent.actions import DEFAULT_CHIPS
+    from ambassador_agent.agent import _with_chips
+    from ambassador_agent.surfaces import (MAX_SURFACE_BYTES, cohort_summary,
+                                           leaderboard, rewards, roster,
+                                           straggler_list)
+
+    from ambassador_agent import data
+
+    # A real college, not the three-row fixture: 20 ambassadors on the board and
+    # a 60-student roster is what produced 7117 and 6716 bytes live.
+    board = {"entries": [{"rank": i + 1, "name": f"Ambassador Number {i}",
+                          "section": "CSE · Yr 3 · Sec A", "activated": 20 - i,
+                          "total": 60, "pct": 30.0 - i, "isPooled": False,
+                          "isMe": i == 1} for i in range(20)],
+             "myRank": 2, "total": 20,
+             "basisNote": ("Ranked by % activation (Google-certified). Cohorts"
+                           " under 10 students compete in a pooled bracket.")}
+    students = [{"id": f"019fb1b1-5d4c-7348-b667-5e21dbd9{i:04d}",
+                 "name": f"Student Number {i}", "rollNo": f"TIL{100+i}",
+                 "phone": "9876543211", "activationStatus": "DORMANT"}
+                for i in range(60)]
+    cohort = {"ambassadorName": "Mohinesh", "label": "CIVIL · Yr 4 · Sec A",
+              "stats": {"total": 60, "activated": 2, "pct": 3.3,
+                        "daysLeft": 0, "isPooled": False},
+              "nextMilestone": {"pct": 25, "activationsAway": 13,
+                                "label": "25% Club", "reward": None},
+              "myRank": 2, "totalAmbassadors": 20,
+              "lastSyncedAt": "2026-08-04T06:40:00Z", "students": students}
+    items = [{"id": s["id"], "name": s["name"], "rollNo": s["rollNo"],
+              "pendingDays": 4, "linkStatus": "not_sent",
+              "goLink": "https://sethu.app/go/H8FoYc", "draftMessage": "Hi",
+              "contextNote": "Same cohort",
+              "angles": {"examPanic": "x" * 178, "placement": "y" * 178,
+                         "friendlyRoast": "z" * 178}} for s in students]
+
+    original = data._payload
+    data._payload = lambda kind, sid=None: (
+        cohort if kind == "cohort" else board if kind == "leaderboard"
+        else {"items": items, "total": 60, "page": 1, "limit": 50})
+    try:
+        for builder in (cohort_summary, straggler_list, leaderboard, rewards,
+                        roster):
+            state = {}
+            size = len(json.dumps(_with_chips(builder(state), DEFAULT_CHIPS,
+                                              state)))
+            assert size <= MAX_SURFACE_BYTES, (builder.__name__, size)
+    finally:
+        data._payload = original
+
+
+def test_the_leaderboard_always_keeps_her_own_row():
+    """Trimming the board to fit must never drop the row she is looking for."""
+    from ambassador_agent import data
+    from ambassador_agent.surfaces import leaderboard
+
+    original = data.get_leaderboard
+    data.get_leaderboard = lambda state: {
+        "entries": [{"rank": i + 1, "name": f"Ambassador Number {i}",
+                     "section": "CSE · Yr 3 · Sec A", "activated": 20 - i,
+                     "total": 60, "pct": 30.0 - i, "isPooled": False,
+                     "isMe": i == 17} for i in range(20)],
+        "myRank": 18, "total": 20, "basisNote": "Ranked by % activation"}
+    try:
+        strings = _literals(leaderboard({}))
+        assert any(s.startswith("#18  You") for s in strings), strings
+    finally:
+        data.get_leaderboard = original
+
+
 def test_every_surface_is_reachable_by_a_tool():
     """Keyword matching only knows the prototype's wording. The tools are what
     let the model handle "who's falling behind?" and still draw a card."""
