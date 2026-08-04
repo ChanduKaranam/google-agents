@@ -135,8 +135,14 @@ def suggestions(prefix: str, labels: list[str]) -> tuple[list[dict], list[str]]:
     return components, ids
 
 
-def build_greeting(message: str, chips: list[str]) -> list[dict]:
-    prefix = "greet"
+def build_greeting(message: str, chips: list[str],
+                   prefix: str = "greet") -> list[dict]:
+    """The opening card, and the card shown when Sethu cannot be reached.
+
+    `prefix` is a parameter because the outage card can be drawn more than once
+    in a conversation, and a repeated surfaceId updates the earlier card
+    instead of adding one -- leaving the new turn blank.
+    """
     components = [text(f"{prefix}-message", message)]
     child_ids = [f"{prefix}-message"]
     chip_components, chip_ids = suggestions(prefix, chips)

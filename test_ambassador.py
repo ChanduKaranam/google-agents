@@ -353,8 +353,11 @@ def test_each_card_binds_both_buttons_to_its_own_student():
     """
     from ambassador_agent.surfaces import straggler_list
 
-    components = _components(straggler_list({}))
+    messages = straggler_list({})
+    components = _components(messages)
     by_id = {c["id"]: c for c in components}
+    prefix = next(m["surfaceUpdate"]["surfaceId"] for m in messages
+                  if "surfaceUpdate" in m)
     # Component ids are indexed (strag-s0…) to keep the surface small enough
     # for GE to render; the student's uuid rides in the button action instead.
     expected = ["Kavya S", "Meera Joshi", "Nisha Verma"]
@@ -363,11 +366,11 @@ def test_each_card_binds_both_buttons_to_its_own_student():
     drawn = sum(1 for c in components if c["id"].endswith("-name"))
     assert drawn >= 1, "no student cards drawn at all"
     for index, (sid, name) in enumerate(list(zip(ids, expected))[:drawn]):
-        shown = by_id[f"strag0-s{index}-name"]["component"]["Text"]["text"]
+        shown = by_id[f"{prefix}-s{index}-name"]["component"]["Text"]["text"]
         assert shown["literalString"] == name, (index, shown)
         for suffix, action in (("send", "send_whatsapp"), ("edit", "open_edit"),
                                ("open", "open_student")):
-            spec = by_id[f"strag0-s{index}-{suffix}"]["component"]["Button"]["action"]
+            spec = by_id[f"{prefix}-s{index}-{suffix}"]["component"]["Button"]["action"]
             assert spec["name"] == action, (index, suffix, spec)
             carried = {c["key"]: c["value"]["literalString"]
                        for c in spec["context"]}
@@ -485,7 +488,7 @@ def test_every_list_surface_keeps_its_shape_in_every_phase():
         # contains "·" and "%", and a content heuristic silently swept it in.
         rows = [c["component"]["Text"]["text"]["literalString"]
                 for c in _components(leaderboard(state))
-                if c["id"].startswith("board-r") and c["id"].endswith("-detail")]
+                if "-r" in c["id"] and c["id"].endswith("-detail")]
         assert len(rows) == 4, (phase, rows)
         for row in rows:                      # % and count never separated
             assert "%" in row and "/" in row, (phase, row)
@@ -582,7 +585,7 @@ def test_chips_surface_builds_a_standalone_chip_row():
     ids = [c["id"] for m in messages if "surfaceUpdate" in m
            for c in m["surfaceUpdate"]["components"]]
     assert len(ids) == len(set(ids))
-    assert all(i.startswith("chips-") for i in ids)
+    assert all(i.startswith("chips") for i in ids)
     names = [c["component"]["Button"]["action"]["name"]
              for m in messages if "surfaceUpdate" in m
              for c in m["surfaceUpdate"]["components"]
@@ -751,7 +754,7 @@ def test_the_greeting_is_drawn_once_but_the_options_keep_coming():
     again = _ctx("hello again")
     again.state = first.state              # same conversation
     # greeting text not repeated, but the options come back
-    assert surfaces_of(render_surface(again)) == ["chips"]
+    assert [x.startswith("chips") for x in surfaces_of(render_surface(again))] == [True]
 
 
 def test_the_opening_greeting_is_built_from_live_numbers():
@@ -891,10 +894,13 @@ def test_unknown_student_raises_rather_than_drawing_a_blank_card():
 def test_every_straggler_card_opens_its_own_student():
     from ambassador_agent.surfaces import straggler_list
 
-    by_id = {c["id"]: c for c in _components(straggler_list({}))}
+    messages = straggler_list({})
+    by_id = {c["id"]: c for c in _components(messages)}
+    prefix = next(m["surfaceUpdate"]["surfaceId"] for m in messages
+                  if "surfaceUpdate" in m)
     drawn = sum(1 for i in by_id if i.endswith("-name"))
     for index, sid in list(enumerate(("stu-002", "stu-004", "stu-006")))[:drawn]:
-        spec = by_id[f"strag0-s{index}-open"]["component"]["Button"]["action"]
+        spec = by_id[f"{prefix}-s{index}-open"]["component"]["Button"]["action"]
         assert spec["name"] == "open_student", (sid, spec)
         carried = {c["key"]: c["value"]["literalString"] for c in spec["context"]}
         assert carried == {"student_id": sid}, (sid, carried)
@@ -907,7 +913,7 @@ def test_open_student_routes_to_the_detail_surface():
                                  "context": {"student_id": "stu-002"}})
     ids = [c["id"] for m in messages if "surfaceUpdate" in m
            for c in m["surfaceUpdate"]["components"]]
-    assert any(i.startswith("stud-stu-002-") for i in ids), ids
+    assert any(i.startswith("stud") and "-name" in i for i in ids), ids
     assert reply == ""
 
 
@@ -1385,10 +1391,11 @@ def test_each_straggler_page_is_its_own_surface():
     students she has already seen stay in the transcript, still tappable."""
     from ambassador_agent.surfaces import straggler_list
 
-    first = {m["surfaceUpdate"]["surfaceId"] for m in straggler_list({})
+    state = {}
+    first = {m["surfaceUpdate"]["surfaceId"] for m in straggler_list(state)
              if "surfaceUpdate" in m}
-    second = {m["surfaceUpdate"]["surfaceId"]
-              for m in straggler_list({"strag_offset": 2})
+    state["strag_offset"] = 2
+    second = {m["surfaceUpdate"]["surfaceId"] for m in straggler_list(state)
               if "surfaceUpdate" in m}
     assert first and second and first != second, (first, second)
 
@@ -1438,6 +1445,31 @@ def test_the_leaderboard_prompt_says_what_it_does():
                        / "agent_card.json").read_text())
     examples = card["skills"][0]["examples"]
     assert "Show the leaderboard" in examples, examples
+
+
+def test_showing_the_list_twice_draws_two_cards():
+    """Reported: 'Back to the list' returned the sentence and no cards. It
+    rebuilt page 0, whose surfaceId was already on screen from earlier in the
+    conversation -- so GE updated that old card instead of drawing a new one
+    and this turn rendered empty. Every drawing of the list needs its own id.
+    """
+    from ambassador_agent.surfaces import straggler_list
+
+    state = {}
+    first = {m["surfaceUpdate"]["surfaceId"] for m in straggler_list(state)
+             if "surfaceUpdate" in m}
+    again = {m["surfaceUpdate"]["surfaceId"] for m in straggler_list(state)
+             if "surfaceUpdate" in m}          # same page, same state, later turn
+    assert first != again, (first, again)
+
+    # and going forward then back is still two distinct surfaces
+    state["strag_offset"] = 2
+    forward = {m["surfaceUpdate"]["surfaceId"] for m in straggler_list(state)
+               if "surfaceUpdate" in m}
+    state["strag_offset"] = 0
+    back = {m["surfaceUpdate"]["surfaceId"] for m in straggler_list(state)
+            if "surfaceUpdate" in m}
+    assert len({tuple(first), tuple(again), tuple(forward), tuple(back)}) == 4
 
 
 def test_every_surface_is_reachable_by_a_tool():

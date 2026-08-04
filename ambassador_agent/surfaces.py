@@ -21,6 +21,22 @@ from .a2ui import (button, button_with_values, card, column, data_model, row,
 
 METER_WIDTH = 20
 
+
+def uid(state, base: str) -> str:
+    """A surfaceId that has never been used in this conversation.
+
+    A2UI treats a repeated surfaceId as an UPDATE to that surface. So drawing
+    the same kind of card twice -- asking "where do I stand?" again, reopening
+    a student, returning to the list -- rewrote the earlier card further up the
+    transcript and left the new turn blank. Reported three times before the
+    pattern was clear; it is a property of every surface, not of paging.
+    """
+    if state is None:
+        return base
+    sequence = int(state.get("surface_seq", 0) or 0) + 1
+    state["surface_seq"] = sequence
+    return f"{base}{sequence}"
+
 # How many student cards one turn may draw.
 #
 # Gemini Enterprise drops a surface that is too large, silently -- the reply
@@ -67,7 +83,7 @@ def meter(pct: float) -> str:
 
 
 def cohort_summary(state) -> list[dict]:
-    prefix = "cohort"
+    prefix = uid(state, "cohort")
     cohort = data.get_cohort(state)
     stats = cohort["stats"]
     pending = len(data.get_stragglers(state))
@@ -118,22 +134,26 @@ def straggler_list(state) -> list[dict]:
     offset = max(int(state.get("strag_offset", 0) or 0), 0)
     if offset >= len(everyone):
         offset = 0
+
+    # A fresh surfaceId every time the list is drawn, not merely per page.
+    # Keying it on the offset alone meant "Back to the list" reused strag0,
+    # which was already on screen from earlier in the conversation -- A2UI
+    # treats a repeated surfaceId as an update TO that surface, so GE rewrote
+    # the old card and left this turn blank.
+    prefix = uid(state, "strag")
+
+    budget = MAX_SURFACE_BYTES - CHIP_ALLOWANCE
     for count in range(min(STRAGGLER_PAGE, len(everyone) - offset), 0, -1):
-        messages = _straggler_page(state, everyone, offset, count)
-        budget = MAX_SURFACE_BYTES - CHIP_ALLOWANCE
+        messages = _straggler_page(state, everyone, offset, count, prefix)
         if len(json.dumps(messages)) <= budget or count == 1:
+            state["strag_drawn"] = count
             return messages
-    return _straggler_page(state, everyone, offset, 0)
+    state["strag_drawn"] = 0
+    return _straggler_page(state, everyone, offset, 0, prefix)
 
 
-def _straggler_page(state, everyone: list[dict], offset: int,
-                    count: int) -> list[dict]:
-    # A fresh surfaceId per page. A2UI treats a repeated surfaceId as an update
-    # to that surface, so reusing "strag" rewrote the card already on screen
-    # and left the new turn blank -- and the students she had just been shown
-    # vanished. Paging now adds a card instead of replacing one, and every page
-    # stays on screen and tappable.
-    prefix = f"strag{offset}"
+def _straggler_page(state, everyone: list[dict], offset: int, count: int,
+                    prefix: str) -> list[dict]:
     students = everyone[offset:offset + count]
     components: list[dict] = []
     child_ids: list[str] = []
@@ -211,7 +231,7 @@ def student_detail(state, student_id: str) -> list[dict]:
     body of the card, not a footnote.
     """
     detail = data.get_student_detail(state, student_id)
-    prefix = f"stud-{student_id}"
+    prefix = uid(state, "stud")
     first = detail["name"].split(" ")[0]
     pending = detail.get("pendingDays")
     status = (f"pending {pending} days" if pending else "pending")
@@ -248,13 +268,13 @@ def student_detail(state, student_id: str) -> list[dict]:
 def drawn_count(session) -> int:
     """How many student cards the last straggler_list actually drew.
 
+    Read from state rather than rebuilt: building it again would burn another
+    surfaceId and another round of API calls.
+
     The parameter is `session`, not `state`, on purpose: test_ambassador.py
-    discovers surface builders by their first parameter being `state`, and this
-    returns a number rather than a surface.
+    discovers surface builders by their first parameter being `state`.
     """
-    return sum(1 for m in straggler_list(session) if "surfaceUpdate" in m
-               for c in m["surfaceUpdate"]["components"]
-               if c["id"].endswith("-name"))
+    return int((session or {}).get("strag_drawn", 0) or 0)
 
 
 def _entry_card(prefix: str, key: str, lines: list[tuple[str, str]]) -> tuple[list[dict], str]:
@@ -271,7 +291,7 @@ def _entry_card(prefix: str, key: str, lines: list[tuple[str, str]]) -> tuple[li
 
 
 def leaderboard(state) -> list[dict]:
-    prefix = "board"
+    prefix = uid(state, "board")
     board = data.get_leaderboard(state)
     components, child_ids = [], []
     for index, entry in enumerate(board["entries"]):
@@ -297,7 +317,7 @@ def leaderboard(state) -> list[dict]:
 
 
 def rewards(state) -> list[dict]:
-    prefix = "rew"
+    prefix = uid(state, "rew")
     components, child_ids = [], []
     for index, tier in enumerate(data.get_rewards(state)):
         # Every tier states its threshold, so a row is never ambiguous about
@@ -319,7 +339,7 @@ def rewards(state) -> list[dict]:
 
 
 def roster(state) -> list[dict]:
-    prefix = "ros"
+    prefix = uid(state, "ros")
     entries = data.get_roster(state)
     components, child_ids = [], []
     for index, entry in enumerate(entries):
@@ -340,7 +360,7 @@ def roster(state) -> list[dict]:
     return surface(prefix, components, f"{prefix}-main-column")
 
 
-def chips_surface(labels: list[str]) -> list[dict]:
+def chips_surface(labels: list[str], state=None) -> list[dict]:
     """Standalone follow-up chip row drawn after every routed reply.
 
     Not auto-discovered by the structural-invariant harness in
@@ -348,7 +368,7 @@ def chips_surface(labels: list[str]) -> list[dict]:
     no cohort state to read — the labels are already resolved by the caller).
     Covered instead by an explicit test.
     """
-    prefix = "chips"
+    prefix = uid(state, "chips")
     components, ids = suggestions(prefix, labels)
     child_ids = list(ids)
     if child_ids:
@@ -359,7 +379,7 @@ def chips_surface(labels: list[str]) -> list[dict]:
 
 
 def edit_form(state, student_id: str) -> list[dict]:
-    prefix = f"edit-{student_id}"
+    prefix = uid(state, "edit")
     entry = data.student(state, student_id)
     if entry is None:
         raise KeyError(student_id)

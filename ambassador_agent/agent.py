@@ -10,6 +10,7 @@ from .actions import (DEFAULT_CHIPS, chips_for, chips_for_action, intent_for,
                       parse_user_action, route, route_question)
 from .surfaces import (chips_surface, cohort_summary, leaderboard, rewards,
                        roster, straggler_list)
+from .surfaces import uid as surfaces_uid
 from .tools import ALL_TOOLS, UNAVAILABLE
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ def _incoming_text(callback_context: CallbackContext) -> str:
     return raw
 
 
-def _with_chips(messages: list[dict], labels: list[str]) -> list[dict]:
+def _with_chips(messages: list[dict], labels: list[str], state=None) -> list[dict]:
     """Attach follow-up chips to EVERY agent turn, card or not.
 
     The prototype keeps one chip row in its chrome, always visible. Gemini
@@ -88,13 +89,13 @@ def _with_chips(messages: list[dict], labels: list[str]) -> list[dict]:
     standalone chip surface is correct, because then it is the first one.
     """
     if not messages:
-        return chips_surface(labels)
+        return chips_surface(labels, state)
 
     update = next((m["surfaceUpdate"] for m in messages if "surfaceUpdate" in m), None)
     root = next((m["beginRendering"]["root"] for m in messages
                  if "beginRendering" in m), None)
     if update is None or root is None:
-        return messages + chips_surface(labels)
+        return messages + chips_surface(labels, state)
 
     prefix = update["surfaceId"]
     components = update["components"]
@@ -110,7 +111,7 @@ def _with_chips(messages: list[dict], labels: list[str]) -> list[dict]:
         spec = next(iter(container["component"].values())) if container else None
     children = (spec or {}).get("children", {}).get("explicitList")
     if children is None:
-        return messages + chips_surface(labels)   # nothing to attach to
+        return messages + chips_surface(labels, state)   # nothing to attach to
 
     chip_ids = []
     for index, label in enumerate(labels):
@@ -147,10 +148,10 @@ def handle_click(callback_context: CallbackContext) -> types.Content | None:
             if intent == "unknown":
                 return None       # off-script: let the model answer freely
             reply, messages = route_question(state, incoming)
-            messages = _with_chips(messages, chips_for(intent))
+            messages = _with_chips(messages, chips_for(intent), state)
         else:
             reply, messages = route(state, action)
-            messages = _with_chips(messages, chips_for_action(action))
+            messages = _with_chips(messages, chips_for_action(action), state)
         parts = []
         if reply:
             parts.append(types.Part(text=reply))
@@ -188,7 +189,7 @@ def render_surface(callback_context: CallbackContext) -> types.Content | None:
             state["surface"] = None
             builder = _SURFACE_BUILDERS.get(picked)
             if builder:
-                messages = _with_chips(builder(state), chips_for(picked))
+                messages = _with_chips(builder(state), chips_for(picked), state)
                 return types.Content(
                     role="model", parts=to_genai_parts(messages))
 
@@ -197,7 +198,7 @@ def render_surface(callback_context: CallbackContext) -> types.Content | None:
             # its own words, but she still gets the options back.
             return types.Content(
                 role="model",
-                parts=to_genai_parts(chips_surface(DEFAULT_CHIPS)))
+                parts=to_genai_parts(chips_surface(DEFAULT_CHIPS, state)))
         state["greeted"] = True
         # First turn: the prototype's opening, from live numbers, instead of a
         # generic welcome. It cannot fire before she speaks -- Gemini
@@ -218,8 +219,9 @@ def render_surface(callback_context: CallbackContext) -> types.Content | None:
         logger.warning("Cannot draw a surface: %s", type(error).__name__)
         return types.Content(
             role="model",
-            parts=to_genai_parts(build_greeting(sethu.message_for(error),
-                                                DEFAULT_CHIPS)))
+            parts=to_genai_parts(build_greeting(
+                sethu.message_for(error), DEFAULT_CHIPS,
+                surfaces_uid(callback_context.state, "greet"))))
     except Exception:  # noqa: BLE001 - a broken widget must not break the answer
         logger.warning("Could not render A2UI surface", exc_info=True)
         return None
