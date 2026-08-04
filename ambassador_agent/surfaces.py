@@ -458,13 +458,24 @@ def edit_form(state, student_id: str) -> list[dict]:
 
     components.append(text_field(f"{prefix}-body", "Message", "/draft/text"))
     components.append(text(f"{prefix}-cta-label", cta))
-    components.append(button_with_values(
-        f"{prefix}-cta", f"{prefix}-cta-label", "send_whatsapp",
-        {"student_id": {"literalString": student_id},
-         "message": {"path": "/draft/text"}}))
+    if sent:
+        # Once it has gone, there is no button at all. A2UI v0.8 has no
+        # disabled state -- Button is {child, primary, action} and nothing
+        # else -- so the choice is a live button or none, and a live one
+        # invites a second send of a message she has already sent.
+        #
+        # The wa.me link in the send reply stays in the transcript, so if it
+        # never actually left WhatsApp she can still tap that.
+        cta_child = f"{prefix}-cta-label"
+    else:
+        components.append(button_with_values(
+            f"{prefix}-cta", f"{prefix}-cta-label", "send_whatsapp",
+            {"student_id": {"literalString": student_id},
+             "message": {"path": "/draft/text"}}))
+        cta_child = f"{prefix}-cta"
     components.append(column(f"{prefix}-main-column", [
         f"{prefix}-heading", f"{prefix}-angle-label", f"{prefix}-angles",
-        f"{prefix}-body", f"{prefix}-cta",
+        f"{prefix}-body", cta_child,
     ]))
     components.append(card(f"{prefix}-card", f"{prefix}-main-column"))
 

@@ -1607,6 +1607,37 @@ def test_the_custom_angle_is_offered_and_selectable():
     assert reply.count("sethu.app/go/abc123") == 1, reply
 
 
+def test_a_sent_message_cannot_be_sent_twice():
+    """Asked for: disable the button once the message has gone.
+
+    A2UI v0.8 has no disabled state -- Button is additionalProperties:false
+    over {child, primary, action}, and "disabled" appears nowhere in the
+    catalog. So the button is not rendered at all, which is stronger: there is
+    nothing to tap rather than something that looks tappable and refuses.
+    """
+    from ambassador_agent.data import mark_sent
+    from ambassador_agent.surfaces import edit_form
+
+    state = {}
+    before = edit_form(state, "stu-002")
+    sends = [c for c in _components(before)
+             if "Button" in c["component"]
+             and c["component"]["Button"]["action"]["name"] == "send_whatsapp"]
+    assert len(sends) == 1, "no send button before sending"
+
+    mark_sent(state, "stu-002")
+    after = edit_form(state, "stu-002")
+    sends = [c for c in _components(after)
+             if "Button" in c["component"]
+             and c["component"]["Button"]["action"]["name"] == "send_whatsapp"]
+    assert sends == [], "the send button survived the send"
+    # it still SAYS what happened
+    assert any("Sent to Kavya" in s for s in _literals(after)), _literals(after)
+    # and the angle buttons stay live, so she can still change tack
+    assert any(c["component"]["Button"]["action"]["name"] == "set_angle"
+               for c in _components(after) if "Button" in c["component"])
+
+
 def test_every_surface_is_reachable_by_a_tool():
     """Keyword matching only knows the prototype's wording. The tools are what
     let the model handle "who's falling behind?" and still draw a card."""
