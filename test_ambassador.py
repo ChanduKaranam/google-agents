@@ -1675,6 +1675,51 @@ def test_the_list_card_shows_the_message_that_will_be_sent():
     assert any("placement agent" in s for s in strings), strings
 
 
+def test_raw_a2ui_json_never_reaches_the_ambassador():
+    """Reported: a turn arrived as a wall of A2UI JSON.
+
+    It was not ours -- surface() rejects any id that does not match its prefix,
+    and that payload mixed "stragglers39" with "straglanders39". The model
+    wrote it, imitating the datapart text it can see in the conversation
+    history. No exception, no warning; the model simply answered and copied
+    what it had seen.
+
+    An instruction alone cannot be trusted for this, so the response is
+    scrubbed on the way out.
+    """
+    from ambassador_agent.agent import scrub_model_output
+
+    leak = ('<a2a_datapart_json>{"data":{"surfaceUpdate":{"surfaceId":'
+            '"stragglers39","components":[]}}}</a2a_datapart_json>')
+    assert scrub_model_output(f"Here you go.\n{leak}") == "Here you go."
+    assert scrub_model_output(leak) == ""
+
+    # a bare unterminated blob -- what a truncated response looks like
+    assert scrub_model_output('{"data":{"surfaceUpdate":{"surfaceId":"x"') == ""
+    assert scrub_model_output('Sure.\n{"surfaceUpdate": {"components": [') == "Sure."
+
+    # ordinary prose is left completely alone
+    for kept in ("2 students have gone quiet on the campaigns.",
+                 "Your 25% Club is 2 activations away.",
+                 "I can't reach Sethu right now."):
+        assert scrub_model_output(kept) == kept
+
+
+def test_the_model_response_is_scrubbed_in_place():
+    from google.genai import types
+
+    from ambassador_agent.agent import strip_a2ui_from_response
+
+    class Resp:
+        content = types.Content(role="model", parts=[
+            types.Part(text='ok'),
+            types.Part(text='<a2a_datapart_json>{"data":{}}</a2a_datapart_json>')])
+
+    out = strip_a2ui_from_response(None, Resp())
+    texts = [p.text for p in out.content.parts if p.text is not None]
+    assert texts == ["ok"], texts
+
+
 def test_every_surface_is_reachable_by_a_tool():
     """Keyword matching only knows the prototype's wording. The tools are what
     let the model handle "who's falling behind?" and still draw a card."""

@@ -1,4 +1,5 @@
 import logging
+import re
 
 from google.adk.agents import Agent
 from google.adk.agents.callback_context import CallbackContext
@@ -43,7 +44,11 @@ verbatim — it carries the numbers and the wording the product is built on.
 Add at most one short sentence of your own.
 
 Never invent an activation count, a rank, or a student. Never claim to have
-sent a message: you draft, she sends from her own WhatsApp."""
+sent a message: you draft, she sends from her own WhatsApp.
+
+NEVER output JSON, and never output anything that looks like a card: no
+<a2a_datapart_json> tags, no "surfaceUpdate", no "components". The cards are
+drawn for you. Your part is one or two plain sentences."""
 
 # Which builder draws each surface a tool can pick.
 _SURFACE_BUILDERS = {
@@ -53,6 +58,51 @@ _SURFACE_BUILDERS = {
     "rewards": rewards,
     "roster": roster,
 }
+
+# A datapart blob, whole or truncated, and any bare A2UI-looking JSON.
+_A2UI_TAGGED = re.compile(r"<a2a_datapart_json>.*?(?:</a2a_datapart_json>|$)",
+                          re.S)
+_A2UI_BARE = re.compile(
+    r"\{\s*\"(?:data|surfaceUpdate|beginRendering|dataModelUpdate)\".*", re.S)
+
+
+def scrub_model_output(text: str) -> str:
+    """Strip any A2UI payload the model has copied into its own reply.
+
+    Reported live: a turn arrived as a wall of JSON. It was not ours -- the ids
+    inside it did not even agree with each other, which `surface()` would have
+    refused -- the model had reproduced the datapart text it can see in the
+    conversation history.
+
+    The instruction tells it not to; this makes it impossible. Both matter: an
+    instruction is a request, and this reply is the product.
+    """
+    if not text:
+        return text
+    cleaned = _A2UI_TAGGED.sub("", text)
+    cleaned = _A2UI_BARE.sub("", cleaned)
+    return cleaned.strip()
+
+
+def strip_a2ui_from_response(_callback_context, llm_response):
+    """after_model_callback: scrub every text part before it is emitted."""
+    content = getattr(llm_response, "content", None)
+    if content is None or not getattr(content, "parts", None):
+        return llm_response
+    kept = []
+    for part in content.parts:
+        if part.text is None:
+            kept.append(part)
+            continue
+        cleaned = scrub_model_output(part.text)
+        if cleaned:
+            part.text = cleaned
+            kept.append(part)
+        else:
+            logger.warning("Dropped an A2UI payload the model wrote as text")
+    content.parts = kept
+    return llm_response
+
 
 def _incoming_text(callback_context: CallbackContext) -> str:
     """Join the user turn's text and inline-data parts into one string.
@@ -146,6 +196,12 @@ def handle_click(callback_context: CallbackContext) -> types.Content | None:
             # not, and this reply is what the product is judged on.
             intent = intent_for(incoming)
             if intent == "unknown":
+                # Reported live: a History click reached the model instead of
+                # the router, and the model answered by copying an A2UI blob
+                # out of the history. Nothing in the logs said what had
+                # arrived, so log it -- a click that lands here is a routing
+                # miss, not an off-script question.
+                logger.info("Unrouted turn, first 300 chars: %r", incoming[:300])
                 return None       # off-script: let the model answer freely
             reply, messages = route_question(state, incoming)
             messages = _with_chips(messages, chips_for(intent), state)
@@ -234,5 +290,6 @@ root_agent = Agent(
     instruction=INSTRUCTION,
     tools=ALL_TOOLS,
     before_agent_callback=handle_click,
+    after_model_callback=strip_a2ui_from_response,
     after_agent_callback=render_surface,
 )
