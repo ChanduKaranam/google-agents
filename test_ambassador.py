@@ -385,11 +385,12 @@ def test_edit_form_offers_three_angles_and_a_send():
     # Angles render with a selection marker ("● Exam panic"), so match on
     # substring. An exact assertion here would push the implementer to
     # restructure the card just to satisfy the test.
-    for angle in ("Exam panic", "Placement", "Friendly roast"):
+    for angle in ("Exam panic", "Placement", "Friendly roast",
+                  "Custom template"):
         assert any(angle in s for s in strings)
     assert "Send to Kavya" in strings
     names = _action_names(messages)
-    assert names.count("set_angle") == 3
+    assert names.count("set_angle") == 4      # three from Sethu, plus ours
     assert "send_whatsapp" in names
 
 
@@ -1546,6 +1547,44 @@ def test_the_leaderboard_always_keeps_her_own_row():
         assert any(s.startswith("#18  You") for s in strings), strings
     finally:
         data.get_leaderboard = original
+
+
+def test_the_custom_template_angle_is_ours_not_the_apis():
+    """Asked for: a fourth angle with a plain, sayable message. Sethu serves
+    three angles; this one is written here, with the student's own /go/ link so
+    her credit still rides on it."""
+    from ambassador_agent import fixtures
+    from ambassador_agent.data import draft_for
+
+    assert ("custom", "Custom template") in fixtures.ANGLES
+
+    draft = draft_for({}, "stu-002", "custom")
+    assert draft == ("Kavya S - Please activate your GE account by clicking on"
+                     " the link below.\nhttps://sethu.app/go/abc123")
+
+    # the API's three still come from the API, untouched
+    api = fixtures.STRAGGLERS["items"][0]["angles"]
+    for key in ("examPanic", "placement", "friendlyRoast"):
+        assert draft_for({}, "stu-002", key) == api[key]
+
+
+def test_the_custom_angle_is_offered_and_selectable():
+    from ambassador_agent.actions import route
+    from ambassador_agent.surfaces import edit_form
+
+    strings = _literals(edit_form({}, "stu-002"))
+    assert any("Custom template" in s for s in strings), strings
+
+    state = {}
+    route(state, {"name": "set_angle",
+                  "context": {"student_id": "stu-002", "angle": "custom"}})
+    assert state["angles"]["stu-002"] == "custom"
+    assert "Please activate your GE account" in state["drafts"]["stu-002"]
+
+    # and sending it does not paste the link twice
+    reply, _ = route(state, {"name": "send_whatsapp",
+                             "context": {"student_id": "stu-002"}})
+    assert reply.count("sethu.app/go/abc123") == 1, reply
 
 
 def test_every_surface_is_reachable_by_a_tool():

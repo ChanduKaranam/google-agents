@@ -292,11 +292,27 @@ def get_student_detail(state, student_id: str) -> dict:
     }
 
 
+CUSTOM_ANGLE = "custom"
+
+
+def custom_draft(entry: dict) -> str:
+    """The plain message, for when none of Sethu's three angles fit.
+
+    Written here rather than served, so it carries no tone at all -- just the
+    ask and the student's own /go/ link, which is what her credit rides on.
+    """
+    return (f"{entry.get('name', '')} - Please activate your GE account by"
+            " clicking on the link below."
+            f"\n{entry.get('goLink', '')}")
+
+
 def draft_for(state, student_id: str, angle_key: str = "examPanic") -> str:
-    """The pre-written message, straight from the API's `angles`."""
+    """The pre-written message: Sethu's `angles`, or our own plain template."""
     entry = student(state, student_id)
     if entry is None:
         raise KeyError(student_id)
+    if angle_key == CUSTOM_ANGLE:
+        return custom_draft(entry)
     angles = entry.get("angles") or {}
     return angles.get(angle_key) or entry.get("draftMessage", "")
 

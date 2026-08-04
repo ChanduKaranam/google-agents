@@ -162,8 +162,12 @@ STUDENT_DETAIL = {
 REWARD_TIERS = [25, 50, 75, 100]
 
 # Angle keys as the API names them, paired with the label we show her.
+#
+# "custom" is not one of Sethu's -- it is written by `data.custom_draft`, a
+# plain message for when none of the three fit the student.
 ANGLES = [
     ("examPanic", "Exam panic"),
     ("placement", "Placement"),
     ("friendlyRoast", "Friendly roast"),
+    ("custom", "Custom template"),
 ]
