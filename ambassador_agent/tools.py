@@ -100,11 +100,13 @@ def show_leaderboard(tool_context: ToolContext) -> dict:
     board = data.get_leaderboard(state)
     cohort = data.get_cohort(state)
     stats = cohort["stats"]
+    # myRank is null for an unranked cohort; never speak it as "#None".
+    placing = (f", ranked #{board['myRank']} of {board['total']}"
+               if board.get("myRank") else ", not ranked yet")
     return {
         "say": (f"{board['basisNote']}. {cohort['label']} is at"
-                f" {stats['activated']} of {stats['total']} ({stats['pct']}%),"
-                f" ranked #{board['myRank']} of {board['total']}."
-                f" {data.milestone_line(state)}"),
+                f" {stats['activated']} of {stats['total']} ({stats['pct']}%)"
+                f"{placing}. {data.milestone_line(state)}"),
         "my_rank": board["myRank"],
     }
 

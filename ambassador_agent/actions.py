@@ -162,6 +162,13 @@ def _route(state, action: dict) -> tuple[str, list[dict]]:
                     " activated since this card was drawn. Ask me who needs a"
                     " message and I'll pull a fresh list."), []
         first = entry["name"].split(" ")[0]
+        if not data.wa_number(entry):
+            # `phone` is null when not on file. wa.me with no number opens an
+            # empty chat, so say it plainly rather than handing her a dead link.
+            return (f"Sethu has no phone number on file for {entry['name']},"
+                    " so I can't open WhatsApp for them. Their link still"
+                    f" works if you can reach them another way:"
+                    f" {data.wa_link(state, student_id)}"), []
         message = context.get("message") or data.draft_for(
             state, student_id, (state.get("angles", {}) or {}).get(
                 student_id, "examPanic"))
@@ -243,10 +250,13 @@ def _route_question(state, question: str) -> tuple[str, list[dict]]:
         cohort = data.get_cohort(state)
         stats = cohort["stats"]
         board = data.get_leaderboard(state)
+        # myRank is null when the cohort is unranked -- interpolating it gave
+        # "ranked #None of 20".
+        placing = (f", ranked #{board['myRank']} of {board['total']}"
+                   if board.get("myRank") else ", not ranked yet")
         return (f"{board['basisNote']}. {cohort['label']} is at"
-                f" {stats['activated']} of {stats['total']} ({stats['pct']}%),"
-                f" ranked #{board['myRank']} of {board['total']}."
-                f" {data.milestone_line(state)}",
+                f" {stats['activated']} of {stats['total']} ({stats['pct']}%)"
+                f"{placing}. {data.milestone_line(state)}",
                 surfaces.leaderboard(state))
     if intent == "rewards":
         return data.milestone_line(state), surfaces.rewards(state)

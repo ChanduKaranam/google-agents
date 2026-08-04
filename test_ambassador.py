@@ -1321,7 +1321,59 @@ def test_the_straggler_note_says_something_per_student():
     assert "no link sent yet" in note, note
     assert straggler_note({"pendingDays": 1, "linkStatus": "opened"}).count("1 day") == 1
     # nothing useful from the API still yields a sentence, not an empty caption
-    assert straggler_note({"contextNote": "Same cohort"}) == "Same cohort"
+    assert straggler_note({"contextNote": "Same cohort",
+                           "phone": "9876543210"}) == "Same cohort"
+    # and a missing phone is worth saying: Send cannot work without one
+    assert "no phone on file" in straggler_note({"rollNo": "TIL1"})
+
+
+def test_an_unranked_cohort_does_not_say_rank_none():
+    """Sethu's updated guide: myRank is null when the cohort is unranked. The
+    reply interpolated it straight into 'ranked #None of 20'."""
+    from ambassador_agent import data
+    from ambassador_agent.actions import route_question
+
+    original = data.get_leaderboard
+    data.get_leaderboard = lambda state: {"entries": [], "myRank": None,
+                                          "total": 18,
+                                          "basisNote": "Ranked by % activation"}
+    try:
+        reply, _ = route_question({}, "how is my rank calculated?")
+        assert "None" not in reply, reply
+        assert "not ranked yet" in reply.lower(), reply
+    finally:
+        data.get_leaderboard = original
+
+
+def test_a_student_with_no_phone_cannot_be_sent_to():
+    """`phone` is documented as null when not on file. wa.me with an empty
+    number opens an empty chat, so the card must say so rather than offering a
+    Send that quietly does nothing."""
+    from ambassador_agent import data
+    from ambassador_agent.actions import route
+
+    original = data.student
+    data.student = lambda state, sid: {"id": sid, "name": "Ravi Kumar",
+                                       "phone": None, "goLink": "https://x/go/1",
+                                       "draftMessage": "hi", "angles": {}}
+    try:
+        reply, _ = route({}, {"name": "send_whatsapp",
+                              "context": {"student_id": "stu_01"}})
+        assert "no phone" in reply.lower(), reply
+        assert "wa.me" not in reply, reply
+    finally:
+        data.student = original
+
+
+def test_a_missing_student_is_not_reported_as_you_are_not_an_ambassador():
+    """404 on /cohorts/mine/students/{id} means that student is not in the
+    cohort -- a stale card -- not that the caller lost their role."""
+    from ambassador_agent import sethu
+
+    error = sethu.classify(404, "/cohorts/mine/students/stu_01")
+    assert error is sethu.StaleStudent, error
+    told = sethu.message_for(sethu.StaleStudent("gone"))
+    assert "no longer" in told.lower() and "ambassador" not in told.lower(), told
 
 
 def test_every_surface_is_reachable_by_a_tool():

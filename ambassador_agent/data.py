@@ -333,6 +333,8 @@ def straggler_note(entry: dict) -> str:
     status = _LINK_WORDS.get(entry.get("linkStatus"))
     if status:
         bits.append(status)
+    if not wa_number(entry):
+        bits.append("no phone on file")
     return " · ".join(bits) or entry.get("contextNote", "")
 
 
@@ -348,6 +350,11 @@ def wa_link(state, student_id: str) -> str:
 # sample showed "+91…". wa.me needs a country code or it opens an empty chat, so
 # a bare Indian mobile is normalised rather than trusted either way.
 _INDIA = "91"
+
+
+def wa_number(entry: dict) -> str:
+    """The dialable number for a student, or "" when none is on file."""
+    return _wa_number((entry or {}).get("phone"))
 
 
 def _wa_number(phone: str) -> str:

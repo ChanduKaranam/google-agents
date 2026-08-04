@@ -142,25 +142,52 @@ Returns `{ token, tokenId, expiresAt, userId, role, tenantId }`. `role` is
 
 ### Faculty endpoints (require a FACULTY-role token)
 
-| Method + path | Purpose |
-|---|---|
-| `GET /faculty/agents` | list the faculty member's GE agents |
-| `POST /faculty/agents` | create one — `{name, description, whoCanUse}` |
-| `PUT /faculty/agents/{id}/sections` | assign sections — `{sectionIds:[...]}` |
-| `POST /faculty/agents/{id}/notify` | WhatsApp notify assigned sections |
-| `POST /faculty/agents/{id}/claim` | claim an agent (idempotent) |
-| `GET /faculty/sections` | the faculty member's own sections |
-| `GET /faculty/section-recipient` | recipients for a section |
+**Updated 2026-08-04 — several of these changed shape from the earlier guide.
+Check the verbs; three of them moved.**
 
-Also useful and undocumented: **`GET /auth/me`** returns
-`{id, name, email, role, tenantId}` for the bearer token. Best possible smoke
-test.
+| Method + path | Purpose | Notes |
+|---|---|---|
+| `GET /faculty/agents` | list your agents, newest first | includes GE-auto-detected ones with `unclaimed: true`, `status: "needs-attention"`, `geUrl: null` |
+| `POST /faculty/agents` | register manually | body is now `{geUrl, name, subject?, semester, sections[], studentCount}` — **not** the old `{name, description, whoCanUse}` |
+| `PATCH /faculty/agents/{id}/claim` | claim an auto-detected agent | **was POST.** Body `{geUrl, sections[], studentCount}`; flips it to `live`. 404 if unknown or already claimed |
+| `PATCH /faculty/agents/{id}/sections` | change sections | **was PUT.** Body `{sections[], studentCount}` |
+| `POST /faculty/agents/{id}/notify` | WhatsApp the sections via WABA | body `{preview: bool}`; returns `{recipientCount, skippedCount, enqueued, shareUrl}` |
+| **`GET /faculty/agents/{id}/laggards`** | **new** — students not yet activated | `{agentId, agentName, recipientCount, activatedCount, laggards[]}`; the faculty equivalent of the ambassador straggler list |
+| `GET /faculty/sections` | your own sections | returned **403 to a valid FACULTY token** on 2026-08-03 — verify before assuming your code is wrong |
+| `GET /faculty/section-recipient` | recipients for a section | also open to COLLEGE_ADMIN |
 
-**Known dev bug:** `/faculty/sections` returned **403 to a valid FACULTY
-token** on 2026-08-03 while `/faculty/agents` returned 200. Verify before
-assuming your code is wrong.
+`FacultyAgentResponse` carries `stats: {usedBy, questionsThisWeek, signInsCaused,
+topUnanswered}` and `statsSyncedAt` — useful, and `null` before the first sync.
 
----
+**Call `notify` with `preview: true` first.** It returns the recipient count
+without sending. Sethu's rule, quoted: *"a faculty member must call this
+endpoint manually. Sethu never auto-sends without a person confirming."* Your
+agent must not send on its own initiative — put a human tap in front of it.
+
+A laggard row is `{studentId, name, rollNo, section, activationStatus,
+linkStatus, hasPhone}`. Note `hasPhone` — see mistake #7; a student without a
+phone cannot be messaged, and the UI has to say so rather than offering a
+button that does nothing.
+
+### Nullable fields that will bite you
+
+Documented 2026-08-04, and each one produced a real defect in the ambassador
+agent before we handled it:
+
+| Field | Null when | What it broke |
+|---|---|---|
+| `phone` | not on file | `wa.me/` with no number opens an empty chat, silently |
+| `myRank` | cohort unranked | rendered as "ranked #None of 20" |
+| `daysLeft` | no drive end date | — |
+| `waLink` | student already ACTIVATED | — |
+| `lastSyncedAt` | before first GE sync | — |
+| `stats.*` | before first stats sync | — |
+
+Also: `GET /cohorts/mine/students/{id}` **404s when the student is not in your
+cohort**. Do not fold that into your "not authorised" branch — it means a card
+went stale, not that the caller lost their role.
+
+Pagination on the list endpoints is `?page=1&limit=N`, **limit max 50**.
 
 ## 5. Code patterns worth copying
 

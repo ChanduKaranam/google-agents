@@ -79,6 +79,15 @@ class NotRegistered(SethuError):
     """The signed-in person has no Sethu account, or is not an ambassador."""
 
 
+class StaleStudent(SethuError):
+    """That student is not in this cohort -- a card drawn before they moved.
+
+    Sethu's guide: the student-detail endpoint 404s when the student is not in
+    the caller's cohort. Reporting that as "you are not an ambassador" would be
+    alarming and wrong.
+    """
+
+
 UNAVAILABLE = ("I can't reach Sethu right now, so I don't want to quote you"
                " numbers that might be wrong. Try again in a moment.")
 
@@ -92,11 +101,32 @@ NOT_REGISTERED = ("You're signed in, but that account isn't registered as an"
                   " you. If that's wrong, ask your placement office to add"
                   " you.")
 
+STALE_STUDENT = ("That student is no longer on your list — they may have"
+                 " activated, or moved section, since this card was drawn."
+                 " Ask me who needs a message and I'll pull a fresh list.")
+
+
+def classify(status: int, path: str):
+    """Which failure a Sethu HTTP status means, given the endpoint.
+
+    The same 404 means three different things depending on where it came from,
+    and each needs a different sentence in front of the ambassador.
+    """
+    if "/auth/agent-tokens/exchange" in path:
+        return NotRegistered if status == 404 else NoIdentity
+    if status == 404 and "/students/" in path:
+        return StaleStudent
+    if status in (401, 403):
+        return NotRegistered
+    return SethuError
+
 
 def message_for(error: Exception) -> str:
     """What she is told, chosen by why it failed."""
     if isinstance(error, NoIdentity):
         return NO_IDENTITY
+    if isinstance(error, StaleStudent):
+        return STALE_STUDENT
     if isinstance(error, NotRegistered):
         return NOT_REGISTERED
     return UNAVAILABLE
@@ -159,16 +189,10 @@ def _request(method: str, path: str, headers: dict,
         request_id = (parsed.get("meta") or {}).get("requestId", "")
         logger.warning("Sethu %s %s failed: %s %s (requestId=%s)", method, path,
                        error.code, detail.get("code", ""), request_id)
-        # Which failure it is depends on the endpoint as well as the status.
-        # A 401 from `exchange` means Google would not vouch for the token we
-        # presented -- an identity problem, not an outage, and telling her to
-        # "try again in a moment" would send her round a loop that never ends.
-        if "/auth/agent-tokens/exchange" in path:
-            failure = NotRegistered if error.code == 404 else NoIdentity
-        elif error.code in (401, 403):
-            failure = NotRegistered      # authenticated, but not this cohort
-        else:
-            failure = SethuError
+        # Which failure it is depends on the endpoint as well as the status --
+        # see classify(). A 401 from `exchange` is an identity problem, not an
+        # outage, and "try again in a moment" would loop forever.
+        failure = classify(error.code, path)
         raise failure(detail.get("message", str(error)),
                       detail.get("code", ""), request_id) from error
     except urllib.error.URLError as error:
