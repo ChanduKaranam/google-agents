@@ -165,9 +165,13 @@ REWARD_TIERS = [25, 50, 75, 100]
 #
 # "custom" is not one of Sethu's -- it is written by `data.custom_draft`, a
 # plain message for when none of the three fit the student.
+# Custom leads, and is what a student gets unless she picks another tone: it is
+# the plainest of the four, and the one that reads as a request rather than a
+# nudge. It is also the shortest, which is what lets the drafted message fit
+# back onto the list cards without pushing the surface past what GE will draw.
 ANGLES = [
+    ("custom", "Custom template"),
     ("examPanic", "Exam panic"),
     ("placement", "Placement"),
     ("friendlyRoast", "Friendly roast"),
-    ("custom", "Custom template"),
 ]

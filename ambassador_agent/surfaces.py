@@ -74,7 +74,10 @@ MAX_SURFACE_BYTES = 6200
 #
 # It is separate from MAX_SURFACE_BYTES on purpose: the leaderboard and roster
 # stay on the conservative number, so a failed probe cannot take them with it.
-STRAGGLER_MAX_BYTES = 11000
+# Raised from 11000 after five cards at ~10.4KB were seen rendering live --
+# the first hard evidence above 5.6KB. 12725 is still the lowest size known to
+# fail, so this stays clear of it.
+STRAGGLER_MAX_BYTES = 12000
 
 # The chip row is appended afterwards by agent._with_chips, into this same
 # surface, so its weight has to come out of the budget here or every page ships
@@ -180,6 +183,7 @@ def _straggler_page(state, everyone: list[dict], offset: int, count: int,
         components.extend([
             text(f"{base}-name", entry["name"], "h5"),
             text(f"{base}-meta", data.straggler_note(entry), "caption"),
+            text(f"{base}-msg", data.current_draft(state, sid, entry)),
             text(f"{base}-send-label", "Send"),
             button(f"{base}-send", f"{base}-send-label", "send_whatsapp",
                    {"student_id": sid}),
@@ -192,7 +196,8 @@ def _straggler_page(state, everyone: list[dict], offset: int, count: int,
             row(f"{base}-actions",
                 [f"{base}-send", f"{base}-edit", f"{base}-open"]),
             column(f"{base}-column", [
-                f"{base}-name", f"{base}-meta", f"{base}-actions",
+                f"{base}-name", f"{base}-meta", f"{base}-msg",
+                f"{base}-actions",
             ]),
             card(f"{base}-card", f"{base}-column"),
         ])
@@ -434,9 +439,8 @@ def edit_form(state, student_id: str) -> list[dict]:
         raise KeyError(student_id)
     first = entry["name"].split(" ")[0]
     sent = data.is_sent(state, student_id)
-    angle = (state.get("angles", {}) or {}).get(student_id, "examPanic")
-    draft = (state.get("drafts", {}) or {}).get(student_id) \
-        or data.draft_for(state, student_id, angle)
+    angle = (state.get("angles", {}) or {}).get(student_id, data.DEFAULT_ANGLE)
+    draft = data.current_draft(state, student_id)
 
     title = (f"Sent — {entry['name']}" if sent
              else f"Edit before sending — {entry['name']}")

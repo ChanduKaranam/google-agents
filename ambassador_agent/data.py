@@ -294,6 +294,9 @@ def get_student_detail(state, student_id: str) -> dict:
 
 CUSTOM_ANGLE = "custom"
 
+# What she sends unless she picks a different tone.
+DEFAULT_ANGLE = CUSTOM_ANGLE
+
 
 def custom_draft(entry: dict) -> str:
     """The plain message, for when none of Sethu's three angles fit.
@@ -306,7 +309,7 @@ def custom_draft(entry: dict) -> str:
             f"\n{entry.get('goLink', '')}")
 
 
-def draft_for(state, student_id: str, angle_key: str = "examPanic") -> str:
+def draft_for(state, student_id: str, angle_key: str = DEFAULT_ANGLE) -> str:
     """The pre-written message: Sethu's `angles`, or our own plain template."""
     entry = student(state, student_id)
     if entry is None:
@@ -352,6 +355,26 @@ def straggler_note(entry: dict) -> str:
     if not wa_number(entry):
         bits.append("no phone on file")
     return " · ".join(bits) or entry.get("contextNote", "")
+
+
+def current_draft(state, student_id: str, entry: dict | None = None) -> str:
+    """What Send will actually send for this student, right now.
+
+    Her own edit wins over the template; her chosen angle wins over the
+    default. One place, so the list card and the edit form can never disagree.
+
+    `entry` is the student's row when the caller already holds it -- the list
+    card does -- which saves looking the same student up again per card.
+    """
+    edited = (_get(state, "drafts", {}) or {}).get(student_id)
+    if edited:
+        return edited
+    angle = (_get(state, "angles", {}) or {}).get(student_id, DEFAULT_ANGLE)
+    if entry is None:
+        return draft_for(state, student_id, angle)
+    if angle == CUSTOM_ANGLE:
+        return custom_draft(entry)
+    return (entry.get("angles") or {}).get(angle) or entry.get("draftMessage", "")
 
 
 def wa_link(state, student_id: str) -> str:

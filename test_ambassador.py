@@ -212,11 +212,11 @@ def test_straggler_list_draws_one_card_per_pending_student():
     # the per-student note is built from rollNo/pendingDays/linkStatus, since
     # live contextNote is identical for everyone in the cohort
     assert "21CS002 · pending 12 days · no link sent yet" in strings
-    # The drafted message and the /go/ link are NOT on the list card: at ~270
-    # bytes each they pushed the surface past what GE will render. Both are one
-    # tap away under Edit, which the next assertions cover.
-    assert not any("sethu.app/go" in s for s in strings), strings
-    assert not any("Circuits agent" in s for s in strings), strings
+    # The drafted message is back on the card, asked for so she can see what
+    # Send will send. It fits because the default angle is the custom
+    # template, the shortest of the four.
+    assert any("Please activate your GE account" in s for s in strings), strings
+    assert any("sethu.app/go/abc123" in s for s in strings), strings
 
 def test_send_buttons_carry_the_student_id():
     from ambassador_agent.surfaces import straggler_list
@@ -702,7 +702,9 @@ def test_send_confirmation_carries_a_tappable_whatsapp_link():
     # phone comes from cohorts/mine.students[], joined on by data.py
     assert "https://wa.me/919876543211?text=" in reply
     assert "sethu.app/go/abc123" in reply         # credit still rides along
-    assert "Circuits%20agent" in reply            # message really is pre-filled
+    # the default angle is the custom template now, so that is what is
+    # pre-filled unless she picks another tone
+    assert "Please%20activate%20your%20GE%20account" in reply
 
 
 def test_every_turn_offers_the_options_again():
@@ -1636,6 +1638,41 @@ def test_a_sent_message_cannot_be_sent_twice():
     # and the angle buttons stay live, so she can still change tack
     assert any(c["component"]["Button"]["action"]["name"] == "set_angle"
                for c in _components(after) if "Button" in c["component"])
+
+
+def test_the_custom_template_is_the_default_angle():
+    """Asked for: custom first, and selected. It is also the shortest of the
+    four, which is what lets the message fit back onto the list cards."""
+    from ambassador_agent import fixtures
+    from ambassador_agent.data import DEFAULT_ANGLE, current_draft
+    from ambassador_agent.surfaces import edit_form
+
+    assert fixtures.ANGLES[0] == ("custom", "Custom template")
+    assert DEFAULT_ANGLE == "custom"
+
+    # the radio marker sits on it before she chooses anything
+    strings = _literals(edit_form({}, "stu-002"))
+    assert "● Custom template" in strings, strings
+    assert "○ Exam panic" in strings, strings
+
+    assert current_draft({}, "stu-002").startswith("Kavya S - Please activate")
+
+
+def test_the_list_card_shows_the_message_that_will_be_sent():
+    """Asked for: show the message alongside the name. It follows whichever
+    angle is selected for that student, so the card and the edit form never
+    disagree about what Send will send."""
+    from ambassador_agent.actions import route
+    from ambassador_agent.surfaces import straggler_list
+
+    strings = _literals(straggler_list({}))
+    assert any("Please activate your GE account" in s for s in strings), strings
+
+    state = {}
+    route(state, {"name": "set_angle",
+                  "context": {"student_id": "stu-002", "angle": "placement"}})
+    strings = _literals(straggler_list(state))
+    assert any("placement agent" in s for s in strings), strings
 
 
 def test_every_surface_is_reachable_by_a_tool():

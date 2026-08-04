@@ -145,7 +145,7 @@ def _route(state, action: dict) -> tuple[str, list[dict]]:
         return "", surfaces.edit_form(state, student_id)
 
     if name == "set_angle":
-        angle = context.get("angle", "examPanic")
+        angle = context.get("angle", data.DEFAULT_ANGLE)
         angles = dict(state.get("angles", {}) or {})
         angles[student_id] = angle
         state["angles"] = angles
@@ -171,9 +171,7 @@ def _route(state, action: dict) -> tuple[str, list[dict]]:
                     " so I can't open WhatsApp for them. Their link still"
                     f" works if you can reach them another way:"
                     f" {data.wa_link(state, student_id)}"), []
-        message = context.get("message") or data.draft_for(
-            state, student_id, (state.get("angles", {}) or {}).get(
-                student_id, "examPanic"))
+        message = context.get("message") or data.current_draft(state, student_id)
         body = data.append_link(message, data.wa_link(state, student_id))
         deeplink = data.whatsapp_deeplink(state, student_id, body)
         data.mark_sent(state, student_id)
