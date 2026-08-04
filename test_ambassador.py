@@ -1301,7 +1301,8 @@ def test_the_straggler_list_is_paged_to_stay_renderable():
     names = [c["component"]["Text"]["text"]["literalString"]
              for c in comps if c["id"].endswith("-name")]
     assert len(names) <= STRAGGLER_PAGE, names
-    assert len(json.dumps(messages)) < 15000, len(json.dumps(messages))
+    from ambassador_agent.surfaces import STRAGGLER_MAX_BYTES
+    assert len(json.dumps(messages)) <= STRAGGLER_MAX_BYTES
 
 
 def test_the_go_link_is_not_pasted_twice():
@@ -1408,6 +1409,19 @@ def test_a_next_button_carries_the_offset_it_belongs_to():
     from ambassador_agent.actions import route
     from ambassador_agent.surfaces import straggler_list
 
+    from ambassador_agent import data
+
+    # The fixture holds three stragglers and a page now fits five, so there is
+    # nothing to page. Give it a cohort big enough to have a second page.
+    original = data.get_stragglers
+    data.get_stragglers = lambda state: [
+        {"id": f"stu-{i:03d}", "name": f"Student Number {i}",
+         "rollNo": f"21CS{i:03d}", "pendingDays": 4, "linkStatus": "not_sent",
+         "goLink": "https://sethu.app/go/abc123", "phone": "9876543210",
+         "draftMessage": "Hi", "contextNote": "c",
+         "angles": {"examPanic": "x", "placement": "y", "friendlyRoast": "z"}}
+        for i in range(8)]
+
     def next_action(state):
         for c in (c for m in straggler_list(state) if "surfaceUpdate" in m
                   for c in m["surfaceUpdate"]["components"]):
@@ -1417,11 +1431,14 @@ def test_a_next_button_carries_the_offset_it_belongs_to():
                         for ctx in spec["action"].get("context", [])}
         return None
 
-    first = next_action({})
-    assert first and int(first["offset"]) > 0, first
-    state = {}
-    route(state, {"name": "more_stragglers", "context": first})
-    assert state["strag_offset"] == int(first["offset"])
+    try:
+        first = next_action({})
+        assert first and int(first["offset"]) > 0, first
+        state = {}
+        route(state, {"name": "more_stragglers", "context": first})
+        assert state["strag_offset"] == int(first["offset"])
+    finally:
+        data.get_stragglers = original
 
 
 def test_the_leaderboard_prompt_says_what_it_does():
@@ -1482,9 +1499,10 @@ def test_no_surface_is_built_bigger_than_ge_will_render():
 
     from ambassador_agent.actions import DEFAULT_CHIPS
     from ambassador_agent.agent import _with_chips
-    from ambassador_agent.surfaces import (MAX_SURFACE_BYTES, cohort_summary,
-                                           leaderboard, rewards, roster,
-                                           straggler_list)
+    from ambassador_agent.surfaces import (MAX_SURFACE_BYTES,
+                                           STRAGGLER_MAX_BYTES,
+                                           cohort_summary, leaderboard,
+                                           rewards, roster, straggler_list)
 
     from ambassador_agent import data
 
@@ -1525,7 +1543,9 @@ def test_no_surface_is_built_bigger_than_ge_will_render():
             state = {}
             size = len(json.dumps(_with_chips(builder(state), DEFAULT_CHIPS,
                                               state)))
-            assert size <= MAX_SURFACE_BYTES, (builder.__name__, size)
+            ceiling = (STRAGGLER_MAX_BYTES if builder is straggler_list
+                       else MAX_SURFACE_BYTES)
+            assert size <= ceiling, (builder.__name__, size, ceiling)
     finally:
         data._payload = original
 

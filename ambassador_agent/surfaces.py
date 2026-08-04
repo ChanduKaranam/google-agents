@@ -65,6 +65,17 @@ STRAGGLER_PAGE = 5
 # at ~5.5KB -- the largest shape we have actually watched render.
 MAX_SURFACE_BYTES = 6200
 
+# The straggler list gets its own, larger ceiling -- deliberately a probe.
+#
+# What we know: 3874-5592 render, 12725 and 14163 do not. Everything between is
+# untested. Five cards come to 10461, so this is the experiment that narrows
+# the gap; if the list comes back as a sentence with no cards, the ceiling is
+# below 10461 and this drops to ~7000 (three cards).
+#
+# It is separate from MAX_SURFACE_BYTES on purpose: the leaderboard and roster
+# stay on the conservative number, so a failed probe cannot take them with it.
+STRAGGLER_MAX_BYTES = 11000
+
 # The chip row is appended afterwards by agent._with_chips, into this same
 # surface, so its weight has to come out of the budget here or every page ships
 # ~1.9KB over the line it was measured against.
@@ -142,7 +153,7 @@ def straggler_list(state) -> list[dict]:
     # the old card and left this turn blank.
     prefix = uid(state, "strag")
 
-    budget = MAX_SURFACE_BYTES - CHIP_ALLOWANCE
+    budget = STRAGGLER_MAX_BYTES - CHIP_ALLOWANCE
     for count in range(min(STRAGGLER_PAGE, len(everyone) - offset), 0, -1):
         messages = _straggler_page(state, everyone, offset, count, prefix)
         if len(json.dumps(messages)) <= budget or count == 1:
