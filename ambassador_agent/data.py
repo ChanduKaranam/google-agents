@@ -219,12 +219,18 @@ def get_rewards(state) -> list[dict]:
     rows = []
     for at in fixtures.REWARD_TIERS:
         need = max(math.ceil(stats["total"] * at / 100) - stats["activated"], 0)
-        if at == milestone.get("pct"):
-            reward = milestone.get("reward") or "reward to be announced"
+        if at == milestone.get("pct") and milestone.get("reward"):
+            reward = milestone["reward"]          # Sethu named a prize
+        elif at == milestone.get("pct") and milestone.get("label"):
+            reward = milestone["label"]           # named rung, prize not set
         elif need == 0:
-            reward = "earned"
+            reward = f"{at}% milestone — earned"
         else:
-            reward = "reward to be announced"
+            # Most drives have no incentive config, so `reward` is null on
+            # every rung and Sethu serves no ladder beyond the next one. Four
+            # rows reading "reward to be announced" told her nothing; the
+            # threshold at least says what she is climbing towards.
+            reward = f"{at}% milestone"
         rows.append({"at": f"{at}%", "reward": reward,
                      "status": "earned" if need == 0 else f"{need} more"})
     return rows

@@ -451,7 +451,9 @@ def test_rewards_lists_four_tiers_and_names_only_the_live_one():
     from ambassador_agent.surfaces import rewards
     strings = _literals(rewards({}))
     assert "₹500 Amazon voucher" in strings           # the live 25% rung
-    assert strings.count("reward to be announced") == 3
+    # the rungs Sethu says nothing about are named by their threshold
+    for tier in ("50% milestone", "75% milestone", "100% milestone"):
+        assert tier in strings, strings
     for at, need in (("25%", "1 more"), ("50%", "16 more"),
                      ("75%", "31 more"), ("100%", "45 more")):
         assert f"at {at} — {need}" in strings, (at, strings)
@@ -1719,6 +1721,46 @@ def test_the_model_response_is_scrubbed_in_place():
     out = strip_a2ui_from_response(callback_context=None, llm_response=Resp())
     texts = [p.text for p in out.content.parts if p.text is not None]
     assert texts == ["ok"], texts
+
+
+def test_unnamed_tiers_still_say_what_they_are():
+    """Live, this drive has no incentives configured -- nextMilestone.reward is
+    null and Sethu serves no ladder at all -- so all four rungs read 'reward to
+    be announced', which tells her nothing. Name the milestone instead; the
+    prize appears the moment Sethu has one."""
+    from ambassador_agent import data
+
+    original = data.get_cohort
+    base = original({})
+
+    def unnamed(state):
+        cohort = dict(base)
+        cohort["nextMilestone"] = {"pct": 25, "activationsAway": 2,
+                                   "label": "25% Club", "reward": None}
+        return cohort
+
+    data.get_cohort = unnamed
+    try:
+        rows = data.get_rewards({})
+        assert rows[0]["reward"] == "25% Club", rows[0]
+        assert rows[1]["reward"] == "50% milestone", rows[1]
+        assert not any("to be announced" in r["reward"] for r in rows), rows
+    finally:
+        data.get_cohort = original
+
+    # and when Sethu DOES name a prize, that wins
+    def named(state):
+        cohort = dict(base)
+        cohort["nextMilestone"] = {"pct": 25, "activationsAway": 2,
+                                   "label": "25% Club",
+                                   "reward": "₹500 Amazon voucher"}
+        return cohort
+
+    data.get_cohort = named
+    try:
+        assert data.get_rewards({})[0]["reward"] == "₹500 Amazon voucher"
+    finally:
+        data.get_cohort = original
 
 
 def test_every_surface_is_reachable_by_a_tool():
