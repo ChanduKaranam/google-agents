@@ -1,0 +1,10 @@
+# Runtime dependencies for the deployed agent, read by `adk deploy agent_engine`.
+#
+# Deliberately narrower than pyproject.toml: only `app/__init__.py` ->
+# `app/agent.py` and what it imports actually runs in Agent Runtime. The a2a,
+# fastapi and dotenv dependencies belong to `fast_api_app.py`, which the agent
+# package never imports, so they are not shipped.
+#
+# Pinned to the version the suite was verified against (google-adk 2.5.0) —
+# the runtime otherwise tracks whatever the deploying machine happens to have.
+google-adk[gcp,otel-gcp]>=2.5.0,<3.0.0
