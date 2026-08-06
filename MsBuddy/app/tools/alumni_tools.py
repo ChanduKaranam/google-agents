@@ -151,12 +151,29 @@ def find_supporting_segment(
     domain: str,
     name: str,
     value: str,
-    quote: str,
 ) -> dict[str, Any]:
     """Locate one segment from `domain` that carries the name *and* the claim.
 
     Returns a verdict dict rather than raising, so the caller can hand the
-    student a precise reason instead of a silent omission.
+    student a precise reason instead of a silent omission. The matched
+    `segment` comes back with it, and that — not the agent's wording — is what
+    gets stored as provenance.
+
+    **The reported quote is deliberately not matched against.** Segments are
+    spans of the *agent's own answer* that the search runtime chose to
+    attribute to a domain (`evidence.harvest_metadata`), and which spans those
+    are is invisible to the agent producing them. Requiring the quote to be
+    one of them asked the model to guess an unobservable target; observed live
+    2026-08-06, a candidate whose quote carried both the name and the value
+    was refused because the attributed sentence was worded differently.
+
+    Nothing is conceded by dropping it. The quote never carried authority of
+    its own — it was the model's restatement, checked against the model's own
+    text. What decides admission is what always decided it, and all of it is
+    deterministic: the domain was retrieved this turn, and one segment
+    attributed to it contains the name and the value *together*. The agent
+    does not choose the attribution and cannot forge it, so a person or a fact
+    no source supports still matches nothing.
     """
     segments = segments_for_domain(harvest, domain)
     if not segments:
@@ -182,11 +199,7 @@ def find_supporting_segment(
             ),
         }
 
-    flat_quote = _flatten(quote)
     for segment in named:
-        flat = _flatten(segment)
-        if flat_quote and flat_quote not in flat:
-            continue
         if value_supported_by(segment, value):
             return {"ok": True, "segment": segment}
 
@@ -554,9 +567,7 @@ def _admit(
             continue
 
         # Checks 2 and 3 — name and claim in one segment from that domain.
-        support = find_supporting_segment(
-            harvest, domain, candidate.name, claim.value, claim.supporting_quote
-        )
+        support = find_supporting_segment(harvest, domain, candidate.name, claim.value)
         if not support["ok"]:
             refused.append(
                 {
@@ -603,7 +614,12 @@ def _admit(
                 "evidence": make_alumni_evidence(
                     source_domain=domain,
                     source_class=source_class,
-                    supporting_quote=claim.supporting_quote,
+                    # The segment the gate matched, not the agent's wording.
+                    # This is the text the runtime actually attributed to
+                    # `domain`, so it is the honest record of why the claim
+                    # was admitted — and it is what a student would be shown
+                    # if they asked how we know.
+                    supporting_quote=support["segment"],
                     field_name=claim.field_name,
                     source_url=claim.source_url,
                     resolved_url=resolved_url,

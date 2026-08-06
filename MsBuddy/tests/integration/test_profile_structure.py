@@ -211,6 +211,35 @@ def test_root_instruction_states_what_is_not_built_yet() -> None:
     assert "never" in instruction
 
 
+def test_root_instruction_forbids_converting_a_gpa_by_hand() -> None:
+    """A converted GPA must come from `normalize_gpa`, never from the model.
+
+    Observed on the deployed agent 2026-08-06: asked to record an 8.1/10
+    CGPA, the root answered "8.1 / 10 (approx. 3.24 / 4.0 US equivalent)"
+    having called `get_profile`, `profile_extractor_agent` and
+    `save_profile_fields` — and not `normalize_gpa`. It did the arithmetic
+    itself.
+
+    The number happened to be right because that scale is linear. The rule
+    exists because most are not: `gpa_scales.py` holds per-scale conversion
+    tables precisely so a 10-point CGPA is not simply multiplied by 0.4, and
+    a model that reaches for the multiplication once will reach for it on a
+    scale where it is wrong.
+
+    "Never do arithmetic yourself" was already in the instruction and was not
+    enough — it lives in a general rules list, far from where a GPA is
+    actually discussed. So the prohibition is repeated where the temptation
+    is, which is what this test pins.
+    """
+    instruction = root_agent.instruction
+    gpa_section = instruction[instruction.index("normalize_gpa") :]
+    nearby = gpa_section[:700].lower()
+    assert "never convert" in nearby, (
+        "the GPA guidance must forbid converting by hand at the point of use"
+    )
+    assert "arithmetic" in instruction.lower()
+
+
 def test_extractor_instruction_lists_the_whole_field_registry() -> None:
     """Rendered from FIELDS so the prompt cannot drift from the allowlist."""
     instruction = root_agent.sub_agents[0].instruction

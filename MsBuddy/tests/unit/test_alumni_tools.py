@@ -871,6 +871,112 @@ def test_a_malformed_source_url_degrades_instead_of_crashing(
     assert field["source_url"] == broken
 
 
+# --- The quote is a proposal; the grounded segment is the evidence ---------
+
+
+def test_a_quote_that_is_not_the_attributed_sentence_still_admits(
+    grounded: StubToolContext, resolver: Resolver
+) -> None:
+    """The agent cannot see which of its sentences the runtime attributed.
+
+    `grounding_supports` mark whichever spans of the answer Vertex chose, and
+    that choice is invisible to the agent producing them. So requiring the
+    reported quote to *be* one of those spans asked the model to guess an
+    unobservable target, and it lost. Observed live 2026-08-06: a candidate
+    whose quote carried both the name and the value was refused
+    `claim_not_in_same_segment`, because the segment attributed to that
+    domain was a differently-worded sentence.
+
+    What still has to hold is unchanged and entirely deterministic: the
+    domain was retrieved, and some segment attributed to it carries the name
+    and the value together.
+    """
+    paraphrased = [
+        claim(
+            "university_affiliation",
+            DELFT,
+            "Anna de Vries is among TU Delft's graduates.",
+            url=ANNA_URI,
+        ),
+        claim(
+            "graduation_year",
+            "2021",
+            "Anna de Vries obtained her master's from TU Delft back in 2021.",
+            url=ANNA_URI,
+        ),
+    ]
+    result = save_alumni_records([candidate("Anna de Vries", paraphrased)], grounded)
+
+    assert result["status"] == "success", result.get("rejected")
+    assert [a["name"] for a in result["admitted"]] == ["Anna de Vries"]
+
+
+def test_the_stored_quote_is_the_attributed_segment_not_the_agents_wording(
+    grounded: StubToolContext, resolver: Resolver
+) -> None:
+    """Provenance records what the runtime attributed, not what the model said.
+
+    This is strictly more accurate than before: the stored text is now the
+    evidence the gate actually matched on.
+    """
+    paraphrased = [
+        claim(
+            "university_affiliation",
+            DELFT,
+            "Anna de Vries is among TU Delft's graduates.",
+            url=ANNA_URI,
+        ),
+        claim(
+            "graduation_year",
+            "2021",
+            "Anna de Vries obtained her master's from TU Delft back in 2021.",
+            url=ANNA_URI,
+        ),
+    ]
+    save_alumni_records([candidate("Anna de Vries", paraphrased)], grounded)
+
+    field = stored(grounded)["Anna de Vries"]["fields"]["graduation_year"]
+    assert field["supporting_quote"] == ANNA
+
+
+def test_a_value_absent_from_every_segment_is_still_refused(
+    grounded: StubToolContext, resolver: Resolver
+) -> None:
+    """Dropping the quote filter must not weaken the value check.
+
+    The name is in a segment from this domain, but no segment says 2018, so
+    the claim has to fail exactly as it did before.
+    """
+    invented = claim(
+        "graduation_year",
+        "2018",
+        "Anna de Vries graduated from TU Delft in 2018.",
+        url=ANNA_URI,
+    )
+    result = save_alumni_records([candidate("Anna de Vries", [invented])], grounded)
+
+    assert result["status"] == "error"
+    assert result["rejected"][0]["rejected_claims"][0]["reason"] == (
+        "claim_not_in_same_segment"
+    )
+
+
+def test_a_person_in_no_segment_is_still_refused(
+    grounded: StubToolContext, resolver: Resolver
+) -> None:
+    """The anti-fabrication check is untouched by the quote change."""
+    ghost = claim(
+        "graduation_year",
+        "2021",
+        "Sanne Bakker graduated from TU Delft in 2021.",
+        url=ANNA_URI,
+    )
+    result = save_alumni_records([candidate("Sanne Bakker", [ghost])], grounded)
+
+    assert result["status"] == "error"
+    assert result["rejected"][0]["rejected_claims"][0]["reason"] == "name_not_in_source"
+
+
 # --- Provenance -----------------------------------------------------------
 
 
