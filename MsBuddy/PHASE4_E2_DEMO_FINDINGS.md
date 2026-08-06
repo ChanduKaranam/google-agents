@@ -167,6 +167,41 @@ It is written up rather than applied because it edits the deterministic
 admission path, which is the one place this work was told not to touch
 without asking.
 
+## 3c. The pattern behind all of it
+
+Three separate blockers, one shape. Each time, the discovery agent was asked
+to predict something about **attribution** — a decision made by the search
+runtime *after* the agent has written its answer, and never shown to it:
+
+| Asked to predict | Refusal it caused | Status |
+|---|---|---|
+| which of its sentences would be attributed | `claim_not_in_same_segment` | fixed — quote no longer matched |
+| how the value would be spelled in that sentence | `claim_not_in_same_segment` | fixed — value copied from the sentence |
+| **which domains would be attributed** | `domain_not_retrieved` | **open** |
+
+The third, measured twice on 2026-08-06 with identical results (3
+`domain_not_retrieved`, 2 `no_verifiable_claim`):
+
+> `'utwente.nl' was not retrieved this turn. Domains actually retrieved:
+> github.io, tudelft.nl.`
+
+The agent cited a domain it genuinely saw in search results. Vertex attributed
+two. The agent cannot tell which two, so it will keep guessing wrong.
+
+**The principled fix is to stop asking it to predict anything.** Provenance
+would be *derived* from the harvest rather than asserted by the model: given
+a name and a value, the gate finds which harvested domain has a segment
+carrying both, and applies source authority to **that** domain. The model
+proposes the person and the fact; the code decides where the evidence is.
+
+Source authority is unaffected — it is applied to the derived domain, so a
+university page still cannot verify an employer. It is arguably stricter
+than today, since a domain the model asserts is no longer taken on trust.
+The cost is that checks 6 and 7 (redirect resolution and host agreement)
+would need their URL from the harvest entry rather than from `claim.source_url`.
+
+Not applied, because it is a third change to the deterministic admission path.
+
 ## 4. What safety still guarantees
 
 Nothing was weakened, and the guarantees were verified live, not asserted:
