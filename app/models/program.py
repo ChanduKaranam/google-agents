@@ -28,6 +28,8 @@ PROGRAM_FIELDS: frozenset[str] = frozenset(
         "gre_requirement",
         "structure",  # thesis / course-based
         "coop_available",
+        "scholarships",
+        "career_signals",
         "other_requirements",
     }
 )

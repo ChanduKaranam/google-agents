@@ -27,12 +27,29 @@ AGGREGATOR_DOMAINS = (
     "topuniversities.com",
     "usnews.com",
     "timeshighereducation.com",
+    "macleans.ca",
     "mastersportal.com",
     "shiksha.com",
     "yocket.com",
     "collegedunia.com",
-    "quora.com",
+)
+
+# Social/community/video platforms. Useful for qualitative signals (student
+# experience, career patterns), never for establishing an admission fact —
+# a deadline "reported by youtube.com" was V1's worst live finding.
+COMMUNITY_DOMAINS = (
+    "youtube.com",
+    "youtu.be",
     "reddit.com",
+    "quora.com",
+    "linkedin.com",
+    "medium.com",
+    "x.com",
+    "twitter.com",
+    "facebook.com",
+    "instagram.com",
+    "tiktok.com",
+    "glassdoor.com",
 )
 
 
@@ -101,6 +118,8 @@ def classify_source(domain: str, university_website: str = "") -> SourceType:
         return "official"
     if domain.endswith(".gov") or ".gov." in domain:
         return "government"
+    if any(domain == d or domain.endswith("." + d) for d in COMMUNITY_DOMAINS):
+        return "community"
     if any(domain == agg or domain.endswith("." + agg) for agg in AGGREGATOR_DOMAINS):
         return "aggregator"
     if domain.endswith(".edu") or ".edu." in domain or ".ac." in domain:

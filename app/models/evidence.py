@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 VerificationStatus = Literal["verified", "partially_verified", "unverified"]
 
-SourceType = Literal["official", "government", "aggregator", "other"]
+SourceType = Literal["official", "government", "aggregator", "community", "other"]
 
 # Domains are classified by suffix match against the program's university
 # website when known; these keywords are the fallback signal for "official".

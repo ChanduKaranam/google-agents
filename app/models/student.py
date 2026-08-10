@@ -58,6 +58,11 @@ class Projects(_Section):
     projects: list[str] = Field(default_factory=list)
 
 
+class Technical(_Section):
+    skills: list[str] = Field(default_factory=list)
+    certifications: list[str] = Field(default_factory=list)
+
+
 class Preferences(_Section):
     cities: list[str] = Field(default_factory=list)
     budget: float | None = Field(None, ge=0)
@@ -65,6 +70,11 @@ class Preferences(_Section):
     university_size: str | None = None
     program_type: str | None = Field(None, description="thesis / course-based / co-op")
     thesis_preference: bool | None = None
+    coop_preference: bool | None = None
+    scholarship_required: bool | None = None
+    funding_plan: str | None = Field(
+        None, description="e.g. family / loan / scholarship / mixed"
+    )
 
 
 class Target(_Section):
@@ -72,6 +82,9 @@ class Target(_Section):
     country: str | None = None
     intake: str | None = Field(None, description="e.g. Fall 2027")
     specialization: str | None = None
+    career_goal: str | None = Field(
+        None, description="e.g. industry SWE / ML engineer / research / PhD"
+    )
 
 
 class StudentProfile(BaseModel):
@@ -80,6 +93,7 @@ class StudentProfile(BaseModel):
     personal: Personal = Field(default_factory=Personal)
     education: Education = Field(default_factory=Education)
     test_scores: TestScores = Field(default_factory=TestScores)
+    technical: Technical = Field(default_factory=Technical)
     experience: Experience = Field(default_factory=Experience)
     research: Research = Field(default_factory=Research)
     projects: Projects = Field(default_factory=Projects)
@@ -97,15 +111,36 @@ class StudentProfile(BaseModel):
         return out
 
 
+class DomainInference(BaseModel):
+    """A specialization the evidence *suggests* — never a stated fact.
+
+    Inference lives in its own channel so it can never be mistaken for
+    something the student said (§49 of the V2 brief: the categories must
+    not blur). It becomes a profile fact only when the student confirms it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    domain: str = Field(description="e.g. AI/ML, NLP, Data Science")
+    confidence: float = Field(ge=0.0, le=1.0)
+    basis: list[str] = Field(
+        default_factory=list, description="The evidence, e.g. '3 ML projects'"
+    )
+
+
 class ProfileUpdate(BaseModel):
-    """What the Profile Agent proposes: a partial profile plus doubts.
+    """What an extractor proposes: stated facts, doubts, and inferences —
+    in three separate channels.
 
     The agent extracts; it never writes. `update_profile` merges this into
     the stored profile deterministically. Anything the agent was unsure
     about goes in `ambiguities` — a question for the student, not a guess.
+    `inferred_domains` carries what a resume *suggests*; those never enter
+    profile fields until confirmed.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     profile: StudentProfile = Field(default_factory=StudentProfile)
     ambiguities: list[str] = Field(default_factory=list)
+    inferred_domains: list[DomainInference] = Field(default_factory=list)

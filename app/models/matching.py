@@ -13,12 +13,14 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class MatchWeights(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    academic_fit: float = 0.30
-    program_fit: float = 0.25
+    academic_fit: float = 0.25
+    program_fit: float = 0.20
     research_fit: float = 0.15
-    experience_fit: float = 0.10
+    career_fit: float = 0.10
+    experience_fit: float = 0.05
     requirements_fit: float = 0.10
-    preference_fit: float = 0.10
+    financial_fit: float = 0.10
+    preference_fit: float = 0.05
 
     @model_validator(mode="after")
     def _sums_to_one(self) -> MatchWeights:
