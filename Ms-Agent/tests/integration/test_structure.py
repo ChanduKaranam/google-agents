@@ -39,6 +39,13 @@ def test_root_holds_exactly_the_expected_tools() -> None:
         "get_next_steps",
         "check_exam_requirements",
         "get_exam_info",
+        "convert_score",
+        "compare_english_tests",
+        "calculate_total_cost",
+        "calculate_budget_fit",
+        "convert_money",
+        "calculate_loan_emi",
+        "calculate_payback",
         "save_alumni_findings",
         "get_alumni_signals",
         "research_agent",
@@ -185,3 +192,17 @@ def test_exams_instruction_pins_the_unknown_rule() -> None:
 def test_exams_never_declare_a_universal_test_winner() -> None:
     assert "never declare a universal winner" in FLAT
     assert "get_exam_info" in ROOT_INSTRUCTION
+
+
+# --- Calculation domain wiring ----------------------------------------------
+
+
+def test_calculation_instruction_forbids_head_math_and_universal_conversion() -> None:
+    assert "no universal cgpa conversion" in FLAT
+    assert "never compute" in FLAT
+    assert "explicit rate with source and date" in FLAT
+
+
+def test_payback_language_is_assumption_bound() -> None:
+    assert "under these assumptions" in FLAT
+    assert "never a promise of recovery" in FLAT

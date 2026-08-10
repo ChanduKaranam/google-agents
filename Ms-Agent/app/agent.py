@@ -27,6 +27,15 @@ from app.config.settings import (
     STATE_SEARCH_COUNT,
 )
 from app.tools.alumni_tools import get_alumni_signals, save_alumni_findings
+from app.tools.calc_tools import (
+    calculate_budget_fit,
+    calculate_loan_emi,
+    calculate_payback,
+    calculate_total_cost,
+    compare_english_tests,
+    convert_money,
+    convert_score,
+)
 from app.tools.exam_tools import check_exam_requirements, get_exam_info
 from app.tools.matching_tools import match_programs
 from app.tools.planning_tools import get_next_steps
@@ -225,15 +234,34 @@ risks in words from `components`, what's missing (`missing_requirements`),
 the financial picture (see below), and the source-backed facts. Scale the
 depth to the question — a small question gets a small answer.
 
-## Money
+## Calculations and money
 
-Budget questions matter. Collect budget with its currency. Financial fit
-compares budget to *researched* tuition only; if currencies differ, say
-the comparison needs their own conversion — never convert currencies
-yourself. Distinguish official tuition (verified), estimated living costs
-(only if researched), and never present an estimate as exact. Use
-`convert_gpa` when the student asks about their GPA on a 4.0 scale —
-never do the arithmetic yourself.
+Every number the student sees comes from a tool — you never compute,
+round, convert or estimate in your head, and you always relay the tool's
+method, assumptions and warnings alongside its result.
+
+- GPA/scale conversion: `convert_score` (or `convert_gpa` for the stored
+  profile value). There is NO universal CGPA conversion — without a
+  researched institutional methodology the result is a labeled estimate,
+  and you present it as one. If the student asks how a specific
+  university evaluates their CGPA, research that university's stated
+  methodology first and pass it to `convert_score`.
+- English tests: `compare_english_tests` gives a commonly-used comparison
+  range, never an official equivalence — say so. Requirement checks stay
+  with `check_exam_requirements`.
+- Costs: `calculate_total_cost` with every amount typed — researched
+  (from stored program facts), user_provided, or estimate. Note the
+  billing-structure assumption when relaying totals.
+- Budget: `calculate_budget_fit`. Currencies must match; if they differ,
+  get a rate from the student (or research one) and `convert_money` first
+  — a conversion needs an explicit rate with source and date, never one
+  from memory.
+- Loans: `calculate_loan_emi` — relay EMI, total repayment, total
+  interest and the fixed-rate assumption.
+- Payback: `calculate_payback` — always "under these assumptions", never
+  a promise of recovery, and the income figure comes from the student or
+  researched evidence, never from you.
+- Never produce an admission probability from any calculation.
 
 ## Profile control
 
@@ -325,6 +353,13 @@ root_agent = Agent(
         get_next_steps,
         check_exam_requirements,
         get_exam_info,
+        convert_score,
+        compare_english_tests,
+        calculate_total_cost,
+        calculate_budget_fit,
+        convert_money,
+        calculate_loan_emi,
+        calculate_payback,
         save_alumni_findings,
         get_alumni_signals,
         AgentTool(create_research_agent()),
