@@ -30,18 +30,25 @@ def test_root_holds_exactly_the_expected_tools() -> None:
     assert names == {
         "get_profile",
         "update_profile",
-        "get_missing_fields",
+        "get_interview_state",
+        "convert_gpa",
+        "clear_profile",
         "save_research",
         "get_programs",
         "match_programs",
+        "get_next_steps",
         "research_agent",
-        # ADK wraps the task-mode sub-agent as a delegation tool.
+        # ADK wraps task-mode sub-agents as delegation tools.
         "profile_agent",
+        "resume_agent",
     }
 
 
-def test_profile_agent_is_the_only_sub_agent() -> None:
-    assert [a.name for a in root_agent.sub_agents] == ["profile_agent"]
+def test_the_two_extractors_are_the_only_sub_agents() -> None:
+    assert [a.name for a in root_agent.sub_agents] == [
+        "profile_agent",
+        "resume_agent",
+    ]
 
 
 def test_the_budget_covers_every_networked_tool() -> None:
@@ -106,7 +113,7 @@ def test_greetings_come_before_tool_guidance_and_use_no_tools() -> None:
 
 
 def test_the_memory_rule_is_scoped_away_from_the_assistant() -> None:
-    assert "not about you" in FLAT
+    assert "never about you" in FLAT
     assert "can't answer from memory" in FLAT
 
 
@@ -117,10 +124,10 @@ def test_no_invention_rules_are_present() -> None:
 
 
 def test_progressive_collection_is_instructed() -> None:
-    assert "first missing item only" in FLAT
-    assert "never a questionnaire" in FLAT
+    assert "at most the one question" in FLAT
+    assert "one question at a time" in FLAT
 
 
 def test_match_scores_are_narrated_never_minted() -> None:
-    assert "never to change them" in FLAT
+    assert "never adjust them" in FLAT
     assert "admission chance" in FLAT  # ...never present as one

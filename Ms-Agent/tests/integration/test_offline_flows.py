@@ -16,7 +16,7 @@ import pytest
 
 from app.config.settings import STATE_EVIDENCE, STATE_KNOWLEDGE, STATE_PROFILE
 from app.tools.matching_tools import match_programs
-from app.tools.profile_tools import get_missing_fields, get_profile, update_profile
+from app.tools.profile_tools import get_interview_state, get_profile, update_profile
 from app.tools.university_tools import get_programs, save_research
 
 TORONTO_SEGMENT = (
@@ -86,7 +86,7 @@ TORONTO_CLAIMS = [
 
 
 def test_profile_create_update_and_status(context: StubToolContext) -> None:
-    created = update_profile(lendi_update(), context)
+    created = update_profile(lendi_update(), "user_explicit", context)
     assert created["status"] == "success"
     assert "education.cgpa" in created["changed"]
 
@@ -98,6 +98,7 @@ def test_profile_create_update_and_status(context: StubToolContext) -> None:
                 "target": {"intake": "Fall 2027"},
             }
         },
+        "user_explicit",
         context,
     )
     status = get_profile(context)
@@ -106,14 +107,18 @@ def test_profile_create_update_and_status(context: StubToolContext) -> None:
     assert status["profile"]["target"]["intake"] == "Fall 2027"
 
     # Scenario 7 — the next question is the single highest-value gap.
-    ask = get_missing_fields(context)["ask_next"]
-    assert ask["field"] == "education.grading_scale"
+    # V2 asks for the degree before the scale: a 3-year vs 4-year
+    # bachelor's changes eligibility outright.
+    ask = get_interview_state("", context)["next_question"]
+    assert ask["field"] == "education.degree"
 
 
 def test_an_invalid_update_is_refused_with_the_field_named(
     context: StubToolContext,
 ) -> None:
-    result = update_profile({"profile": {"education": {"cgpa": "eight"}}}, context)
+    result = update_profile(
+        {"profile": {"education": {"cgpa": "eight"}}}, "user_explicit", context
+    )
     assert result["status"] == "error"
     assert result["reason"] == "invalid_update"
     assert STATE_PROFILE not in context.state
@@ -175,7 +180,7 @@ def test_stored_programs_render_with_sources(context: StubToolContext) -> None:
 
 
 def test_profile_research_match_pipeline(context: StubToolContext) -> None:
-    update_profile(lendi_update(), context)
+    update_profile(lendi_update(), "user_explicit", context)
     update_profile(
         {
             "profile": {
@@ -183,6 +188,7 @@ def test_profile_research_match_pipeline(context: StubToolContext) -> None:
                 "test_scores": {"ielts": 7.5},
             }
         },
+        "user_explicit",
         context,
     )
     stub_evidence(context)
@@ -208,5 +214,5 @@ def test_profile_research_match_pipeline(context: StubToolContext) -> None:
 
 def test_matching_refuses_before_the_inputs_exist(context: StubToolContext) -> None:
     assert match_programs(context)["reason"] == "empty_profile"
-    update_profile(lendi_update(), context)
+    update_profile(lendi_update(), "user_explicit", context)
     assert match_programs(context)["reason"] == "no_programs_researched"

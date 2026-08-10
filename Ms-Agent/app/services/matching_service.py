@@ -241,43 +241,137 @@ def _requirements_fit(
     )
 
 
+def _financial_fit(profile: StudentProfile, program: Program) -> ComponentScore:
+    """Budget against researched tuition — currencies never converted.
+
+    There is no exchange rate in this system; inventing one would be a
+    fabricated number a student plans money around. Different currencies →
+    unevaluable, with the reason stated.
+    """
+    weight = MATCH_WEIGHTS.financial_fit
+    budget = profile.preferences.budget
+    tuition_fact = program.facts.get("tuition")
+    if budget is None or tuition_fact is None:
+        return ComponentScore(
+            name="financial_fit",
+            score=None,
+            weight=weight,
+            basis=(
+                "No budget on the profile."
+                if budget is None
+                else "Tuition has not been researched for this program."
+            ),
+        )
+    tuition = _first_number(tuition_fact.value)
+    if tuition is None:
+        return ComponentScore(
+            name="financial_fit",
+            score=None,
+            weight=weight,
+            basis=f"Stated tuition '{tuition_fact.value}' is not numeric.",
+        )
+    budget_currency = (profile.preferences.budget_currency or "").strip().upper()
+    tuition_currency = (
+        program.facts["tuition_currency"].value.strip().upper()
+        if "tuition_currency" in program.facts
+        else ""
+    )
+    if budget_currency and tuition_currency and budget_currency != tuition_currency:
+        return ComponentScore(
+            name="financial_fit",
+            score=None,
+            weight=weight,
+            basis=(
+                f"Budget is in {budget_currency}, tuition in "
+                f"{tuition_currency} — no conversion exists here, so this "
+                "needs the student's own comparison."
+            ),
+        )
+    if tuition <= budget:
+        score, note = 90, "researched tuition fits the stated budget"
+    elif tuition <= budget * 1.2:
+        score, note = 55, "tuition runs up to ~20% over the stated budget"
+    else:
+        score, note = 25, "tuition is well above the stated budget"
+    return ComponentScore(
+        name="financial_fit",
+        score=score,
+        weight=weight,
+        basis=f"Tuition {tuition_fact.value} vs budget {budget}: {note}. "
+        "Living costs not included unless researched.",
+    )
+
+
+_RESEARCH_GOALS = ("research", "phd", "professor", "academia", "thesis")
+_INDUSTRY_GOALS = (
+    "industry",
+    "engineer",
+    "swe",
+    "developer",
+    "job",
+    "data scientist",
+    "product",
+    "startup",
+)
+
+
+def _career_fit(profile: StudentProfile, program: Program) -> ComponentScore:
+    weight = MATCH_WEIGHTS.career_fit
+    goal = (profile.target.career_goal or "").casefold()
+    if not goal:
+        return ComponentScore(
+            name="career_fit",
+            score=None,
+            weight=weight,
+            basis="No career goal on the profile yet.",
+        )
+    structure = (
+        program.facts["structure"].value.casefold()
+        if "structure" in program.facts
+        else ""
+    )
+    coop = (
+        program.facts["coop_available"].value.casefold()
+        if "coop_available" in program.facts
+        else ""
+    )
+    research_goal = any(k in goal for k in _RESEARCH_GOALS)
+    industry_goal = any(k in goal for k in _INDUSTRY_GOALS)
+    if research_goal and "thesis" in structure:
+        score, note = 90, "thesis-based structure suits a research/PhD goal"
+    elif industry_goal and coop.startswith(("yes", "true", "available")):
+        score, note = 90, "co-op availability suits an industry goal"
+    elif research_goal and "course" in structure:
+        score, note = 45, "course-based structure is a weaker path to research"
+    elif not structure and not coop:
+        score, note = 60, "program structure/co-op not researched yet"
+    else:
+        score, note = 65, "no strong signal either way"
+    return ComponentScore(
+        name="career_fit",
+        score=score,
+        weight=weight,
+        basis=f"Goal '{profile.target.career_goal}': {note}.",
+    )
+
+
 def _preference_fit(profile: StudentProfile, program: Program) -> ComponentScore:
     weight = MATCH_WEIGHTS.preference_fit
     country = profile.target.country
-    if not country and profile.preferences.budget is None:
+    if not country:
         return ComponentScore(
             name="preference_fit",
             score=None,
             weight=weight,
-            basis="No target country or budget on the profile.",
+            basis="No target country on the profile.",
         )
-    notes, score = [], 50
-    if country:
-        if program.country and country.casefold() == program.country.casefold():
-            score += 40
-            notes.append(f"in the target country ({program.country})")
-        elif program.country:
-            score -= 20
-            notes.append(f"outside the target country ({program.country})")
-        else:
-            notes.append("program country unknown")
-    budget = profile.preferences.budget
-    tuition = _first_number(
-        program.facts["tuition"].value if "tuition" in program.facts else None
-    )
-    if budget is not None and tuition is not None:
-        if tuition <= budget:
-            score += 10
-            notes.append("tuition within budget")
-        else:
-            score -= 10
-            notes.append("tuition above stated budget")
-    return ComponentScore(
-        name="preference_fit",
-        score=max(0, min(100, score)),
-        weight=weight,
-        basis="; ".join(notes) or "preferences partially known",
-    )
+    if program.country and country.casefold() == program.country.casefold():
+        score, note = 90, f"in the target country ({program.country})"
+    elif program.country:
+        score, note = 30, f"outside the target country ({program.country})"
+    else:
+        score, note = 50, "program country unknown"
+    return ComponentScore(name="preference_fit", score=score, weight=weight, basis=note)
 
 
 def categorize(score: int) -> str:
@@ -299,8 +393,10 @@ def calculate_match_score(
         _academic_fit(profile, program),
         _program_fit(profile, program),
         _research_fit(profile, program),
+        _career_fit(profile, program),
         _experience_fit(profile, program),
         requirements_component,
+        _financial_fit(profile, program),
         _preference_fit(profile, program),
     ]
 

@@ -23,6 +23,10 @@ CATEGORY_THRESHOLDS = DEFAULT_CATEGORY_THRESHOLDS
 # --- Session state keys -----------------------------------------------------
 # `user:` prefix = persistent per-user in ADK; bare = session-scoped.
 STATE_PROFILE = "user:student_profile"
+# Per-field provenance: {path: {source, status, confidence}} plus the
+# unconfirmed domain inferences a resume produced. Separate key so the
+# profile stays the plain value shape every consumer already reads.
+STATE_PROFILE_META = "user:profile_meta"
 STATE_KNOWLEDGE = "user:program_knowledge"
 STATE_EVIDENCE = "evidence_ledger"
 

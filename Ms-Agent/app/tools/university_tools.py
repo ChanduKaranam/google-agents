@@ -17,6 +17,22 @@ from app.config.settings import STATE_EVIDENCE, STATE_KNOWLEDGE
 from app.models.program import PROGRAM_FIELDS, Program
 from app.services.research_service import build_fact, harvest_grounding
 
+# Facts a student will act on with money or a deadline. These demand a
+# source with standing: community/video/social platforms can never supply
+# them (V1's live probe served a deadline "reported by youtube.com"), and a
+# non-official source can at best report them, never verify them.
+AUTHORITATIVE_FIELDS: frozenset[str] = frozenset(
+    {
+        "application_deadline",
+        "tuition",
+        "tuition_currency",
+        "gpa_requirement",
+        "english_requirement",
+        "gre_requirement",
+        "intake",
+    }
+)
+
 
 def _collect_evidence(tool_context: ToolContext) -> list[dict[str, Any]]:
     """Session grounding plus the ledger the research callback stored."""
@@ -108,6 +124,30 @@ def save_research(
             university_website="",
             quote=str(claim.get("quote", "")),
         )
+        # The authority gate. Verification asks "was this genuinely
+        # retrieved"; authority asks "does this source have standing to
+        # state this fact". Both must hold.
+        if field in AUTHORITATIVE_FIELDS:
+            if fact.evidence.source_type == "community":
+                refused.append(
+                    {
+                        "field": field,
+                        "reason": "source_lacks_authority",
+                        "message": (
+                            f"'{fact.evidence.source_domain}' is a community/"
+                            "social platform and cannot establish "
+                            f"'{field}'. Use the university's own pages."
+                        ),
+                    }
+                )
+                continue
+            if fact.evidence.source_type == "aggregator" and fact.status == "verified":
+                # An aggregator can report an admission fact, never verify
+                # it — restating a figure is not confirming it. "other"
+                # keeps its grading: most universities outside the US have
+                # no .edu suffix, and without a university-domain registry
+                # (a V2.1 item) their own sites classify as "other".
+                fact = fact.model_copy(update={"status": "partially_verified"})
         stored_facts[field] = fact
         graded.append(
             {
