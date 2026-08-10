@@ -37,7 +37,10 @@ def test_root_holds_exactly_the_expected_tools() -> None:
         "get_programs",
         "match_programs",
         "get_next_steps",
+        "save_alumni_findings",
+        "get_alumni_signals",
         "research_agent",
+        "alumni_agent",
         # ADK wraps task-mode sub-agents as delegation tools.
         "profile_agent",
         "resume_agent",
@@ -131,3 +134,37 @@ def test_progressive_collection_is_instructed() -> None:
 def test_match_scores_are_narrated_never_minted() -> None:
     assert "never adjust them" in FLAT
     assert "admission chance" in FLAT  # ...never present as one
+
+
+# --- Alumni agent wiring ----------------------------------------------------
+
+
+def test_alumni_agent_is_search_only_and_harvests() -> None:
+    from app.agents.alumni_agent import create_alumni_agent
+
+    agent = create_alumni_agent()
+    assert len(agent.tools) == 1
+    assert tool_name(agent.tools[0]) == "google_search"
+    assert agent.after_agent_callback is not None
+
+
+def test_alumni_agent_is_inside_the_search_budget() -> None:
+    assert "alumni_agent" in RESEARCH_TOOL_NAMES
+
+
+def test_alumni_instruction_scopes_to_approved_sources() -> None:
+    from app.agents.alumni_agent import INSTRUCTION
+
+    flat = " ".join(INSTRUCTION.split()).lower()
+    assert "site:linkedin.com/in" in flat
+    assert "ignored" in flat  # unapproved results are ignored
+    assert "public information only" in flat
+    assert "no emails, phones" in flat
+    assert "found: none" in flat
+
+
+def test_root_alumni_section_pins_the_presentation_rules() -> None:
+    assert "only admitted people may be named" in FLAT
+    assert "denominator" in FLAT
+    assert "never a guarantee" in FLAT
+    assert "approved sources" in FLAT

@@ -28,6 +28,8 @@ STATE_PROFILE = "user:student_profile"
 # profile stays the plain value shape every consumer already reads.
 STATE_PROFILE_META = "user:profile_meta"
 STATE_KNOWLEDGE = "user:program_knowledge"
+# Resolved alumni entities with per-claim evidence, entity-keyed.
+STATE_ALUMNI = "user:alumni_signals"
 STATE_EVIDENCE = "evidence_ledger"
 
 # Outbound research is budgeted so no flow can loop the network.

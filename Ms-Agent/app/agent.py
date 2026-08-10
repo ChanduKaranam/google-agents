@@ -16,6 +16,7 @@ from google.adk.models import Gemini
 from google.adk.tools import AgentTool, BaseTool, ToolContext
 from google.genai import types
 
+from app.agents.alumni_agent import create_alumni_agent
 from app.agents.profile_agent import create_profile_agent
 from app.agents.research_agent import create_research_agent
 from app.agents.resume_agent import create_resume_agent
@@ -25,6 +26,7 @@ from app.config.settings import (
     MODEL,
     STATE_SEARCH_COUNT,
 )
+from app.tools.alumni_tools import get_alumni_signals, save_alumni_findings
 from app.tools.matching_tools import match_programs
 from app.tools.planning_tools import get_next_steps
 from app.tools.profile_tools import (
@@ -38,7 +40,7 @@ from app.tools.university_tools import get_programs, save_research
 
 logger = logging.getLogger("msbuddy.root")
 
-RESEARCH_TOOL_NAMES = frozenset({"research_agent"})
+RESEARCH_TOOL_NAMES = frozenset({"research_agent", "alumni_agent"})
 
 
 async def enforce_search_budget(
@@ -213,6 +215,51 @@ If they ask you to delete their data: confirm once, then call
 do. Use `get_next_steps` when they ask "what should I do next" — relay its
 actions, adding verified deadlines only.
 
+## Alumni and career intelligence
+
+When the student asks where graduates work, which companies hire, what
+roles alumni get, research/PhD trajectories, startup activity, alumni at a
+named company, "people like me", or a university comparison on outcomes —
+that is alumni intelligence. This is the strictest thing you do: it names
+real people.
+
+1. Plan the research around the question and the student: career questions
+   need university career pages and LinkedIn; research questions need the
+   scholarly indexes and department pages; "alumni at NVIDIA?" needs
+   university news, LinkedIn and that company's site. Include the
+   student's domain, target role and target companies in the request you
+   send to `alumni_agent` — that is what makes results personal.
+2. Call `alumni_agent` with that request (and the university's official
+   domain if you know it from research).
+3. Pass EVERY person from its `---` block to `save_alumni_findings`,
+   unedited, with the university's official domain. Do not pre-screen —
+   deciding who is real is the tool's job.
+4. Present from `get_alumni_signals` only.
+
+Presenting alumni intelligence:
+
+- **Only admitted people may be named.** Rejected candidates do not exist
+  in this conversation: say how many didn't meet the evidence bar and
+  why, never who.
+- Distinguish three things explicitly: a FACT (a sourced claim about one
+  person, cite its source label and link), a PATTERN (counts among found
+  profiles — always with the denominator: "among the 8 public profiles I
+  verified, 5 are in ML roles"), and your INFERENCE ("this suggests a
+  useful ecosystem"), labeled as such.
+- If `may_use_pattern_language` is false there are too few profiles to
+  generalize: give counts and say the group is too small for patterns.
+- Public profiles are not the graduate population — never percentages of
+  graduates, never "most graduates", never a statistic no authoritative
+  source published.
+- Alumni presence is career intelligence, never a guarantee: not of
+  employment, not of admission, not of anyone's future.
+- Report conflicts as conflicts ("the university page lists Company A;
+  the public profile currently lists Company B"), with retrieval dates.
+- Current role/company/location are time-sensitive — qualify with when
+  they were retrieved.
+- If nothing verifiable was found: "I couldn't verify enough from the
+  approved sources" — never pad with an unapproved site, never invent.
+
 ## Rules you do not bend
 
 - Never invent a university fact, a source, or a URL.
@@ -247,7 +294,10 @@ root_agent = Agent(
         get_programs,
         match_programs,
         get_next_steps,
+        save_alumni_findings,
+        get_alumni_signals,
         AgentTool(create_research_agent()),
+        AgentTool(create_alumni_agent()),
     ],
     sub_agents=[create_profile_agent(), create_resume_agent()],
     before_tool_callback=enforce_search_budget,
