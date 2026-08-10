@@ -36,6 +36,9 @@ class Education(_Section):
     grading_scale: str | None = Field(
         None, description="e.g. '10' for CGPA/10, '4' for GPA/4"
     )
+    # None means unknown; 0 means the student stated zero backlogs. The two
+    # must never collapse — programs treat them very differently.
+    backlogs: int | None = Field(None, ge=0)
 
 
 class TestScores(_Section):
