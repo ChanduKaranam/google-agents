@@ -71,17 +71,36 @@ ROOT_AGENT_NAME = "root_agent"
 
 # Phrasings that assert a fact about an institution. Deliberately narrow:
 # a false positive here would block a correct answer.
+#
+# "Assert" is the operative word. The original `deadline` and `tuition`
+# alternatives matched the bare noun, which meant a capability list —
+# "I can check tuition and deadlines for you" — counted as a claim. In a
+# fresh session (no harvest, no shortlist) that is precisely the blocking
+# condition, so the very first "who are you?" of a conversation was replaced
+# with the memory refusal (observed live, 2026-08-07). Offering to look
+# something up asserts nothing; only stating a value does, so these now
+# require the assertive form: "the deadline is …", "tuition is …".
 INSTITUTIONAL_CLAIM_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    # The assertive verb may sit across a `for/of/at <subject>` phrase —
+    # "the deadline for MIT EECS is 15 December" asserts as hard as "the
+    # deadline is 15 December". Only those prepositions bridge, so a
+    # capability list ("deadlines and requirements are things I can check")
+    # still is not a claim.
     (
         "deadline",
         re.compile(
-            r"\b(deadline|due\s+date|closes?\s+on|applications?\s+close)\b", re.I
+            r"\b(deadlines?(\s+(for|of|at)\s+[^.?!]{0,40})?"
+            r"\s+(is|are|was|were|falls?|:)"
+            r"|due\s+date|closes?\s+on|applications?\s+close)\b",
+            re.I,
         ),
     ),
     (
         "tuition",
         re.compile(
-            r"\b(tuition|fees?\s+(are|is)|costs?\s+(about|around)?\s*[\$€£₹])", re.I
+            r"\b(tuition(\s+(for|of|at)\s+[^.?!]{0,40})?\s+(is|was|:|runs)"
+            r"|fees?\s+(are|is)|costs?\s+(about|around)?\s*[\$€£₹])",
+            re.I,
         ),
     ),
     (

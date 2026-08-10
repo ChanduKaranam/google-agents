@@ -94,6 +94,11 @@ MIN_PATTERN_N = 5
 URL_RESOLUTION_TIMEOUT_SECONDS = 10
 MAX_URL_RESOLUTIONS_PER_TURN = 20
 
+# --- Application plan (documents and progress) -------------------------------
+# Persistent, user-scoped: a document checklist survives the session for the
+# same reason the profile does — it describes the student, not the question.
+STATE_DOCUMENTS = "user:documents"
+
 # --- Profile record ---------------------------------------------------------
 PROFILE_SCHEMA_VERSION = 1
 

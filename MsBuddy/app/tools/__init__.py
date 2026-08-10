@@ -25,6 +25,8 @@ from app.tools.comparison_tools import (
     explain_ranking_inputs,
     score_programs,
 )
+from app.tools.fit_tools import match_universities
+from app.tools.plan_tools import get_application_plan, set_document_status
 from app.tools.profile_tools import (
     clear_profile_fields,
     get_profile,
@@ -45,8 +47,10 @@ __all__ = [
     "clear_profile_fields",
     "explain_ranking_inputs",
     "get_alumni",
+    "get_application_plan",
     "get_profile",
     "get_shortlist",
+    "match_universities",
     "normalize_gpa",
     "profile_completeness",
     "rank_alumni_by_affinity",
@@ -54,4 +58,5 @@ __all__ = [
     "save_profile_fields",
     "save_program_record",
     "score_programs",
+    "set_document_status",
 ]

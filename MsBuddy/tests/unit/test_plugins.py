@@ -126,6 +126,31 @@ def test_profile_conversation_is_not_an_institutional_claim(text: str) -> None:
     assert find_institutional_claims(text) == []
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "I can research tuition and deadline information for any program.",
+        "I'm MS Buddy — I can check tuition, deadlines and requirements for you.",
+        "Ask me about a university's tuition and I'll look it up with sources.",
+        "Want me to find the application deadline for TU Delft?",
+    ],
+)
+def test_an_offer_to_research_is_not_an_institutional_claim(text: str) -> None:
+    """The greeting regression, observed live 2026-08-07.
+
+    "Who are you?" produced a capability list that *mentioned* tuition and
+    deadlines, the bare-keyword patterns fired, the session was fresh (no
+    harvest, no shortlist), and the plugin replaced a perfectly good
+    introduction with "I can't answer that from memory."
+
+    Offering to look something up asserts nothing about any institution.
+    Only stating a value does. The patterns therefore require the assertive
+    form — "the deadline is …", "tuition is …" — which every existing
+    positive case in this file already uses.
+    """
+    assert find_institutional_claims(text) == []
+
+
 def test_numbers_absent_from_retrieved_text_are_reported() -> None:
     segments = ["The deadline is 15 December 2026."]
     orphans = unsupported_numbers("The deadline is 30 November 2026.", segments)
