@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from app.config.settings import STATE_PROFILE, STATE_PROFILE_META
 from app.models.student import ProfileUpdate, StudentProfile
 from app.services.matching_service import gpa_on_4_scale
+from app.services.profile_enrichment import derive_skills
 from app.services.profile_service import apply_update
 from app.services.question_service import choose_next_question, readiness
 
@@ -64,6 +65,7 @@ def get_profile(tool_context: ToolContext) -> dict:
         "profile": known,
         "provenance": meta["fields"],
         "unconfirmed_domain_inferences": meta["inferred_domains"],
+        "derived_skills": meta.get("derived_skills", []),
         "readiness": readiness(profile),
     }
 
@@ -105,16 +107,55 @@ def update_profile(update: dict, source: str, tool_context: ToolContext) -> dict
         }
 
     current = _read_profile(tool_context.state)
+    meta = _read_meta(tool_context.state)
+
+    # Cross-source conflict detection (§6): an incoming value that differs
+    # from a stored value with a DIFFERENT source is a question for the
+    # student, never a silent overwrite. Same-source differences remain
+    # self-corrections and win; `user_confirmed` resolves anything.
+    conflicts: list[dict[str, Any]] = []
+    if source != "user_confirmed":
+        for section_name in type(proposed.profile).model_fields:
+            proposed_section = getattr(proposed.profile, section_name)
+            current_section = getattr(current, section_name)
+            for field_name in type(proposed_section).model_fields:
+                incoming = getattr(proposed_section, field_name)
+                if incoming is None or incoming == [] or incoming == {}:
+                    continue
+                existing = getattr(current_section, field_name)
+                if existing is None or existing == [] or existing == incoming:
+                    continue
+                path = f"{section_name}.{field_name}"
+                existing_source = (meta["fields"].get(path) or {}).get("source")
+                if existing_source and existing_source != source:
+                    conflicts.append(
+                        {
+                            "field": path,
+                            "existing_value": existing,
+                            "existing_source": existing_source,
+                            "incoming_value": incoming,
+                            "incoming_source": source,
+                        }
+                    )
+                    # Strip the conflicting value so the merge cannot apply
+                    # it; the stored value stands until the student decides.
+                    setattr(proposed_section, field_name, None)
+
     merged, changed = apply_update(current, proposed)
     tool_context.state[STATE_PROFILE] = merged.model_dump()
 
-    meta = _read_meta(tool_context.state)
     for path in changed:
         meta["fields"][path] = {
             "source": source,
             "status": "confirmed" if source == "user_confirmed" else "extracted",
             "confidence": 1.0,
         }
+
+    # Deterministic enrichment (§8-9): skills derived from stated skills and
+    # project descriptions, each with its textual basis. Metadata only —
+    # never merged into the stated profile.
+    enrichment_text = " ".join([*merged.technical.skills, *merged.projects.projects])
+    meta["derived_skills"] = derive_skills(enrichment_text)
     for inference in proposed.inferred_domains:
         entry = {
             **inference.model_dump(),
@@ -130,14 +171,17 @@ def update_profile(update: dict, source: str, tool_context: ToolContext) -> dict
     return {
         "status": "success",
         "changed": changed,
+        "conflicts": conflicts,
         "ambiguities": proposed.ambiguities,
         "profile": merged.known(),
         "unconfirmed_domain_inferences": meta["inferred_domains"],
+        "derived_skills": meta["derived_skills"],
         "readiness": readiness(merged),
         "note": (
-            "Inferred domains are suggestions to confirm with the student, "
-            "never facts. On confirmation, store the choice via "
-            "update_profile with source='user_confirmed'."
+            "Inferred domains are suggestions to confirm; conflicts are "
+            "questions for the student ('I found two different values — "
+            "which should I use?'). Resolve either via update_profile with "
+            "source='user_confirmed'. Never resolve a conflict yourself."
         ),
     }
 

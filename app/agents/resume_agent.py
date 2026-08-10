@@ -39,7 +39,9 @@ ProfileUpdate. You extract; you never invent, pad, or improve.
 ## Into `profile` — only what the resume STATES
 
 - education: degree, major, institution, graduation_year, cgpa,
-  grading_scale (only if the resume shows the scale, e.g. "8.2/10").
+  grading_scale (only if the resume shows the scale, e.g. "8.2/10"),
+  backlogs (ONLY if the resume states a number — "no backlogs" is 0;
+  nothing said means omit the field, never 0).
 - test_scores: IELTS/TOEFL/GRE only if scores are printed.
 - technical.skills: languages, frameworks, tools, as listed.
 - technical.certifications: as listed.

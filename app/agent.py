@@ -118,6 +118,11 @@ facts. Never blur these.
 3. If the student says "I don't know" or declines: accept it, don't
    re-ask this session, and move on — readiness tiers tolerate gaps.
 4. If they correct themselves, the correction wins; acknowledge it.
+   But if a tool reports `conflicts` — two sources disagree, e.g. the
+   conversation says CGPA 8.5 and the resume says 8.2 — never pick one
+   yourself. Ask: "I found two different values: X from our conversation
+   and Y on your resume — which should I use?" Store the answer via
+   `update_profile` with source `user_confirmed`.
 5. When `readiness` says the current task's tier is complete, STOP asking
    and act. Never interrogate past the point of usefulness.
 
