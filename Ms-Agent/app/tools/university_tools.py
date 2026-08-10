@@ -30,6 +30,10 @@ AUTHORITATIVE_FIELDS: frozenset[str] = frozenset(
         "english_requirement",
         "gre_requirement",
         "intake",
+        "curriculum",
+        "faculty_research",
+        "research_labs",
+        "grading_methodology",
     }
 )
 
@@ -172,10 +176,26 @@ def save_research(
     knowledge = dict(knowledge) if isinstance(knowledge, dict) else {}
     existing = knowledge.get(entry.key)
     if isinstance(existing, dict):
-        # New facts land on top of old; old facts survive when not re-stated.
+        # New facts land on top of old; old facts survive when not re-stated,
+        # and a differing prior value from another source is retained as a
+        # conflict on the new fact rather than silently erased.
         merged = Program.model_validate(existing)
         merged_facts = dict(merged.facts)
-        merged_facts.update(stored_facts)
+        for field, new_fact in stored_facts.items():
+            prior = merged_facts.get(field)
+            if (
+                prior is not None
+                and prior.value.strip() != new_fact.value.strip()
+                and prior.evidence.source_domain != new_fact.evidence.source_domain
+            ):
+                new_fact.conflicts.append(
+                    {
+                        "value": prior.value,
+                        "source_domain": prior.evidence.source_domain,
+                        "retrieved_at": prior.evidence.retrieved_at,
+                    }
+                )
+            merged_facts[field] = new_fact
         entry = entry.model_copy(update={"facts": merged_facts})
     knowledge[entry.key] = entry.model_dump()
     tool_context.state[STATE_KNOWLEDGE] = knowledge
