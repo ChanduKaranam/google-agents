@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Real credentials/config live in .env; commit .env.example instead.
+.env
+
+# local adk session/artifact storage
+.adk/
