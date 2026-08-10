@@ -103,10 +103,19 @@ INSTITUTIONAL_CLAIM_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
             re.I,
         ),
     ),
+    # Grammar separates a claim from guidance here. A *specific* institution
+    # asserts in the singular — "the program requires a GRE quant of 165",
+    # "the minimum GPA is 3.0" — while honest general guidance hedges in the
+    # plural or defers the value: "some programs require GRE", "the minimum
+    # score depends on the program". Bare `requires?` and bare `minimum score`
+    # blocked the second kind, which is the correct answer to "which exams do
+    # I need for Canada?" (observed 2026-08-07).
     (
         "requirement",
         re.compile(
-            r"\b(requires?|minimum\s+(gpa|score|gre|toefl|ielts)|cut\s?off|eligibility\s+criteria)\b",
+            r"\b(requires\b"
+            r"|minimum\s+(gpa|score|gre|toefl|ielts)\s+(is|was|of|:)"
+            r"|cut\s?off|eligibility\s+criteria)\b",
             re.I,
         ),
     ),

@@ -136,6 +136,36 @@ def test_profile_conversation_is_not_an_institutional_claim(text: str) -> None:
     ],
 )
 def test_an_offer_to_research_is_not_an_institutional_claim(text: str) -> None:
+    """See below — and its sibling for hedged general statements."""
+    assert find_institutional_claims(text) == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The exact minimum score depends on the university and program.",
+        "Some programs require GRE, others waive it.",
+        "GRE requirements vary by program and are often not universally required.",
+        "Universities require different English tests, so it's worth checking each.",
+    ],
+)
+def test_a_hedged_general_statement_is_not_an_institutional_claim(text: str) -> None:
+    """The exam-question regression: correct country-level guidance blocked.
+
+    "Which exams do I need for MS in Canada?" has a correct general answer —
+    English tests are commonly expected, GRE varies, exact scores depend on
+    the program. Every hedge in that answer ("depends", "vary", "some
+    programs require") tripped the requirement pattern, and in a fresh
+    session that blocks the whole reply and serves the memory refusal
+    instead. The student asked a reasonable question and got a refusal for
+    being told the truth carefully.
+
+    The grammar does the work: a *specific* institution asserts in the
+    singular — "the program requires", "the minimum GPA is" — while generic
+    guidance hedges in the plural or defers the value ("programs require",
+    "minimum score depends"). Singular-assertive stays a claim; hedged
+    generality does not.
+    """
     """The greeting regression, observed live 2026-08-07.
 
     "Who are you?" produced a capability list that *mentioned* tuition and
