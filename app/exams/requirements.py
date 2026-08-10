@@ -128,6 +128,7 @@ def compare_score(
         return {
             "verdict": "below_stated_minimum",
             "note": f"Overall {overall} is below the stated {min_overall}.",
+            "gap": round(min_overall - overall, 2),
         }
     if min_section is not None:
         if lowest_section is None:
@@ -146,6 +147,7 @@ def compare_score(
                     f"Lowest section {lowest_section} is below the stated "
                     f"per-section minimum {min_section}."
                 ),
+                "section_gap": round(min_section - lowest_section, 2),
             }
     return {
         "verdict": "meets_stated_minimum",
