@@ -3,8 +3,9 @@
 An AI application advisor for students planning a Master's degree abroad,
 built on **Google ADK**. V2 is a conversational advisor — an adaptive
 one-question-at-a-time interview, resume intelligence with provenance,
-authority-gated research, and deterministic matching with financial and
-career fit — on top of V1's core loop:
+authority-gated research, deterministic matching with financial and
+career fit, and a 26-source allowlisted **alumni intelligence** system —
+on top of V1's core loop:
 
 > tell MSBuddy about yourself → it builds your profile → researches real
 > programs with sources → scores how well each fits you, deterministically.
