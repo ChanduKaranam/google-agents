@@ -37,6 +37,8 @@ def test_root_holds_exactly_the_expected_tools() -> None:
         "get_programs",
         "match_programs",
         "get_next_steps",
+        "check_exam_requirements",
+        "get_exam_info",
         "save_alumni_findings",
         "get_alumni_signals",
         "research_agent",
@@ -168,3 +170,18 @@ def test_root_alumni_section_pins_the_presentation_rules() -> None:
     assert "denominator" in FLAT
     assert "never a guarantee" in FLAT
     assert "approved sources" in FLAT
+
+
+# --- Exams domain wiring ----------------------------------------------------
+
+
+def test_exams_instruction_pins_the_unknown_rule() -> None:
+    """Absence is unknown, never not_required — the domain's classic trap."""
+    assert "never present unknown" in FLAT
+    assert "check_exam_requirements" in ROOT_INSTRUCTION
+    assert "requirements never transfer between programs" in FLAT
+
+
+def test_exams_never_declare_a_universal_test_winner() -> None:
+    assert "never declare a universal winner" in FLAT
+    assert "get_exam_info" in ROOT_INSTRUCTION

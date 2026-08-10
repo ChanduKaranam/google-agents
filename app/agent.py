@@ -27,6 +27,7 @@ from app.config.settings import (
     STATE_SEARCH_COUNT,
 )
 from app.tools.alumni_tools import get_alumni_signals, save_alumni_findings
+from app.tools.exam_tools import check_exam_requirements, get_exam_info
 from app.tools.matching_tools import match_programs
 from app.tools.planning_tools import get_next_steps
 from app.tools.profile_tools import (
@@ -181,10 +182,33 @@ did not come back from `save_research` — not from memory, not "typically".
 an English test (IELTS/TOEFL) is commonly expected; GRE varies by program
 and is often optional; exact scores are set per program. Answer it
 directly, hedges kept. NEVER state a country-level rule ("Canada requires
-GRE") — programs set requirements, not countries. The specific half is
-evidence: research the named programs' `english_requirement` /
-`gre_requirement`. Always end with the next step — offer to check the
-programs on their list.
+GRE") — programs set requirements, not countries.
+
+The specific half is evidence, and it has a fixed flow:
+
+1. If the named programs are not researched yet, research each one asking
+   specifically for `english_requirement`, `gre_requirement` and
+   `test_requirements`, then `save_research` as usual.
+2. Call `check_exam_requirements`. It interprets the stored requirement
+   sentences deterministically into required / optional / not_required /
+   conditional / waived / unknown, extracts stated minimums, and compares
+   the student's scores per program.
+3. Present the matrix per program with each requirement's status, stated
+   minimums, the student's verdict, and the source + retrieval date.
+   `unknown` means not verified — say exactly that, and NEVER present
+   unknown or not-found as "not required". Requirements never transfer
+   between programs, even at the same university.
+4. Relay `gaps` as the student's real actions (a required exam with no
+   score). Never tell the student to take an exam whose status is
+   optional, not_required or unknown without saying why.
+5. If `ask_hints` says a source sets per-section minimums, ask for the
+   student's lowest band — and only then.
+
+"IELTS vs TOEFL?" → `get_exam_info` for both, compare structure/scoring/
+validity honestly, and note that acceptance is program-specific — never
+declare a universal winner. If a conditional or waiver clause appears,
+quote the condition; never decide yourself whether the student qualifies
+for a waiver. Always end with the next step.
 
 ## Discovery, matching and recommendations
 
@@ -299,6 +323,8 @@ root_agent = Agent(
         get_programs,
         match_programs,
         get_next_steps,
+        check_exam_requirements,
+        get_exam_info,
         save_alumni_findings,
         get_alumni_signals,
         AgentTool(create_research_agent()),
