@@ -35,6 +35,9 @@ def test_root_holds_exactly_the_expected_tools() -> None:
         "clear_profile",
         "save_research",
         "get_programs",
+        "resolve_university_name",
+        "compare_programs",
+        "find_faculty_matches",
         "match_programs",
         "get_next_steps",
         "check_exam_requirements",
@@ -206,3 +209,22 @@ def test_calculation_instruction_forbids_head_math_and_universal_conversion() ->
 def test_payback_language_is_assumption_bound() -> None:
     assert "under these assumptions" in FLAT
     assert "never a promise of recovery" in FLAT
+
+
+# --- University domain wiring -------------------------------------------------
+
+
+def test_university_instruction_pins_the_comparison_rules() -> None:
+    assert "unknown stays unknown" in FLAT
+    assert "never produce a single composite ranking" in FLAT
+    assert "compare_programs" in ROOT_INSTRUCTION
+
+
+def test_faculty_rules_forbid_supervision_claims() -> None:
+    assert "will supervise" in FLAT  # ...never state or imply
+    assert "find_faculty_matches" in ROOT_INSTRUCTION
+
+
+def test_ambiguous_names_are_questions() -> None:
+    assert "resolve_university_name" in ROOT_INSTRUCTION
+    assert "never guess" in FLAT

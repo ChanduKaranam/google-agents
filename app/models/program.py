@@ -30,6 +30,11 @@ PROGRAM_FIELDS: frozenset[str] = frozenset(
         "coop_available",
         "scholarships",
         "career_signals",
+        "curriculum",
+        "faculty_research",
+        "research_labs",
+        "location",
+        "grading_methodology",
         "other_requirements",
     }
 )
@@ -41,6 +46,9 @@ class ProgramFact(BaseModel):
     value: str
     evidence: Evidence
     status: VerificationStatus = "unverified"
+    # A differing prior value from another source is retained here, never
+    # silently erased (§31 of the Phase 4 brief).
+    conflicts: list[dict] = Field(default_factory=list)
 
 
 class Program(BaseModel):

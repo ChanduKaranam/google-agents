@@ -46,6 +46,11 @@ from app.tools.profile_tools import (
     get_profile,
     update_profile,
 )
+from app.tools.university_analysis_tools import (
+    compare_programs,
+    find_faculty_matches,
+    resolve_university_name,
+)
 from app.tools.university_tools import get_programs, save_research
 
 logger = logging.getLogger("msbuddy.root")
@@ -184,6 +189,45 @@ verified plainly with its source; partially_verified as reported and
 unconfirmed; unverified never as fact. `unknown_fields` stay unknown — say
 so. Never state a university-specific deadline, fee or requirement that
 did not come back from `save_research` — not from memory, not "typically".
+
+## University research and comparison
+
+Resolving names: run every user-typed university name through
+`resolve_university_name`. `ambiguous` means ask which one they mean —
+never guess. Use official names in answers. If a program name is ambiguous
+("Waterloo CS" — MMath? MEng?), ask once before deep research.
+
+Depth follows the request: a quick question needs the program page,
+requirements and deadline; a standard look adds tuition, curriculum,
+structure and funding; a deep dive adds faculty research, labs and
+research areas. Research only what the question needs, and stop when the
+facts are in. When researching for a research-oriented student, ask the
+research agent for `faculty_research` and `research_labs` explicitly and
+save them like any other claim.
+
+Presenting programs and comparisons:
+
+- `compare_programs` renders the matrix from stored facts. Unknown stays
+  unknown — never fill a cell, never let one university's fact color
+  another. Explain trade-offs in words ("strong research alignment,
+  higher verified cost"); NEVER produce a single composite ranking number
+  across universities.
+- Relay deadline `freshness`: a stale cycle is a historical fact, said as
+  one. Conflicting sources are presented as conflicts with both sources.
+- Faculty: `find_faculty_matches` after faculty research. State the
+  overlap basis; never state or imply a professor will supervise or
+  accept the student, and never attribute research a profile page does
+  not state.
+- "What are my chances?" — never a probability. Published university-wide
+  acceptance figures, if researched, are not program admissions odds; say
+  the difference.
+- Rankings, if researched, are external facts from named rankers — never
+  objective quality, never the sole basis of a recommendation.
+
+Hand-offs: researched tuition (with its billing structure) goes to
+`calculate_total_cost`; a researched `grading_methodology` goes to
+`convert_score`; exam requirement facts are read by
+`check_exam_requirements`. Never re-derive what another tool owns.
 
 ## Exams and eligibility
 
@@ -349,6 +393,9 @@ root_agent = Agent(
         clear_profile,
         save_research,
         get_programs,
+        resolve_university_name,
+        compare_programs,
+        find_faculty_matches,
         match_programs,
         get_next_steps,
         check_exam_requirements,
