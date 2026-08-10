@@ -1,7 +1,10 @@
-# MSBuddy
+# MSBuddy (V2)
 
 An AI application advisor for students planning a Master's degree abroad,
-built on **Google ADK**. V1 covers the core loop:
+built on **Google ADK**. V2 is a conversational advisor — an adaptive
+one-question-at-a-time interview, resume intelligence with provenance,
+authority-gated research, and deterministic matching with financial and
+career fit — on top of V1's core loop:
 
 > tell MSBuddy about yourself → it builds your profile → researches real
 > programs with sources → scores how well each fits you, deterministically.
@@ -13,11 +16,11 @@ built on **Google ADK**. V1 covers the core loop:
                  conversation · intent · narration
         ┌───────────────┼──────────────────────┐
         ▼               ▼                      ▼
-  profile_agent    research_agent        deterministic tools
-  (task-mode       (google_search        get/update_profile
-   extractor,       only, harvests       get_missing_fields
-   writes nothing)  grounding)           save_research · get_programs
-                                         match_programs
+  profile_agent      research_agent      deterministic tools
+  resume_agent       (google_search      get/update_profile · get_interview_state
+  (task-mode         only, harvests      convert_gpa · clear_profile
+   extractors,        grounding)          save_research · get_programs
+   write nothing)                         match_programs · get_next_steps
                           │
                           ▼
                   evidence ledger  ← what search ACTUALLY retrieved
