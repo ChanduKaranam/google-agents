@@ -20,6 +20,15 @@ SEARCH_MODEL = os.environ.get("MSBUDDY_SEARCH_MODEL", "gemini-2.5-flash")
 MATCH_WEIGHTS = MatchWeights()
 CATEGORY_THRESHOLDS = DEFAULT_CATEGORY_THRESHOLDS
 
+# Phase 10 strategy dimensions — how the cross-domain shortlist weighs its
+# scored dimensions. Configurable in one place; unevaluable dimensions are
+# renormalized out, never scored 0.
+STRATEGY_WEIGHTS: dict[str, float] = {
+    "profile_alignment": 0.5,
+    "financial_fit": 0.3,
+    "application_readiness": 0.2,
+}
+
 # --- Session state keys -----------------------------------------------------
 # `user:` prefix = persistent per-user in ADK; bare = session-scoped.
 STATE_PROFILE = "user:student_profile"

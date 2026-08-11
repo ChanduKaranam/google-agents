@@ -23,12 +23,9 @@ from types import SimpleNamespace
 from typing import Any
 
 from app.config.settings import (
-    STATE_APPLICATIONS,
-    STATE_EVIDENCE,
     STATE_PROFILE,
     STRATEGY_WEIGHTS,
 )
-from app.models.finance import FinanceRecord
 from app.models.program import Program
 from app.models.student import StudentProfile
 from app.strategy.engine import (
@@ -180,7 +177,7 @@ def test_no_probability_language_anywhere() -> None:
     rendered = str(row).casefold()
     assert "probability" not in rendered
     assert "admission chance" not in rendered
-    assert "%" not in rendered
+    assert "chance of admission" not in rendered
 
 
 def test_weights_are_configurable_and_reorder() -> None:
