@@ -1,0 +1,10 @@
+.git/
+__pycache__/
+*.pyc
+.adk/
+# The agent's .env holds AGENT_AUTH_SECRET and, during local testing, a dev
+# access token. Cloud Run gets its configuration from --set-env-vars; a .env in
+# the image would let a dev identity reach a deployment.
+**/.env
+**/.env.*
+*.mine-superseded

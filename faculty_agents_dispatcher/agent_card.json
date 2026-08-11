@@ -1,0 +1,86 @@
+{
+  "name": "champion-faculty",
+  "description": "Sends a professor's newly created AI agent to their students. Paste the agent's share link and say which section, year and branch to send it to; it confirms the student count before sending over WhatsApp.",
+  "version": "1.0.0",
+  "protocolVersion": "0.3.0",
+  "preferredTransport": "JSONRPC",
+  "url": "https://localhost:8080/",
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "send_agent",
+      "name": "Send an agent",
+      "description": "Publish a Gemini Enterprise agent to sections and send the link to those students over WhatsApp, after confirming how many people it reaches.",
+      "tags": [
+        "send",
+        "whatsapp",
+        "sections",
+        "publish"
+      ],
+      "examples": [
+        "Send an agent to my students",
+        "Show the section list"
+      ]
+    },
+    {
+      "id": "progress",
+      "name": "Activation progress",
+      "description": "How much of the department has activated, section by section, and how the sections rank against each other.",
+      "tags": [
+        "progress",
+        "activation",
+        "leaderboard",
+        "sections"
+      ],
+      "examples": [
+        "How is my department doing?",
+        "Show the leaderboard"
+      ]
+    },
+    {
+      "id": "ambassadors",
+      "name": "Ambassadors",
+      "description": "The department's student ambassadors, which sections have gone quiet, and which have no ambassador at all.",
+      "tags": [
+        "ambassadors",
+        "sections",
+        "activity"
+      ],
+      "examples": [
+        "Who are my ambassadors?"
+      ]
+    },
+    {
+      "id": "agent_usage",
+      "name": "My agents",
+      "description": "The professor's published agents and how much students actually use them.",
+      "tags": [
+        "agents",
+        "usage",
+        "reach"
+      ],
+      "examples": [
+        "How are my agents used?"
+      ]
+    }
+  ],
+  "capabilities": {
+    "streaming": true,
+    "extensions": [
+      {
+        "uri": "https://a2ui.org/a2a-extension/a2ui/v0.8",
+        "required": false,
+        "params": {
+          "supportedCatalogIds": [
+            "https://a2ui.org/specification/v0_8/standard_catalog_definition.json"
+          ]
+        }
+      }
+    ]
+  }
+}

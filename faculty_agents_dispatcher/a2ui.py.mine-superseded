@@ -1,0 +1,140 @@
+"""A2UI payloads, so the professor picks sections instead of typing them.
+
+Two things make this worth doing. A bare section name is ambiguous — every
+department has a "Sec A" in every year — and a section string Sethu cannot
+resolve is published to zero students rather than rejected. A picker removes
+both failure modes at the source: the professor chooses from the roster, so
+what we publish is always a label Sethu already knows.
+
+Wire format, measured against ADK 2.6.1's own renderer rather than assumed:
+
+The console scans the agent's message text for a `<a2ui-json>…</a2ui-json>`
+block (`extractA2uiJsonFromText` in the browser bundle), parses it as a list,
+sorts entries by their single top-level key, strips the block from the visible
+text, and renders through `app-a2ui-canvas`. So emitting UI is a matter of
+appending one fenced block to what the model already said.
+
+There is a second path — an A2A DataPart carrying `application/json+a2ui` —
+which is what a hosted A2A agent would use. The text path needs no A2A server,
+so it is what this module targets.
+
+Message shapes are v0.8: a flat adjacency list of components referenced by id,
+with `beginRendering` naming the root.
+"""
+
+_SURFACE = 'sections'
+_CATALOG = 'https://a2ui.org/specification/v0_8/standard_catalog_definition.json'
+
+OPEN, CLOSE = '<a2ui-json>', '</a2ui-json>'
+
+# Where the picker's selections live in the surface data model. The
+# MultipleChoice binds to this path, so the selected labels can be read back.
+SELECTION_PATH = '/chosen'
+
+
+def block(messages: list) -> str:
+    """Wrap A2UI messages in the fence the ADK console looks for."""
+    import json
+
+    return f'{OPEN}\n{json.dumps(messages, ensure_ascii=False)}\n{CLOSE}'
+
+
+def section_picker(sections: list, description: str) -> list:
+    """A section chooser, with a confirm button.
+
+    `sections` is the roster from `list_faculty_sections` — objects carrying
+    `label` and `students`. The option value is the exact label, because that
+    is the string `publish_agent` must send; showing the headcount alongside
+    lets a professor notice an empty section before they commit.
+
+    How many sections can be chosen at once is the renderer's decision, not
+    ours. ADK's console gives a single-select dropdown; a renderer that
+    implements the catalog's `variant`/`filterable` would give a filterable
+    checklist. The payload asks for the richer form and degrades to the
+    simpler one.
+    """
+    options = [
+        {
+            'label': {
+                'literalString': f'{s["label"]}  ({s.get("students", 0)})'
+            },
+            'value': s['label'],
+        }
+        for s in sections
+        if s.get('label')
+    ]
+
+    components = [
+        {
+            'id': 'root',
+            'component': {
+                'Column': {
+                    'children': {
+                        # No separate heading component: the renderer already
+                        # shows MultipleChoice's `description` above the
+                        # control, and a Text above it just repeats itself.
+                        'explicitList': ['picker', 'confirm']
+                    }
+                }
+            },
+        },
+        {
+            'id': 'picker',
+            'component': {
+                'MultipleChoice': {
+                    'options': options,
+                    # ADK's console renders MultipleChoice as a plain <select>
+                    # and reads exactly `options`, `value` and `description`
+                    # (see a2ui-multiple-choice in its browser bundle). It
+                    # writes the chosen option into `value.path` on change.
+                    'value': {'path': SELECTION_PATH},
+                    'description': description,
+                    # Spec-catalog properties. That renderer ignores all three
+                    # — it has no multi-select and no filter — but a renderer
+                    # implementing the full v0.8 catalog, such as Gemini
+                    # Enterprise may, will honour them. Harmless where unread.
+                    'selections': {'path': SELECTION_PATH},
+                    'variant': 'checkbox',
+                    'filterable': True,
+                }
+            },
+        },
+        {
+            'id': 'confirm_label',
+            'component': {
+                'Text': {'text': {'literalString': 'Use these sections'}}
+            },
+        },
+        {
+            'id': 'confirm',
+            'component': {
+                'Button': {
+                    'child': 'confirm_label',
+                    'primary': True,
+                    'action': {
+                        'name': 'sections_chosen',
+                        'context': [
+                            {'key': 'sections', 'value': {'path': SELECTION_PATH}}
+                        ],
+                    },
+                }
+            },
+        },
+    ]
+
+    return [
+        {'surfaceUpdate': {'surfaceId': _SURFACE, 'components': components}},
+        {
+            'dataModelUpdate': {
+                'surfaceId': _SURFACE,
+                'contents': [],
+            }
+        },
+        {
+            'beginRendering': {
+                'surfaceId': _SURFACE,
+                'catalogId': _CATALOG,
+                'root': 'root',
+            }
+        },
+    ]

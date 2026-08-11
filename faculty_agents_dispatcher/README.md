@@ -1,7 +1,7 @@
-# Faculty-Agent (Dispatcher Agent)
+# Champion Faculty (Dispatcher Agent)
 
 An ADK agent that lives in Gemini Enterprise. A professor pastes the link to an
-AI agent they just created and asks Faculty-Agent to share it; Faculty-Agent
+AI agent they just created and asks Champion Faculty to share it; Champion Faculty
 checks the sections against the college's roster, confirms the send, and
 triggers the WhatsApp blast.
 
@@ -68,9 +68,9 @@ The guard keys on the agent id alone, not on the section list.
 | `sethu_client.py` | The only file that knows Sethu's HTTP shape |
 | `config.py` | Environment configuration |
 | `sethu_openapi.json` | Sethu's spec. Stale in places — see below |
-| `SETHU-403-faculty-sections.md` | Bug report for the backend team |
 | `SETHU-whatsapp-notify-500.md` | 🔴 Blocker: WhatsApp send returns 500 |
-| `SETHU-proposal-sections-endpoint.md` | Proposal: server-to-server sections endpoint |
+| `SETHU-proposal-student-sections.md` | Proposal: student-facing sections endpoint, for per-section access control |
+| `A2UI-VIEWS.md` | The card interface: views built, views requested, and what each needs from Sethu |
 
 ## Setup
 
@@ -104,7 +104,7 @@ Verified 2026-08-03 against the live project:
 | | |
 | --- | --- |
 | Project | `supadha-dev` (`1019856256943`) |
-| Agent Engine | `projects/supadha-dev/locations/us-central1/reasoningEngines/7549916988647145472` — *Faculty Dispatcher Agent* |
+| Agent Engine | `projects/supadha-dev/locations/us-central1/reasoningEngines/7549916988647145472` — *Champion Faculty* |
 | Gemini Enterprise app | `AI_GE` (`ai-ge_1784736359549`, global) |
 | Registered agent | `12220860024771704401`, state `ENABLED`, bound to engine `7549916988647145472` |
 | Authorization resource | `projects/1019856256943/locations/global/authorizations/sethu-faculty` |
@@ -119,7 +119,7 @@ agent package folder as the final argument:
 ```bash
 adk deploy agent_engine --project=supadha-dev --region=us-central1 \
   --agent_engine_id=7549916988647145472 \
-  --display_name="Faculty Dispatcher Agent" faculty_dispatcher
+  --display_name="Champion Faculty" faculty_agents_dispatcher
 ```
 
 `AGENT_AUTH_SECRET` must reach the deployment — confirm it lands as an env var

@@ -86,6 +86,15 @@ def _google_access_token(tool_context: ToolContext) -> str:
         if looks_like_access_token(value):
             return value
 
+    # On the A2A runtime there is no platform template writing the token into
+    # session state; it arrives as an Authorization header and the identity
+    # interceptor publishes it for the duration of the request.
+    from . import identity
+
+    token = identity.current_access_token()
+    if token:
+        return token
+
     if config.DEV_GOOGLE_ACCESS_TOKEN:
         return config.DEV_GOOGLE_ACCESS_TOKEN
 

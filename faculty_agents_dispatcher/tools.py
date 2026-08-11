@@ -6,10 +6,32 @@ OpenAPI document and the team guide: there is no `claim` and no
 share link and the sections together, and a separate `notify` does the send.
 """
 
+import logging
+import uuid
+
 from google.adk.tools import ToolContext
 
-from . import auth, config, sethu_client
+from . import auth, config, progress_ui, sethu_client
 from .sethu_client import SethuError
+
+# Set by `show_section_picker`, read by the after-agent callback that draws the
+# card. The payload never travels through the model: it is thousands of
+# characters of JSON, and a model asked to echo it will eventually corrupt it
+# into a card that silently fails to render.
+PENDING_UI = 'pending_a2ui'
+
+# The roster the picker was built from, so a click can be resolved without
+# re-fetching, and the sections the professor has chosen so far.
+ROSTER_CACHE = 'roster_cache'
+CHOSEN_SECTIONS = 'chosen_sections'
+
+# How widely this send goes, chosen on the Send Agent card. It decides what a
+# later department tap means: pick every section in that department, or drill
+# down to one.
+SEND_SCOPE = 'send_scope'
+
+# The link the professor pasted into the card's text field.
+PENDING_LINK = 'pending_agent_link'
 
 # Session-state key recording the exact agent the professor was shown a student
 # count for. Sending requires an exact match, so a confirmation given for one
@@ -22,8 +44,70 @@ _QUOTED_SEND = 'quoted_send'
 # code, where no amount of prompt drift can get past it.
 _QUOTED_COUNT = 'quoted_send_count'
 
+# Agents this session has already sent. The confirmation card stays on screen
+# after the send, so a professor can tap "Yes, send it" a second time — and
+# nothing about the card says it has been spent. Sending again would put a
+# duplicate WhatsApp message in front of every student, so a repeat tap is
+# answered rather than acted on.
+SENT_AGENTS = 'sent_agents'
+
+# The Idempotency-Key for the send in flight, kept per agent so a retry, a
+# re-click, or a second attempt after a timeout is the SAME send to Sethu
+# rather than a second blast at the same students.
+SEND_KEY = 'send_idempotency_key'
+
+# Said when Sethu stops answering mid-send. It deliberately does not claim the
+# send failed: a read timeout means the request may well have been processed,
+# and telling a professor "nothing was sent" when 60 students already have the
+# message is the worse of the two wrong answers.
+SEND_UNCONFIRMED_MESSAGE = (
+    'Sethu did not answer in time, so I cannot tell you whether the messages '
+    'went out. They may have. Check the agent in Sethu before trying again — '
+    'if you do try again, students who already received it will not be '
+    'messaged twice.'
+)
+
+# What a repeat confirmation is answered with, in code rather than by the
+# model, so the professor gets the same sentence every time.
+ALREADY_SENT_MESSAGE = (
+    'Already sent — this agent went out to those sections earlier, so nothing '
+    'was sent again.'
+)
+
+# A confirmation card that can no longer be acted on. Distinct from
+# ALREADY_SENT_MESSAGE because we genuinely cannot tell the two apart: a card
+# left from before this session — or from before the send guard existed — has
+# no recorded state either way. It says what is certain (nothing went out just
+# now) and nothing it cannot back up.
+STALE_CONFIRMATION_MESSAGE = (
+    'That confirmation is no longer current, so nothing was sent just now. If '
+    'this agent has not gone out yet, start again from Send Agent.'
+)
+
 # Sethu stores the Gemini Enterprise share link on the agent record as `geUrl`.
 _LINK_FIELD = 'geUrl'
+
+
+def confirmation_status(state, agent_id: str) -> str:
+    """Whether a tapped "Yes, send it" can still be acted on.
+
+    The card stays on screen for the rest of the conversation, long after the
+    state that produced it is gone, so a tap has to be classified before it is
+    obeyed.
+
+        'sent'  this agent already went out in this session.
+        'stale' the quoted count no longer belongs to this agent — the send was
+                spent, the session was cleared, or a later publish replaced it.
+        'live'  the count the professor is looking at is still this agent's.
+    """
+    if agent_id in (state.get(SENT_AGENTS) or []):
+        return 'sent'
+    if state.get(_QUOTED_SEND) != agent_id:
+        return 'stale'
+    return 'live'
+
+
+logger = logging.getLogger(__name__)
 
 
 def _error(message: str) -> dict:
@@ -138,6 +222,328 @@ def _same_link(a: str, b: str) -> bool:
     return bool(a) and bool(b) and a.strip().rstrip('/') == b.strip().rstrip('/')
 
 
+def show_main_menu(tool_context: ToolContext) -> dict:
+    """Offer the professor the things this agent can do, as buttons.
+
+    Call this when they greet you, ask what you can do, or open the
+    conversation without a request. Reply with one short line — the buttons
+    appear underneath it — and do not list the options in words.
+
+    Returns:
+        A dict with 'status'.
+    """
+    tool_context.state[PENDING_UI] = 'menu'
+    logger.info('show_main_menu: staged')
+    return {
+        'status': 'success',
+        'note': 'The menu is displayed. Wait for the professor to choose.',
+    }
+
+
+def show_section_picker(tool_context: ToolContext) -> dict:
+    """Show the professor a searchable list of sections to tick.
+
+    Prefer this over asking them to type a section whenever they have not named
+    one precisely, or when they want several. Typing is where sections go
+    wrong: "Sec A" is ambiguous across 7 departments and 4 years, and a section
+    string Sethu cannot resolve is published to zero students rather than
+    refused.
+
+    The list renders after your reply, so say something brief first — "here are
+    the sections" — and do not describe the list or repeat its contents.
+
+    Returns:
+        A dict with 'status'. On success, 'section_count' is how many were
+        offered. The professor's choices arrive in their next message.
+    """
+    try:
+        roster = _call(tool_context, sethu_client.list_faculty_sections)
+    except SethuError as exc:
+        return _error(str(exc))
+
+    if not roster:
+        return _error('Sethu lists no sections for this college.')
+
+    tool_context.state[ROSTER_CACHE] = roster
+    tool_context.state[PENDING_UI] = 'departments'
+    logger.info('show_section_picker: staged %d sections', len(roster))
+    return {
+        'status': 'success',
+        'section_count': len(roster),
+        'note': 'The picker is displayed. Wait for the professor to choose.',
+    }
+
+
+# Set once Sethu has been observed ignoring a `department` request, so the
+# switcher stops being offered rather than handing a professor buttons that
+# silently return their own department every time.
+DEPT_SWITCH_UNSUPPORTED = 'department_switch_unsupported'
+
+# The payload a progress card is drawn from. Held in state for the same reason
+# as the roster: it is kilobytes of JSON, the model has no use for it, and a
+# model asked to carry numbers through a turn will eventually change one.
+VIEW_DATA = 'view_payload'
+
+# Which view `VIEW_DATA` currently holds. Only one payload is kept, so a card
+# further up the transcript can outlive the data it was drawn from — and the
+# builders take different shapes (a dict here, a list of agents there). Paging
+# an older card without this check hands a builder the wrong shape.
+VIEW_NAME = 'view_payload_name'
+
+
+def _staged(tool_context: ToolContext, view: str, payload) -> None:
+    tool_context.state[VIEW_DATA] = payload
+    tool_context.state[VIEW_NAME] = view
+    tool_context.state[PENDING_UI] = view
+    logger.info('%s: staged', view)
+
+
+def show_department_progress(tool_context: ToolContext,
+                             department: str = '') -> dict:
+    """Show how the professor's department is doing on student activation.
+
+    Call this for "how is my department doing", "how are my sections doing",
+    "how many students have activated", or any question about activation
+    progress across sections.
+
+    The card carries every figure — the activated total, which sections are
+    behind, and the per-section breakdown. Say one short sentence and stop:
+    do not repeat the numbers, and do not describe the card. Quoting a figure
+    yourself risks quoting one the tool never returned.
+
+    Returns:
+        A dict with 'status'. On success, 'section_count' is how many sections
+        the card covers.
+    """
+    try:
+        progress = _progress(tool_context, department)
+    except SethuError as exc:
+        return _error(str(exc))
+    if not progress or not progress.get('sections'):
+        return _error('Sethu returned no activation data for this department.')
+    _log_scope(tool_context, progress)
+
+    # The idle-sections figure lives on a different endpoint. It is worth one
+    # extra call on an already-woken API, but not worth failing the whole card
+    # for: if it errors, the dashboard simply drops that line.
+    ambassadors = None
+    if config.AMBASSADOR_VIEW_ENABLED:
+        try:
+            ambassadors = _call(tool_context, sethu_client.get_ambassadors)
+        except SethuError:
+            logger.info('ambassadors unavailable; dashboard drops the idle count')
+
+    _staged(
+        tool_context,
+        progress_ui.VIEW_DEPARTMENT,
+        {
+            'progress': progress,
+            'ambassadors': ambassadors,
+            'departments': _departments(tool_context),
+            'switch_unsupported': bool(
+                tool_context.state.get(DEPT_SWITCH_UNSUPPORTED)
+            ),
+        },
+    )
+    return {
+        'status': 'success',
+        'section_count': len(progress.get('sections') or []),
+        'note': 'The card shows the figures. Do not repeat them.',
+    }
+
+
+def _departments_roster(tool_context: ToolContext) -> list:
+    """The full college roster, fetched once per session."""
+    roster = tool_context.state.get(ROSTER_CACHE)
+    if not roster:
+        try:
+            roster = _call(tool_context, sethu_client.list_faculty_sections)
+        except SethuError:
+            return []
+        tool_context.state[ROSTER_CACHE] = roster
+    return roster or []
+
+
+def _departments(tool_context: ToolContext) -> list:
+    """Every department in the college, from the roster already cached.
+
+    The roster is the only list of departments there is — the progress endpoint
+    returns one department, so it cannot name the others. Fetched only if this
+    session has not already loaded it for the section picker.
+    """
+    seen = []
+    for section in _departments_roster(tool_context):
+        name = section.get('department')
+        if name and name not in seen:
+            seen.append(name)
+    return seen
+
+
+def _log_scope(tool_context: ToolContext, progress: dict) -> None:
+    """Record how much of the college a progress response actually covered.
+
+    The endpoint returns one department while `GET /faculty/sections` returns
+    the whole roster, so the only way to tell "all of this department" from
+    "some of it" is to count both and compare. Logged rather than shown: it is
+    a question about the API, not something a professor asked.
+    """
+    try:
+        sections = progress.get('sections') or []
+        scope = progress.get('department') or ''
+        roster = _departments_roster(tool_context)
+        # An admin or non-roster email gets `department: ""` and the whole
+        # college, so filtering by that empty name would compare against
+        # nothing and pass vacuously.
+        same_dept = ([s for s in roster if s.get('department') == scope]
+                     if scope else list(roster))
+        logger.info(
+            'scope: progress returned %d sections for %r (students %s of %s); '
+            'roster holds %d sections for %r, %d in all across %d departments',
+            len(sections), scope or '(whole college)',
+            progress.get('activated'), progress.get('total'),
+            len(same_dept), scope or '(n/a)', len(roster),
+            len({s.get('department') for s in roster if s.get('department')}),
+        )
+        missing = ({str(s.get('label')) for s in same_dept}
+                   - {str(s.get('label')) for s in sections})
+        if missing:
+            logger.warning(
+                'scope: %d section(s) on the roster are absent from '
+                'department-progress: %s',
+                len(missing), sorted(missing)[:10],
+            )
+    except Exception:  # Diagnostics must never cost a professor their card.
+        logger.exception('scope logging failed')
+
+
+def _progress(tool_context: ToolContext, department: str | None):
+    """Fetch progress, and notice if Sethu refused to change department."""
+    progress = _call(
+        tool_context,
+        lambda token: sethu_client.get_department_progress(token, department),
+    )
+    if department and progress:
+        returned = progress.get('department')
+        if returned and returned != department:
+            # Asked for one department, given another: the scope is fixed to
+            # the caller's own. Recorded so the buttons stop being offered.
+            tool_context.state[DEPT_SWITCH_UNSUPPORTED] = True
+            logger.info(
+                'department switch ignored: asked %r, got %r', department,
+                returned,
+            )
+    return progress
+
+
+def show_leaderboard(tool_context: ToolContext,
+                     department: str = '') -> dict:
+    """Show the sections ranked by how much of each has activated.
+
+    Call this for "show the leaderboard", "which sections are doing best", or
+    "rank my sections".
+
+    The ranking and the pooling of small sections are decided by Sethu and
+    shown as given. Never re-order the list in your reply or describe a section
+    as first or last yourself — say one short sentence and stop.
+
+    Returns:
+        A dict with 'status' and 'section_count'.
+    """
+    try:
+        progress = _progress(tool_context, department)
+    except SethuError as exc:
+        return _error(str(exc))
+    if not progress or not progress.get('sections'):
+        return _error('Sethu returned no activation data for this department.')
+    _log_scope(tool_context, progress)
+
+    _staged(tool_context, progress_ui.VIEW_LEADERBOARD, {
+        'progress': progress,
+        'departments': _departments(tool_context),
+        'switch_unsupported': bool(
+            tool_context.state.get(DEPT_SWITCH_UNSUPPORTED)
+        ),
+    })
+    return {
+        'status': 'success',
+        'section_count': len(progress.get('sections') or []),
+        'note': 'The card shows the ranking. Do not repeat or re-order it.',
+    }
+
+
+def show_ambassadors(tool_context: ToolContext) -> dict:
+    """Show the department's student ambassadors and which sections are quiet.
+
+    Call this for "who are my ambassadors", "how are my ambassadors", "are my
+    ambassadors active", or "ambassador status".
+
+    What the card calls quiet is the absence of *student* activations in that
+    ambassador's section — Sethu does not record what an ambassador personally
+    did. Never restate it as the ambassador having done nothing: that is an
+    accusation about a named person the data cannot support.
+
+    Returns:
+        A dict with 'status' and 'ambassador_count'.
+    """
+    if not config.AMBASSADOR_VIEW_ENABLED:
+        return _error(
+            'The ambassador view is switched off for this deployment. Tell the '
+            'professor it is not available, and offer the department progress '
+            'card instead.'
+        )
+    try:
+        data = _call(tool_context, sethu_client.get_ambassadors)
+    except SethuError as exc:
+        return _error(str(exc))
+    if not data:
+        return _error('Sethu returned no ambassador data for this department.')
+
+    logger.info(
+        'scope: ambassadors returned %d for %r, %d section(s) with none',
+        len(data.get('ambassadors') or []), data.get('department'),
+        len(data.get('sectionsWithoutAmbassador') or []),
+    )
+    _staged(tool_context, progress_ui.VIEW_AMBASSADORS, data)
+    return {
+        'status': 'success',
+        'ambassador_count': len(data.get('ambassadors') or []),
+        'note': 'The card shows the roster and the summary. Do not repeat them.',
+    }
+
+
+def show_agent_usage(tool_context: ToolContext) -> dict:
+    """Show the professor's published agents and how much they are used.
+
+    Call this for "how are my agents used", "which of my agents is working", or
+    "show my agents".
+
+    Chat volume, return rate and unanswered topics are not populated yet — a
+    sync that would fill them does not run. The card says so where it applies.
+    Do not fill the gap with a number of your own, and do not report a missing
+    figure as zero: an agent nobody has measured is not an agent nobody uses.
+
+    Returns:
+        A dict with 'status' and 'agent_count'.
+    """
+    try:
+        agents = _call(tool_context, sethu_client.list_faculty_agents)
+    except SethuError as exc:
+        return _error(str(exc))
+    if not agents:
+        return _error('This professor has no published agents yet.')
+
+    logger.info(
+        'scope: agents returned %d, %d of them sent to sections',
+        len(agents), sum(1 for a in agents if a.get('sections')),
+    )
+    _staged(tool_context, progress_ui.VIEW_AGENT_USAGE, agents)
+    return {
+        'status': 'success',
+        'agent_count': len(agents),
+        'note': 'The card shows each agent. Do not repeat the figures.',
+    }
+
+
 def _summarise(agent: dict) -> dict:
     """The fields the model needs to talk about an agent with the professor."""
     return {
@@ -228,7 +634,6 @@ def find_agent_by_link(agent_link: str, tool_context: ToolContext) -> dict:
 def publish_agent(
     agent_link: str,
     name: str,
-    semester: str,
     sections: list[str],
     tool_context: ToolContext,
 ) -> dict:
@@ -245,7 +650,6 @@ def publish_agent(
     Args:
         agent_link: The full https:// share URL from Gemini Enterprise.
         name: What the professor calls the agent, e.g. "CS101 TA".
-        semester: The semester it is for, e.g. "1".
         sections: Section labels as plain strings, exactly as they appear in
             the 'label' field from list_college_sections, e.g.
             ["CSE · Year 1 · Sec A"]. Never a bare section letter — that does
@@ -287,7 +691,7 @@ def publish_agent(
         agent = _call(
             tool_context,
             lambda token: sethu_client.publish_faculty_agent(
-                token, link, name, semester, sections
+                token, link, name, sections
             ),
         )
     except SethuError as exc:
@@ -393,7 +797,16 @@ def send_agent_to_sections(agent_id: str, tool_context: ToolContext) -> dict:
 
     Returns:
         A dict with 'status'. On success, 'result' is Sethu's send result.
+        'already_sent' means this agent has gone out already and nothing was
+        done — tell the professor exactly what 'message' says.
     """
+    already = list(tool_context.state.get(SENT_AGENTS) or [])
+    if agent_id in already:
+        # Checked before the quoted-count guard: both refuse the send, but only
+        # this one knows why, and the other's wording would send the model
+        # hunting for a count that is not the problem.
+        return {'status': 'already_sent', 'message': ALREADY_SENT_MESSAGE}
+
     if tool_context.state.get(_QUOTED_SEND) != agent_id:
         return _error(
             'Quote the student count for this exact agent first, then ask the '
@@ -411,15 +824,35 @@ def send_agent_to_sections(agent_id: str, tool_context: ToolContext) -> dict:
             'send.'
         )
 
+    # One key per send, minted on the first attempt and reused afterwards.
+    keys = dict(tool_context.state.get(SEND_KEY) or {})
+    key = keys.get(agent_id)
+    if not key:
+        key = str(uuid.uuid4())
+        keys[agent_id] = key
+        tool_context.state[SEND_KEY] = keys
+
+    logger.info('notify: agent %s, %s students, key %s', agent_id, quoted, key)
     try:
         result = _call(
             tool_context,
-            lambda token: sethu_client.notify_agent_sections(token, agent_id),
+            lambda token: sethu_client.notify_agent_sections(
+                token, agent_id, key
+            ),
         )
     except SethuError as exc:
+        logger.warning('notify failed for agent %s: %s', agent_id, exc)
+        if exc.status_code is None:
+            # No HTTP status means we never got an answer — a timeout or a
+            # dropped connection. Whether Sethu acted on it is unknowable from
+            # here, so say exactly that.
+            return {'status': 'unconfirmed',
+                    'error_message': SEND_UNCONFIRMED_MESSAGE}
         return _error(str(exc))
 
+    logger.info('notify: agent %s accepted by Sethu', agent_id)
     # A send must not be replayable on a stray second "yes".
+    tool_context.state[SENT_AGENTS] = already + [agent_id]
     tool_context.state[_QUOTED_SEND] = None
     tool_context.state[_QUOTED_COUNT] = None
     return {'status': 'success', 'result': result}

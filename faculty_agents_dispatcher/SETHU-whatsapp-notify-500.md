@@ -1,4 +1,27 @@
-# WhatsApp send is broken: `POST /faculty/agents/{id}/notify` returns 500
+# ✅ RESOLVED 2026-08-04 — WhatsApp send now works
+
+Confirmed by the Sethu backend team's fix and verified end to end through the
+Gemini Enterprise agent: a professor published an agent and the WhatsApp
+message was delivered. This was the first successful send through this
+integration.
+
+Kept below as the original report and as the record of what was measured.
+
+**Still open, and not covered by this fix:**
+
+1. **Is `notify` idempotent?** Unanswered. Until it is, the agent must not
+   offer a professor a retry after a failed send — a retry may double-message
+   students.
+2. **Does a freshly published agent get a correct `studentCount`?** Agents
+   published 2026-08-03 all carried 0. The agent now quotes the roster's
+   per-section headcount instead, so this no longer blocks a send, but the two
+   numbers should agree.
+3. **Which channels fire?** The confirmation sentence says WhatsApp; the spec
+   says "WhatsApp and Email".
+
+---
+
+# Original report: `POST /faculty/agents/{id}/notify` returns 500
 
 **Reported:** 2026-08-03
 **Environment:** `https://sethu-dev-api.onrender.com/api/v1` (dev)
