@@ -1,13 +1,13 @@
-"""Phase 1 — profile hardening: conflicts, backlogs, enrichment.
+"""Phase 1 — profile hardening: precedence, backlogs, enrichment.
 
-The three behaviors this phase adds, pinned before implementation:
+The behaviors pinned here (updated by the conversational-intelligence
+refactor):
 
-* **Cross-source conflicts are detected, never silently resolved.** A
-  resume CGPA of 8.2 against a conversation CGPA of 8.5 keeps the stored
-  value, reports the conflict with both sources, and leaves resolution to
-  the student (who resolves via source `user_confirmed`). Same-source
-  corrections still win immediately — a student correcting themselves is
-  not a conflict.
+* **Precedence resolves cross-source differences silently.** A resume
+  CGPA of 8.2 arriving after a conversation CGPA of 8.5 keeps the
+  student's value and reports it as `retained` history — the student is
+  never asked to reconcile. `user_confirmed` still overrides anything.
+  Same-source corrections still win immediately.
 * **Backlogs distinguish zero from unknown.** `backlogs=0` is a fact;
   `backlogs=None` is a gap. They must never collapse into each other.
 * **Skill/project enrichment is derived, based, and never stated.**
@@ -44,57 +44,62 @@ def put(context, source: str, **sections) -> dict:
     return update_profile({"profile": sections}, source, context)
 
 
-# --- Cross-source conflicts (§6) --------------------------------------------
+# --- Cross-source precedence (refactor §2-§4) --------------------------------
 
 
-def test_a_cross_source_conflict_is_detected_not_resolved(
+def test_a_lower_authority_source_is_retained_not_asked_about(
     context: StubToolContext,
 ) -> None:
     put(context, "user_explicit", education={"cgpa": 8.5})
     result = put(context, "resume", education={"cgpa": 8.2})
 
     assert result["status"] == "success"
-    conflict = result["conflicts"][0]
-    assert conflict["field"] == "education.cgpa"
-    assert conflict["existing_value"] == 8.5
-    assert conflict["existing_source"] == "user_explicit"
-    assert conflict["incoming_value"] == 8.2
-    assert conflict["incoming_source"] == "resume"
-    # The stored value did not silently change.
+    kept = result["retained"][0]
+    assert kept["field"] == "education.cgpa"
+    assert kept["kept_value"] == 8.5
+    assert kept["kept_source"] == "user_explicit"
+    assert kept["incoming_value"] == 8.2
+    assert kept["incoming_source"] == "resume"
+    # The student's value stands; nothing asks them to reconcile.
     assert get_profile(context)["profile"]["education"]["cgpa"] == 8.5
+    assert "conflicts" not in result
 
 
 def test_a_same_source_correction_still_wins(context: StubToolContext) -> None:
     put(context, "user_explicit", education={"cgpa": 8.5})
     result = put(context, "user_explicit", education={"cgpa": 8.6})
-    assert result["conflicts"] == []
+    assert result["retained"] == []
     assert get_profile(context)["profile"]["education"]["cgpa"] == 8.6
 
 
-def test_user_confirmed_resolves_a_conflict(context: StubToolContext) -> None:
+def test_user_confirmed_overrides_anything(context: StubToolContext) -> None:
     put(context, "user_explicit", education={"cgpa": 8.5})
     put(context, "resume", education={"cgpa": 8.2})
     result = put(context, "user_confirmed", education={"cgpa": 8.2})
-    assert result["conflicts"] == []
+    assert result["retained"] == []
     assert get_profile(context)["profile"]["education"]["cgpa"] == 8.2
     assert get_profile(context)["provenance"]["education.cgpa"]["source"] == (
         "user_confirmed"
     )
 
 
-def test_resume_filling_a_gap_is_not_a_conflict(context: StubToolContext) -> None:
+def test_resume_filling_a_gap_is_not_retained_history(
+    context: StubToolContext,
+) -> None:
     put(context, "user_explicit", target={"country": "Canada"})
     result = put(context, "resume", education={"cgpa": 8.2})
-    assert result["conflicts"] == []
+    assert result["retained"] == []
     profile = get_profile(context)["profile"]
     assert profile["target"]["country"] == "Canada"  # §5: both survive
     assert profile["education"]["cgpa"] == 8.2
 
 
-def test_conflicting_university_is_also_caught(context: StubToolContext) -> None:
+def test_a_differing_institution_is_also_precedence_resolved(
+    context: StubToolContext,
+) -> None:
     put(context, "user_explicit", education={"institution": "Lendi"})
     result = put(context, "resume", education={"institution": "LIET"})
-    assert result["conflicts"][0]["field"] == "education.institution"
+    assert result["retained"][0]["field"] == "education.institution"
     assert get_profile(context)["profile"]["education"]["institution"] == "Lendi"
 
 
