@@ -105,6 +105,13 @@ STALE_STUDENT = ("That student is no longer on your list — they may have"
                  " activated, or moved section, since this card was drawn."
                  " Ask me who needs a message and I'll pull a fresh list.")
 
+# The two failures where no chip helps: every one of the four starter prompts
+# routes back through the same missing identity or missing Sethu
+# registration, so offering them just invites another dead end. The outage
+# and stale-card messages are transient or scoped to one student, so their
+# chip row still makes sense.
+UNAUTHORIZED_MESSAGES = frozenset((NO_IDENTITY, NOT_REGISTERED))
+
 
 def classify(status: int, path: str):
     """Which failure a Sethu HTTP status means, given the endpoint.

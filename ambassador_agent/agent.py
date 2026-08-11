@@ -211,10 +211,16 @@ def handle_click(callback_context: CallbackContext) -> types.Content | None:
                 logger.info("Unrouted turn, first 300 chars: %r", incoming[:300])
                 return None       # off-script: let the model answer freely
             reply, messages = route_question(state, incoming)
-            messages = _with_chips(messages, chips_for(intent), state)
+            if reply in sethu.UNAUTHORIZED_MESSAGES:
+                state["unauthorized"] = True
+            else:
+                messages = _with_chips(messages, chips_for(intent), state)
         else:
             reply, messages = route(state, action)
-            messages = _with_chips(messages, chips_for_action(action), state)
+            if reply in sethu.UNAUTHORIZED_MESSAGES:
+                state["unauthorized"] = True
+            else:
+                messages = _with_chips(messages, chips_for_action(action), state)
         parts = []
         if reply:
             parts.append(types.Part(text=reply))
@@ -256,6 +262,12 @@ def render_surface(callback_context: CallbackContext) -> types.Content | None:
                 return types.Content(
                     role="model", parts=to_genai_parts(messages))
 
+        if state.get("unauthorized"):
+            # Set on an earlier turn's SethuError below. Nothing has changed
+            # since -- she is still signed in as the same non-ambassador
+            # account -- so this off-script turn gets no card and no chips
+            # either, same as the turn that first told her so.
+            return None
         if state.get("greeted"):
             # Off-script turn later in the conversation: the model answered in
             # its own words, but she still gets the options back.
@@ -278,12 +290,23 @@ def render_surface(callback_context: CallbackContext) -> types.Content | None:
         # this left her with the model's
         # generic reply and NO card and NO chips -- measured in Gemini
         # Enterprise, and it reads as a dead agent. Say so, and keep the
-        # options on screen so she can try again with one tap.
+        # options on screen so she can try again with one tap -- unless no
+        # option would help: NotRegistered/NoIdentity mean every chip routes
+        # back through the same missing identity, so offering them is a dead
+        # end dressed up as a choice.
         logger.warning("Cannot draw a surface: %s", type(error).__name__)
+        message = sethu.message_for(error)
+        unauthorized = message in sethu.UNAUTHORIZED_MESSAGES
+        if unauthorized:
+            # Remembered so every later off-script turn this session skips
+            # straight to no-card-no-chips instead of re-hitting Sethu only
+            # to hear the same refusal again.
+            callback_context.state["unauthorized"] = True
+        chips = [] if unauthorized else DEFAULT_CHIPS
         return types.Content(
             role="model",
             parts=to_genai_parts(build_greeting(
-                sethu.message_for(error), DEFAULT_CHIPS,
+                message, chips,
                 surfaces_uid(callback_context.state, "greet"))))
     except Exception:  # noqa: BLE001 - a broken widget must not break the answer
         logger.warning("Could not render A2UI surface", exc_info=True)
