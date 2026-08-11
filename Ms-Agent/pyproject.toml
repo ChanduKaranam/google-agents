@@ -27,6 +27,9 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "RUF"]
 ignore = ["E501"]
+# Deliberate typography in formula docstrings/labels ("EMI = P·r·(1+r)^n",
+# "budget − cost"), not lookalike bugs.
+allowed-confusables = ["×", "−"]
 
 [build-system]
 requires = ["hatchling"]

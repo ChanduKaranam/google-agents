@@ -404,7 +404,7 @@ def calculate_match_score(
     if evaluable:
         total_weight = sum(c.weight for c in evaluable)
         raw = sum(c.score * c.weight for c in evaluable) / total_weight
-        match_score = int(round(raw))
+        match_score = round(raw)
     else:
         match_score = 0
 
