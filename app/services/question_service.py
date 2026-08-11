@@ -135,12 +135,14 @@ BASIC_PATHS = (
     "education.grading_scale",
     "target.specialization",
 )
-STRONG_PATHS = BASIC_PATHS + (
+STRONG_PATHS = (
+    *BASIC_PATHS,
     "target.intake",
     "preferences.budget",
     "test_scores.ielts",
 )
-DEEP_PATHS = STRONG_PATHS + (
+DEEP_PATHS = (
+    *STRONG_PATHS,
     "research.research_interests",
     "experience.work_experience_months",
     "target.career_goal",
@@ -167,7 +169,7 @@ def readiness(profile: StudentProfile) -> dict[str, Any]:
     deep = tier(DEEP_PATHS)
     known_count = sum(1 for p, _, _ in QUESTION_BANK if _known(profile, p))
     return {
-        "percent": int(round(known_count / len(QUESTION_BANK) * 100)),
+        "percent": round(known_count / len(QUESTION_BANK) * 100),
         "basic_recommendations": basic,
         "strong_recommendations": strong,
         "deep_recommendations": deep,
