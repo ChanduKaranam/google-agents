@@ -26,6 +26,13 @@ AUTHORITATIVE_FIELDS: frozenset[str] = frozenset(
         "application_deadline",
         "tuition",
         "tuition_currency",
+        "mandatory_fees",
+        "billing_structure",
+        "living_cost_estimate",
+        "housing_cost",
+        "health_insurance_cost",
+        "application_fee",
+        "deposit",
         "gpa_requirement",
         "english_requirement",
         "gre_requirement",
@@ -77,6 +84,9 @@ def save_research(
         claims: One dict per fact: `{"field": <slot>, "value": <as
             published>, "source_domain": <domain>, "quote": <supporting
             text, optional>}`. Valid slots: tuition, tuition_currency,
+            mandatory_fees, billing_structure, living_cost_estimate,
+            housing_cost, health_insurance_cost, application_fee, deposit,
+            scholarships, assistantship_evidence, funding_evidence,
             duration, intake, application_deadline, gpa_requirement,
             english_requirement, gre_requirement, structure,
             coop_available, other_requirements.

@@ -30,6 +30,10 @@ STATE_PROFILE_META = "user:profile_meta"
 STATE_KNOWLEDGE = "user:program_knowledge"
 # Resolved alumni entities with per-claim evidence, entity-keyed.
 STATE_ALUMNI = "user:alumni_signals"
+# Financial facts that belong to a city, country, provider or market rather
+# than one program (living costs, work rules, visa funds, loan terms) —
+# scope-keyed so a city figure can never masquerade as a program figure.
+STATE_FINANCE = "user:finance_facts"
 STATE_EVIDENCE = "evidence_ledger"
 
 # Outbound research is budgeted so no flow can loop the network.

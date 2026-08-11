@@ -50,6 +50,10 @@ def test_root_holds_exactly_the_expected_tools() -> None:
         "convert_money",
         "calculate_loan_emi",
         "calculate_payback",
+        "plan_financial_research",
+        "save_finance_research",
+        "build_cost_breakdown",
+        "get_funding_options",
         "save_alumni_findings",
         "get_alumni_signals",
         "research_agent",
@@ -229,6 +233,47 @@ def test_faculty_rules_forbid_supervision_claims() -> None:
 def test_ambiguous_names_are_questions() -> None:
     assert "resolve_university_name" in ROOT_INSTRUCTION
     assert "never guess" in FLAT
+
+
+# --- Finance domain wiring ----------------------------------------------------
+
+
+def test_the_finance_flow_is_wired_planner_first() -> None:
+    for tool in (
+        "plan_financial_research",
+        "save_finance_research",
+        "build_cost_breakdown",
+        "get_funding_options",
+    ):
+        assert tool in ROOT_INSTRUCTION, tool
+    # The planner comes before any money research.
+    assert ROOT_INSTRUCTION.index("plan_financial_research") < ROOT_INSTRUCTION.index(
+        "save_finance_research"
+    )
+
+
+def test_finance_promises_are_forbidden() -> None:
+    assert "never promise a scholarship" in FLAT
+    assert "never assumed tuition funding" in FLAT
+    assert "not a financial advisor" in FLAT
+    assert "never collapse a range" in FLAT
+
+
+def test_finance_freshness_is_relayed_as_its_year() -> None:
+    assert "the latest official fee information i could verify" in FLAT
+
+
+def test_finance_adds_no_second_research_engine() -> None:
+    """§36: the finance domain reuses the one research path."""
+    networked = set()
+    for tool in root_agent.tools:
+        if isinstance(tool, AgentTool):
+            agent = getattr(tool, "agent", None)
+            if "google_search" in {
+                tool_name(t) for t in getattr(agent, "tools", [])
+            }:
+                networked.add(tool_name(tool))
+    assert networked == RESEARCH_TOOL_NAMES == {"research_agent", "alumni_agent"}
 
 
 # --- Placement domain wiring --------------------------------------------------

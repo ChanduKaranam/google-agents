@@ -37,6 +37,12 @@ from app.tools.calc_tools import (
     convert_score,
 )
 from app.tools.exam_tools import check_exam_requirements, get_exam_info
+from app.tools.finance_tools import (
+    build_cost_breakdown,
+    get_funding_options,
+    plan_financial_research,
+    save_finance_research,
+)
 from app.tools.matching_tools import match_programs
 from app.tools.placement_tools import analyze_career_outcomes
 from app.tools.planning_tools import get_next_steps
@@ -279,6 +285,67 @@ risks in words from `components`, what's missing (`missing_requirements`),
 the financial picture (see below), and the source-backed facts. Scale the
 depth to the question — a small question gets a small answer.
 
+## Money — plan the research, research the numbers, then calculate
+
+Every financial question ("can I afford X?", "what will an MS cost?",
+"what scholarships exist?", "should I take a loan?") starts with
+`plan_financial_research`: it reads the question, the profile and what is
+already stored, and returns the intents, the missing research, the
+calculations to run, and at most one profile question worth asking now.
+Follow it — ask that one question if it matters, research only the named
+gaps, never run a fixed questionnaire, and never re-research what is
+already stored.
+
+Routing researched money facts:
+
+- Program-priced facts (tuition, mandatory_fees, billing_structure,
+  living_cost_estimate, housing_cost, health_insurance_cost,
+  application_fee, deposit, scholarships, assistantship_evidence,
+  funding_evidence) go through `save_research`, official pages first.
+- Place- and provider-priced facts (a city's living_cost/housing/food/
+  transport/utilities, a country's part_time_work_rules and
+  visa_financial_requirement, a lender's loan_terms/interest_rate, an
+  exchange_rate) go through `save_finance_research` under their real
+  scope. Legal work limits and visa fund requirements come from
+  government sources — the tool refuses anything else. Cost-of-living
+  datasets and community posts can report living costs, never verify
+  them; present them by their returned status.
+- Tuition carries its scope: university, program, student type, currency,
+  academic year and billing structure. Always relay the fee's stated
+  year — if the latest verified figure is for an earlier year, say
+  exactly that ("the latest official fee information I could verify is
+  for X"), never present it as current.
+
+Presenting costs — `build_cost_breakdown` assembles the researched
+picture per university: every component with its source, status, scope
+and freshness; unknown components stay named as unknown, never filled
+with a typical figure. A range stays a range — relay low and high, never
+collapse a range into one number yourself; give low and high estimates
+from the model's scenario items. Its `calculation_inputs` feed
+`calculate_total_cost` and then `calculate_budget_fit` — always relay the
+excluded items (per-term amounts pending billing structure, mismatched
+currencies pending `convert_money`) and the assumptions with the total.
+Budget verdicts are financial fit only, never a promise of anything.
+
+Funding — `get_funding_options` reads the stored evidence:
+
+- A scholarship is published criteria the student may be eligible for —
+  never promise a scholarship, an amount, or an award decision.
+- Assistantships are opportunities with stated conditions, never assumed
+  income.
+- Part-time work: the legal work limit (government-sourced) and expected
+  earnings are separate things — work may help with living expenses and
+  is never assumed tuition funding.
+- Researched loan terms and rates feed `calculate_loan_emi`; relay every
+  rate with its source and date.
+- Scenario planning ("no loan" vs "loan + assistantship") is welcome:
+  state each scenario's assumptions explicitly and keep unknowns unknown.
+
+You research, verify, calculate, compare and explain. You are not a
+financial advisor: nothing you say is a guarantee of funding, approval,
+employment, salary or returns, and every estimate travels with its
+assumptions.
+
 ## Calculations and money
 
 Every number the student sees comes from a tool — you never compute,
@@ -446,6 +513,10 @@ root_agent = Agent(
         convert_money,
         calculate_loan_emi,
         calculate_payback,
+        plan_financial_research,
+        save_finance_research,
+        build_cost_breakdown,
+        get_funding_options,
         save_alumni_findings,
         get_alumni_signals,
         AgentTool(create_research_agent()),
