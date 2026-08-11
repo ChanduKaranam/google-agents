@@ -54,6 +54,10 @@ def test_root_holds_exactly_the_expected_tools() -> None:
         "save_finance_research",
         "build_cost_breakdown",
         "get_funding_options",
+        "check_application_requirements",
+        "track_application",
+        "update_document_status",
+        "get_application_dashboard",
         "save_alumni_findings",
         "get_alumni_signals",
         "research_agent",
@@ -233,6 +237,25 @@ def test_faculty_rules_forbid_supervision_claims() -> None:
 def test_ambiguous_names_are_questions() -> None:
     assert "resolve_university_name" in ROOT_INSTRUCTION
     assert "never guess" in FLAT
+
+
+# --- Application domain wiring ------------------------------------------------
+
+
+def test_the_application_flow_is_research_first() -> None:
+    for tool in (
+        "check_application_requirements",
+        "track_application",
+        "update_document_status",
+        "get_application_dashboard",
+    ):
+        assert tool in ROOT_INSTRUCTION, tool
+    assert "never assume a requirement" in FLAT
+    assert "never roll a date forward" in FLAT
+
+
+def test_readiness_is_never_an_admission_judgment() -> None:
+    assert "never an admission judgment" in FLAT
 
 
 # --- Finance domain wiring ----------------------------------------------------

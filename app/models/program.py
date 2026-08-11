@@ -50,6 +50,16 @@ PROGRAM_FIELDS: frozenset[str] = frozenset(
         "location",
         "grading_methodology",
         "other_requirements",
+        # Application requirements (Phase 9) — requirement *sentences* as
+        # published, interpreted deterministically downstream.
+        "sop_requirement",
+        "lor_requirement",
+        "transcript_requirement",
+        "resume_requirement",
+        "portfolio_requirement",
+        "prerequisite_requirement",
+        "application_portal",
+        "additional_documents",
     }
 )
 

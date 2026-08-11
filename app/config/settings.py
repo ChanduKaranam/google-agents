@@ -34,6 +34,9 @@ STATE_ALUMNI = "user:alumni_signals"
 # than one program (living costs, work rules, visa funds, loan terms) —
 # scope-keyed so a city figure can never masquerade as a program figure.
 STATE_FINANCE = "user:finance_facts"
+# The application tracker: per-program status + document states, mutated
+# only through validated tracker functions.
+STATE_APPLICATIONS = "user:applications"
 STATE_EVIDENCE = "evidence_ledger"
 
 # Outbound research is budgeted so no flow can loop the network.

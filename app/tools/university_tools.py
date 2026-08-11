@@ -43,6 +43,16 @@ AUTHORITATIVE_FIELDS: frozenset[str] = frozenset(
         "grading_methodology",
         "employment_outcomes",
         "salary_evidence",
+        # What a student must submit is an admission fact: a forum's "you
+        # need three LORs" can never establish it.
+        "sop_requirement",
+        "lor_requirement",
+        "transcript_requirement",
+        "resume_requirement",
+        "portfolio_requirement",
+        "prerequisite_requirement",
+        "application_portal",
+        "additional_documents",
     }
 )
 
