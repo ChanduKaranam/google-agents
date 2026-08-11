@@ -20,6 +20,15 @@ PROGRAM_FIELDS: frozenset[str] = frozenset(
     {
         "tuition",
         "tuition_currency",
+        "mandatory_fees",
+        "billing_structure",  # per term / per year / per credit
+        "living_cost_estimate",  # the university's own published estimate
+        "housing_cost",
+        "health_insurance_cost",
+        "application_fee",
+        "deposit",
+        "assistantship_evidence",  # TA/RA availability as published
+        "funding_evidence",
         "duration",
         "intake",
         "application_deadline",

@@ -27,6 +27,7 @@ from google.adk.tools import google_search
 from google.genai import types
 
 from app.config.settings import SEARCH_MODEL, STATE_EVIDENCE
+from app.models.finance import FINANCE_FIELDS
 from app.models.program import PROGRAM_FIELDS
 from app.services.research_service import harvest_grounding
 
@@ -93,6 +94,13 @@ Then a line containing only `---`, then one line per fact:
   FIELD: <slot> | VALUE: <value as published> | SOURCE: <domain>
 
 Valid slots: {", ".join(sorted(PROGRAM_FIELDS))}
+
+For costs and rules that belong to a city, country, lender or market
+rather than one program — rent in a city, a country's work rules or visa
+fund requirements, a lender's rates — use these slots instead and name
+the place or provider in the value: {", ".join(sorted(FINANCE_FIELDS))}.
+For legal rules (work hours, visa funds) prefer the government's own
+site; for fees and funding prefer the university's own pages.
 
 If you found nothing useful, write only: FOUND: none
 
