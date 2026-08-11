@@ -1,11 +1,13 @@
 """Profile tools — the only writers of the stored student profile.
 
-Extractors propose; these tools validate, merge and persist — now with
-provenance. Every stored path records where its value came from
-(`user_explicit` / `resume` / `user_confirmed`), and a resume's domain
-*inferences* live in a separate unconfirmed channel until the student
-confirms one. What the student said, what the resume said, and what was
-inferred never blur (V2 brief §49).
+Extractors propose; these tools validate, merge and persist — with
+provenance and an explicit precedence model (refactor §2): what the
+student says NOW beats this session's resume, which beats anything
+historical, and inference outranks nothing. Precedence is applied
+silently — a superseded value becomes history, never a question. The
+student is NEVER asked to reconcile stored data with what they just said.
+What the student said, what the resume said, and what was inferred never
+blur (V2 brief §49).
 """
 
 from __future__ import annotations
@@ -15,7 +17,11 @@ from typing import Any
 from google.adk.tools import ToolContext
 from pydantic import ValidationError
 
-from app.config.settings import STATE_PROFILE, STATE_PROFILE_META
+from app.config.settings import (
+    STATE_PROFILE,
+    STATE_PROFILE_META,
+    STATE_SESSION_FACTS,
+)
 from app.models.student import ProfileUpdate, StudentProfile
 from app.services.matching_service import gpa_on_4_scale
 from app.services.profile_enrichment import derive_skills
@@ -23,6 +29,19 @@ from app.services.profile_service import apply_update
 from app.services.question_service import choose_next_question, readiness
 
 VALID_SOURCES = ("user_explicit", "resume", "user_confirmed")
+
+
+def _authority(source: str, in_session: bool) -> int:
+    """Effective priority (§2, lower = stronger).
+
+    1 — the student, this session (user_explicit / user_confirmed)
+    3 — a resume analyzed this session
+    4 — the student, a previous session
+    5 — a historical resume
+    """
+    if source in ("user_explicit", "user_confirmed"):
+        return 1 if in_session else 4
+    return 3 if in_session else 5
 
 
 def _read_profile(state: Any) -> StudentProfile:
@@ -58,15 +77,23 @@ def get_profile(tool_context: ToolContext) -> dict:
     """
     profile = _read_profile(tool_context.state)
     meta = _read_meta(tool_context.state)
+    session_facts = tool_context.state.get(STATE_SESSION_FACTS)
+    session_facts = session_facts if isinstance(session_facts, dict) else {}
     known = profile.known()
     return {
         "status": "success",
         "is_empty": not known,
         "profile": known,
         "provenance": meta["fields"],
+        "stated_this_session": sorted(session_facts),
+        "historical": sorted(set(meta["fields"]) - set(session_facts)),
         "unconfirmed_domain_inferences": meta["inferred_domains"],
         "derived_skills": meta.get("derived_skills", []),
         "readiness": readiness(profile),
+        "note": (
+            "Historical values are context, not current truth — anything "
+            "the student states now supersedes them automatically."
+        ),
     }
 
 
@@ -108,48 +135,82 @@ def update_profile(update: dict, source: str, tool_context: ToolContext) -> dict
 
     current = _read_profile(tool_context.state)
     meta = _read_meta(tool_context.state)
+    session_facts = tool_context.state.get(STATE_SESSION_FACTS)
+    session_facts = dict(session_facts) if isinstance(session_facts, dict) else {}
 
-    # Cross-source conflict detection (§6): an incoming value that differs
-    # from a stored value with a DIFFERENT source is a question for the
-    # student, never a silent overwrite. Same-source differences remain
-    # self-corrections and win; `user_confirmed` resolves anything.
-    conflicts: list[dict[str, Any]] = []
-    if source != "user_confirmed":
-        for section_name in type(proposed.profile).model_fields:
-            proposed_section = getattr(proposed.profile, section_name)
-            current_section = getattr(current, section_name)
-            for field_name in type(proposed_section).model_fields:
-                incoming = getattr(proposed_section, field_name)
-                if incoming is None or incoming == [] or incoming == {}:
-                    continue
-                existing = getattr(current_section, field_name)
-                if existing is None or existing == [] or existing == incoming:
-                    continue
-                path = f"{section_name}.{field_name}"
-                existing_source = (meta["fields"].get(path) or {}).get("source")
-                if existing_source and existing_source != source:
-                    conflicts.append(
-                        {
-                            "field": path,
-                            "existing_value": existing,
-                            "existing_source": existing_source,
-                            "incoming_value": incoming,
-                            "incoming_source": source,
-                        }
-                    )
-                    # Strip the conflicting value so the merge cannot apply
-                    # it; the stored value stands until the student decides.
-                    setattr(proposed_section, field_name, None)
+    # Precedence merge (refactor §2-§4): where a differing value exists,
+    # the stronger authority wins SILENTLY. Incoming values are always
+    # "this session". A weaker incoming source (a resume against something
+    # the student already said) is kept as history (`retained`); a
+    # stronger one supersedes the stored value (`auto_resolved`). Equal
+    # authority = a self-correction — newest wins (§9). None of these is
+    # ever a question for the student.
+    auto_resolved: list[dict[str, Any]] = []
+    retained: list[dict[str, Any]] = []
+    incoming_authority = _authority(source, in_session=True)
+    for section_name in type(proposed.profile).model_fields:
+        proposed_section = getattr(proposed.profile, section_name)
+        current_section = getattr(current, section_name)
+        for field_name in type(proposed_section).model_fields:
+            incoming = getattr(proposed_section, field_name)
+            if incoming is None or incoming == [] or incoming == {}:
+                continue
+            existing = getattr(current_section, field_name)
+            if existing is None or existing == [] or existing == incoming:
+                continue
+            path = f"{section_name}.{field_name}"
+            existing_source = (meta["fields"].get(path) or {}).get(
+                "source", "user_explicit"
+            )
+            existing_authority = _authority(
+                existing_source, in_session=path in session_facts
+            )
+            history = list((meta["fields"].get(path) or {}).get("history", []))
+            if incoming_authority <= existing_authority:
+                history.append({"value": existing, "source": existing_source})
+                meta["fields"].setdefault(path, {})["history"] = history
+                auto_resolved.append(
+                    {
+                        "field": path,
+                        "effective_value": incoming,
+                        "effective_source": source,
+                        "superseded_value": existing,
+                        "superseded_source": existing_source,
+                        "rule": "current statement outranks the stored value",
+                    }
+                )
+            else:
+                history.append({"value": incoming, "source": source})
+                meta["fields"].setdefault(path, {})["history"] = history
+                retained.append(
+                    {
+                        "field": path,
+                        "kept_value": existing,
+                        "kept_source": existing_source,
+                        "incoming_value": incoming,
+                        "incoming_source": source,
+                        "rule": (
+                            "the student's stated value outranks this "
+                            "source; the incoming value went to history"
+                        ),
+                    }
+                )
+                # Strip so the merge cannot apply the weaker value.
+                setattr(proposed_section, field_name, None)
 
     merged, changed = apply_update(current, proposed)
     tool_context.state[STATE_PROFILE] = merged.model_dump()
 
     for path in changed:
+        history = (meta["fields"].get(path) or {}).get("history", [])
         meta["fields"][path] = {
             "source": source,
             "status": "confirmed" if source == "user_confirmed" else "extracted",
             "confidence": 1.0,
+            **({"history": history} if history else {}),
         }
+        session_facts[path] = {"source": source}
+    tool_context.state[STATE_SESSION_FACTS] = session_facts
 
     # Deterministic enrichment (§8-9): skills derived from stated skills and
     # project descriptions, each with its textual basis. Metadata only —
@@ -171,17 +232,21 @@ def update_profile(update: dict, source: str, tool_context: ToolContext) -> dict
     return {
         "status": "success",
         "changed": changed,
-        "conflicts": conflicts,
+        "auto_resolved": auto_resolved,
+        "retained": retained,
         "ambiguities": proposed.ambiguities,
         "profile": merged.known(),
         "unconfirmed_domain_inferences": meta["inferred_domains"],
         "derived_skills": meta["derived_skills"],
         "readiness": readiness(merged),
         "note": (
-            "Inferred domains are suggestions to confirm; conflicts are "
-            "questions for the student ('I found two different values — "
-            "which should I use?'). Resolve either via update_profile with "
-            "source='user_confirmed'. Never resolve a conflict yourself."
+            "Precedence already applied — never ask the student to "
+            "reconcile these. `auto_resolved` values superseded history "
+            "silently; `retained` values kept the student's own statement. "
+            "Acknowledge naturally and continue the task. Only "
+            "`ambiguities` (a genuinely unclear statement) may prompt one "
+            "concrete question. Inferred domains stay suggestions until "
+            "confirmed via source='user_confirmed'."
         ),
     }
 
@@ -266,6 +331,7 @@ def clear_profile(confirm: bool, tool_context: ToolContext) -> dict:
         }
     tool_context.state[STATE_PROFILE] = StudentProfile().model_dump()
     tool_context.state[STATE_PROFILE_META] = {"fields": {}, "inferred_domains": []}
+    tool_context.state[STATE_SESSION_FACTS] = {}
     return {
         "status": "success",
         "message": "The profile and its provenance were erased.",

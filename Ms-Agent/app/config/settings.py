@@ -36,6 +36,11 @@ STATE_PROFILE = "user:student_profile"
 # unconfirmed domain inferences a resume produced. Separate key so the
 # profile stays the plain value shape every consumer already reads.
 STATE_PROFILE_META = "user:profile_meta"
+# Paths stated in THIS session (deliberately session-scoped — no `user:`
+# prefix): the precedence model's line between "what the student says now"
+# and "what history says". A new session starts with this empty while the
+# `user:` profile persists as history.
+STATE_SESSION_FACTS = "session_facts"
 STATE_KNOWLEDGE = "user:program_knowledge"
 # Resolved alumni entities with per-claim evidence, entity-keyed.
 STATE_ALUMNI = "user:alumni_signals"

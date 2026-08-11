@@ -31,6 +31,7 @@ def test_root_holds_exactly_the_expected_tools() -> None:
         "get_profile",
         "update_profile",
         "get_interview_state",
+        "interpret_reply",
         "convert_gpa",
         "clear_profile",
         "save_research",
@@ -154,6 +155,35 @@ def test_no_invention_rules_are_present() -> None:
 def test_progressive_collection_is_instructed() -> None:
     assert "at most the one question" in FLAT
     assert "one question at a time" in FLAT
+
+
+# --- Conversational intelligence (precedence refactor) ------------------------
+
+
+def test_precedence_is_automatic_never_a_reconciliation_question() -> None:
+    assert "never ask the student to reconcile" in FLAT
+    assert "never reopen a superseded value" in FLAT
+    assert "what the student says now always beats what history says" in FLAT
+
+
+def test_action_beats_interrogation() -> None:
+    assert "prefer acting over asking" in FLAT
+    assert "never interrogate past the point of usefulness" in FLAT
+
+
+def test_short_replies_are_answers_in_context() -> None:
+    assert "interpret_reply" in ROOT_INSTRUCTION
+    assert "never re-ask the question the student just answered" in FLAT
+
+
+def test_state_management_is_never_narrated() -> None:
+    assert "never narrate state management" in FLAT
+    assert "i have updated your profile" in FLAT  # named as the forbidden form
+
+
+def test_corrections_apply_instantly_without_permission() -> None:
+    assert "corrections are instant" in FLAT
+    assert "never ask permission to update" in FLAT
 
 
 def test_match_scores_are_narrated_never_minted() -> None:
