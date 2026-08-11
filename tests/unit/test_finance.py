@@ -272,6 +272,38 @@ def test_a_bare_dollar_sign_does_not_guess_the_currency() -> None:
     assert money["currency"] is None  # USD? CAD? The text does not say.
 
 
+def test_an_amount_before_its_currency_code_is_understood() -> None:
+    """Live finding: sources also write '44,000 CAD', not only 'CAD 44,000'."""
+    money = extract_money("Tuition is 44,000 CAD per year (2025)")
+    assert money["amount"] == 44000
+    assert money["currency"] == "CAD"
+    assert money["period"] == "year"
+
+
+def test_a_range_with_a_trailing_code_survives() -> None:
+    money = extract_money("Rent runs 900–1,400 CAD monthly")
+    assert money["is_range"] is True
+    assert money["low"] == 900
+    assert money["high"] == 1400
+    assert money["currency"] == "CAD"
+
+
+def test_dollar_abbreviations_name_their_country() -> None:
+    assert extract_money("C$44,000 per year")["currency"] == "CAD"
+    assert extract_money("US$44,000")["currency"] == "USD"
+
+
+def test_a_year_before_a_code_is_not_an_amount() -> None:
+    money = extract_money("For 2025 CAD figures see the fee page")
+    assert money["amount"] is None
+
+
+def test_an_academic_year_range_is_not_a_money_range() -> None:
+    money = extract_money("Fees for 2025–2026 CAD amounts are listed per term")
+    assert money["is_range"] is False
+    assert money["low"] is None
+
+
 def test_no_amount_stays_none() -> None:
     money = extract_money("Tuition is competitive for international students")
     assert money["amount"] is None

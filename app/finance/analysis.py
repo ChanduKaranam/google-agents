@@ -23,13 +23,24 @@ from app.models.finance import FinanceRecord
 from app.models.program import Program, ProgramFact
 
 _CODES = r"CAD|USD|EUR|GBP|INR|AUD"
-_SYMBOLS = {"₹": "INR", "€": "EUR", "£": "GBP"}  # "$" is ambiguous by design
+_SYMBOLS = {"₹": "INR", "€": "EUR", "£": "GBP"}  # a bare "$" is ambiguous by design
+_ABBREVIATIONS = {"C$": "CAD", "CA$": "CAD", "US$": "USD", "A$": "AUD"}
 _NUM = r"[\d,]+(?:\.\d+)?"
+# Sources write the currency on either side ("CAD 44,000" and "44,000 CAD"
+# both occur on real fee pages — the second was a live finding).
+_MARKER = rf"(?:({_CODES})\b|(CA\$|C\$|US\$|A\$)|[$€£₹])"
 
-_RANGE = re.compile(
-    rf"(?:({_CODES})|[$€£₹])\s*({_NUM})\s*[–—-]\s*({_NUM})", re.IGNORECASE
+_RANGE_BEFORE = re.compile(
+    rf"{_MARKER}\s*({_NUM})\s*[–—-]\s*({_NUM})", re.IGNORECASE
 )
-_SINGLE = re.compile(rf"(?:({_CODES})|[$€£₹])\s*({_NUM})", re.IGNORECASE)
+_RANGE_AFTER = re.compile(
+    rf"({_NUM})\s*[–—-]\s*({_NUM})\s*(?:({_CODES})\b|(CA\$|C\$|US\$|A\$))",
+    re.IGNORECASE,
+)
+_SINGLE_BEFORE = re.compile(rf"{_MARKER}\s*({_NUM})", re.IGNORECASE)
+_SINGLE_AFTER = re.compile(
+    rf"({_NUM})\s*(?:({_CODES})\b|(CA\$|C\$|US\$|A\$))", re.IGNORECASE
+)
 _INDIAN = re.compile(rf"({_NUM})\s*(lakh|lakhs|lac|crore|crores)", re.IGNORECASE)
 _CODE_ANYWHERE = re.compile(rf"\b({_CODES})\b", re.IGNORECASE)
 _PERIOD = re.compile(
@@ -55,9 +66,17 @@ def _to_number(raw: str) -> float:
     return float(raw.replace(",", ""))
 
 
-def _currency_of(text: str, code_group: str | None) -> str | None:
+def _is_year(raw: str) -> bool:
+    return bool(re.fullmatch(r"20\d{2}", raw.replace(",", "")))
+
+
+def _currency_of(
+    text: str, code_group: str | None, abbreviation: str | None = None
+) -> str | None:
     if code_group:
         return code_group.upper()
+    if abbreviation:
+        return _ABBREVIATIONS.get(abbreviation.upper())
     for symbol, code in _SYMBOLS.items():
         if symbol in text:
             return code
@@ -97,28 +116,55 @@ def extract_money(text: str) -> dict[str, Any]:
         )
         return result
 
-    ranged = _RANGE.search(raw)
-    if ranged:
-        low, high = _to_number(ranged.group(2)), _to_number(ranged.group(3))
+    for ranged in _RANGE_BEFORE.finditer(raw):
+        code, abbreviation, raw_low, raw_high = ranged.groups()
+        low, high = _to_number(raw_low), _to_number(raw_high)
         if low > high:
             low, high = high, low
         result.update(
             is_range=True,
             low=low,
             high=high,
-            currency=_currency_of(raw, ranged.group(1)),
+            currency=_currency_of(raw, code, abbreviation),
+        )
+        return result
+    for ranged in _RANGE_AFTER.finditer(raw):
+        raw_low, raw_high, code, abbreviation = ranged.groups()
+        if _is_year(raw_low) and _is_year(raw_high):
+            continue  # "2025–2026 CAD ..." is a cycle, not a price
+        low, high = _to_number(raw_low), _to_number(raw_high)
+        if low > high:
+            low, high = high, low
+        result.update(
+            is_range=True,
+            low=low,
+            high=high,
+            currency=_currency_of(raw, code, abbreviation),
         )
         return result
 
-    single = _SINGLE.search(raw)
+    single = _SINGLE_BEFORE.search(raw)
     if single:
-        amount = _to_number(single.group(2))
+        amount = _to_number(single.group(3))
         result.update(
             amount=amount,
             low=amount,
             high=amount,
-            currency=_currency_of(raw, single.group(1)),
+            currency=_currency_of(raw, single.group(1), single.group(2)),
         )
+        return result
+    for single in _SINGLE_AFTER.finditer(raw):
+        raw_amount, code, abbreviation = single.groups()
+        if _is_year(raw_amount):
+            continue  # "for 2025 CAD figures" states a year, not a price
+        amount = _to_number(raw_amount)
+        result.update(
+            amount=amount,
+            low=amount,
+            high=amount,
+            currency=_currency_of(raw, code, abbreviation),
+        )
+        return result
     return result
 
 
