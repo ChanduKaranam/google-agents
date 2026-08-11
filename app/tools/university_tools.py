@@ -34,6 +34,8 @@ AUTHORITATIVE_FIELDS: frozenset[str] = frozenset(
         "faculty_research",
         "research_labs",
         "grading_methodology",
+        "employment_outcomes",
+        "salary_evidence",
     }
 )
 

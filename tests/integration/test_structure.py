@@ -36,6 +36,7 @@ def test_root_holds_exactly_the_expected_tools() -> None:
         "save_research",
         "get_programs",
         "resolve_university_name",
+        "analyze_career_outcomes",
         "compare_programs",
         "find_faculty_matches",
         "match_programs",
@@ -228,3 +229,16 @@ def test_faculty_rules_forbid_supervision_claims() -> None:
 def test_ambiguous_names_are_questions() -> None:
     assert "resolve_university_name" in ROOT_INSTRUCTION
     assert "never guess" in FLAT
+
+
+# --- Placement domain wiring --------------------------------------------------
+
+
+def test_placement_instruction_pins_scope_and_example_rules() -> None:
+    assert "scope is sacred" in FLAT
+    assert "individuals are not statistics" in FLAT
+    assert "analyze_career_outcomes" in ROOT_INSTRUCTION
+
+
+def test_no_placement_probabilities_are_promised() -> None:
+    assert "never an employment probability" in FLAT
