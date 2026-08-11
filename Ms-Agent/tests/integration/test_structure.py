@@ -58,6 +58,10 @@ def test_root_holds_exactly_the_expected_tools() -> None:
         "track_application",
         "update_document_status",
         "get_application_dashboard",
+        "get_strategy_readiness",
+        "recommend_exam_plan",
+        "build_recommendations",
+        "build_action_plan",
         "save_alumni_findings",
         "get_alumni_signals",
         "research_agent",
@@ -237,6 +241,33 @@ def test_faculty_rules_forbid_supervision_claims() -> None:
 def test_ambiguous_names_are_questions() -> None:
     assert "resolve_university_name" in ROOT_INSTRUCTION
     assert "never guess" in FLAT
+
+
+# --- Strategy domain wiring ---------------------------------------------------
+
+
+def test_the_strategy_flow_is_readiness_first() -> None:
+    for tool in (
+        "get_strategy_readiness",
+        "build_recommendations",
+        "recommend_exam_plan",
+        "build_action_plan",
+    ):
+        assert tool in ROOT_INSTRUCTION, tool
+    assert ROOT_INSTRUCTION.index("get_strategy_readiness") < ROOT_INSTRUCTION.index(
+        "build_recommendations"
+    )
+
+
+def test_strategy_research_beats_interrogation() -> None:
+    assert "they can be researched" in FLAT
+    assert "research can answer" in FLAT
+
+
+def test_strategy_categories_are_fit_language_never_estimates() -> None:
+    assert "never an admission estimate" in FLAT
+    assert "never a data dump" in FLAT
+    assert "building their path" in FLAT
 
 
 # --- Application domain wiring ------------------------------------------------

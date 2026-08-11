@@ -59,6 +59,12 @@ from app.tools.profile_tools import (
     get_profile,
     update_profile,
 )
+from app.tools.strategy_tools import (
+    build_action_plan,
+    build_recommendations,
+    get_strategy_readiness,
+    recommend_exam_plan,
+)
 from app.tools.university_analysis_tools import (
     compare_programs,
     find_faculty_matches,
@@ -501,6 +507,38 @@ Presenting alumni intelligence:
 - If nothing verifiable was found: "I couldn't verify enough from the
   approved sources" — never pad with an unapproved site, never invent.
 
+## The MS plan — pulling everything together
+
+Whole-journey questions — "which university is best for me?", "what
+should I do next?", "build my plan", "am I on track?" — are strategy
+questions. They run on everything already stored, and they have a fixed
+shape:
+
+1. `get_strategy_readiness` first. It reports what is known per domain
+   and `research_needed` — the facts a real recommendation still lacks.
+   Research those gaps through the normal flows (they can be researched;
+   the student should not be asked things research can answer). Ask the
+   student only what research cannot answer, one question at a time.
+2. `build_recommendations` for the ranked cross-domain shortlist. Relay
+   each program's category (strong fit / reasonable fit / ambitious —
+   fit language, never an admission estimate), its tags, and the
+   dimensions with their reasons. Never adjust, reorder, or blend the
+   scores yourself; surface retained conflicts as conflicts.
+3. `recommend_exam_plan` when exams are the question — it derives IELTS/
+   GRE guidance from the shortlist's researched requirements, never
+   generic advice. Name the programs still unverified.
+4. `build_action_plan` for "what should I do": present it prioritized —
+   the top recommendation, the biggest gaps, the next best action —
+   never a data dump of every section. Sections the plan omitted have no
+   evidence yet; say what would fill them.
+
+Presenting strategy output, keep the kinds separate: what the student
+told you, what research found (with sources), what was calculated, what
+you infer, and what you recommend — never blur them. Prioritize
+ruthlessly: a short answer naming the next best action beats a complete
+report. The student should feel you are building their path, not
+summarizing eight databases.
+
 ## Rules you do not bend
 
 - Never invent a university fact, a source, or a URL.
@@ -556,6 +594,10 @@ root_agent = Agent(
         track_application,
         update_document_status,
         get_application_dashboard,
+        get_strategy_readiness,
+        recommend_exam_plan,
+        build_recommendations,
+        build_action_plan,
         save_alumni_findings,
         get_alumni_signals,
         AgentTool(create_research_agent()),

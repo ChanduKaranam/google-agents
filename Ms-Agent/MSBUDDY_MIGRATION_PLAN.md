@@ -119,24 +119,32 @@ distinct retrieval contract, as alumni was.
 ## H. Roadmap (brief's phases, re-baselined)
 
 - **Phase 0** — this document. ✅
-- **Phase 1 — Profile + Resume Analyzer** (first milestone): live
+- **Phase 1 — Profile + Resume Analyzer**: ✅ shipped (live PDF path,
+  conflicts, backlogs, analyzers). Original scope below:
+  live
   file-upload resume test through the UI artifact path; deterministic
   skill/project analyzers feeding domain-inference bases; `backlogs`;
   instruction: program-level qualification when presenting people.
   *Mostly built; the milestone is closing the file-ingestion gap and
   hardening.*
-- **Phase 2 — Exams**: reference module + `match_exam_requirements` tool.
-- **Phase 3 — Calculation**: finance calculators + score tables; GPA
-  methodology overrides.
-- **Phase 4 — University**: faculty/labs slot, comparison renderer,
-  deadline freshness.
-- **Phase 5 — Placement**: outcomes-report facts, salary evidence rules.
+- **Phase 2 — Exams**: ✅ shipped (six-status interpreter, requirement
+  matrix, score comparison).
+- **Phase 3 — Calculation**: ✅ shipped (GPA methodology/estimate split,
+  EMI, sourced currency, payback).
+- **Phase 4 — University**: ✅ shipped (resolution, freshness, faculty
+  matching, comparison matrix).
+- **Phase 5 — Placement**: ✅ shipped (scope discipline, salary
+  attributes, career fit).
 - **Phase 6 — Alumni**: ✅ shipped; API clients optional.
-- **Phase 7 — Finance**: living-cost slot, cost breakdown, scholarship flow.
-- **Phase 8 — Visa**: gov registry + checklist.
-- **Phase 9 — Application**: document tracker (port), SOP/LOR sections.
-- **Phase 10-11 — Integration & eval**: cross-domain flows, new matching
-  signals (only then — per §18, weights stay put until signals are real).
+- **Phase 7 — Finance**: ✅ shipped (intent planner, scoped finance
+  records, gated money facts, cost model feeding app.calc).
+- **Phase 8 — Visa**: gov registry + checklist. *Deliberately not built
+  yet; visa_financial_requirement (government-only) already exists.*
+- **Phase 9 — Application**: ✅ shipped (researched requirement slots,
+  readiness derivation, deterministic tracker, deadline urgency).
+- **Phase 10 — Strategy**: ✅ shipped (coverage → research needs,
+  cross-domain synthesis with weighted/kind-tagged dimensions, exam
+  recommendation, prioritized gaps, plan of action).
 
 ## I. Risks and architectural conflicts
 
