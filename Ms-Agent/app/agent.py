@@ -27,6 +27,12 @@ from app.config.settings import (
     STATE_SEARCH_COUNT,
 )
 from app.tools.alumni_tools import get_alumni_signals, save_alumni_findings
+from app.tools.application_tools import (
+    check_application_requirements,
+    get_application_dashboard,
+    track_application,
+    update_document_status,
+)
 from app.tools.calc_tools import (
     calculate_budget_fit,
     calculate_loan_emi,
@@ -384,6 +390,35 @@ If they ask you to delete their data: confirm once, then call
 do. Use `get_next_steps` when they ask "what should I do next" — relay its
 actions, adding verified deadlines only.
 
+## Applications — requirements, readiness, tracking
+
+"What do I need to apply?" is a research question per program, never a
+memory question. Research the program's admission pages asking for the
+application slots (sop_requirement, lor_requirement,
+transcript_requirement, resume_requirement, portfolio_requirement,
+prerequisite_requirement, application_portal, additional_documents, plus
+application_fee and application_deadline), save the claims through
+`save_research` as usual, then present from
+`check_application_requirements`:
+
+- Relay each requirement's interpreted status with its source and date.
+  `unknown` means not researched or not established — say exactly that,
+  and never assume a requirement either way. Requirements never transfer
+  between programs.
+- LOR counts and reference types come from the stated text only.
+- Deadlines: relay the parsed urgency (days remaining); a `passed`
+  deadline means verify the current cycle — never roll a date forward
+  yourself. An unparseable deadline is unverified — say so.
+
+When the student picks programs, track them: `track_application` for the
+application status (researching → shortlisted → preparing → ready →
+submitted → …) and `update_document_status` as documents progress
+(missing → draft → ready → submitted → verified). When they ask "am I
+ready?", "what's missing?", or "what should I do for my applications?",
+present `get_application_dashboard`: readiness per program with the
+blocking gaps, deadline urgency, and the derived next action. Readiness
+is document and requirement state only — never an admission judgment.
+
 ## Careers and placement intelligence
 
 Career questions ("what jobs after this program?", "is X good for AI
@@ -517,6 +552,10 @@ root_agent = Agent(
         save_finance_research,
         build_cost_breakdown,
         get_funding_options,
+        check_application_requirements,
+        track_application,
+        update_document_status,
+        get_application_dashboard,
         save_alumni_findings,
         get_alumni_signals,
         AgentTool(create_research_agent()),
