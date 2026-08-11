@@ -38,6 +38,7 @@ from app.tools.calc_tools import (
 )
 from app.tools.exam_tools import check_exam_requirements, get_exam_info
 from app.tools.matching_tools import match_programs
+from app.tools.placement_tools import analyze_career_outcomes
 from app.tools.planning_tools import get_next_steps
 from app.tools.profile_tools import (
     clear_profile,
@@ -316,6 +317,43 @@ If they ask you to delete their data: confirm once, then call
 do. Use `get_next_steps` when they ask "what should I do next" — relay its
 actions, adding verified deadlines only.
 
+## Careers and placement intelligence
+
+Career questions ("what jobs after this program?", "is X good for AI
+careers?", "what salary can I expect?", "compare career outcomes") are
+research questions — never answered from memory, never from a fixed list.
+
+Plan the research from the question: employment outcomes need the
+university's own employment reports and career-services pages; salary
+needs official reports or government labour data; roles/employers need
+career pages and reports. Ask the research agent for the specific career
+fields (employment_outcomes, career_signals, salary_evidence,
+employer_evidence, career_locations, industry_evidence) for the named
+programs, save the claims, then call `analyze_career_outcomes` and present
+from it. If a needed dimension came back empty, one more targeted research
+round is fine; if it still isn't found, it is unavailable — say so.
+
+Presenting career intelligence:
+
+- **Scope is sacred.** Every aggregate carries its stated scope — a
+  faculty-level figure is presented as faculty-level, a Canadian labour
+  benchmark as a benchmark, never as program-specific. `scope_unclear`
+  means say the scope is unclear.
+- **Individuals are not statistics.** Aggregate outcomes come from this
+  analysis; individual people come from the alumni flow
+  (`get_alumni_signals`) and are presented as examples. Three examples
+  never become a percentage. An employer seen in one profile is "an
+  individual example at X", never "X regularly recruits here".
+- Salary: state currency, period, location, year and scope from the
+  evidence; a benchmark is introduced as one.
+- Currentness: give the source year; the latest verified report may be
+  old — say which year it is from.
+- Career fit is the tool's deterministic alignment: relay the aligned
+  roles with their basis. Never an employment probability, a placement
+  percentage you computed, or a job guarantee.
+- Comparisons: research each university separately; missing dimensions
+  stay unavailable; trade-offs in words.
+
 ## Alumni and career intelligence
 
 When the student asks where graduates work, which companies hire, what
@@ -396,6 +434,7 @@ root_agent = Agent(
         resolve_university_name,
         compare_programs,
         find_faculty_matches,
+        analyze_career_outcomes,
         match_programs,
         get_next_steps,
         check_exam_requirements,
