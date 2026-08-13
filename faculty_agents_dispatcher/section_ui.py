@@ -47,10 +47,25 @@ MENU_SHOWN = 'menu_shown'
 
 # Naming, publishing, and the send confirmation.
 PUBLISH = 'publish_agent'
+SAVE_LINK = 'save_agent_link'
+
+# Ends manual section picking. Without it, picking has to end when something
+# else happens to be true — and it did: the first tap jumped to naming the
+# agent as soon as a link had been pasted, so one section was the most anyone
+# could choose in the order the Send Agent card actually asks for.
+DONE_PICKING = 'done_picking_sections'
 SAVE_NAME = 'save_agent_name'
 CONFIRM_SEND = 'confirm_send'
 CANCEL_SEND = 'cancel_send'
 NAME_PATH = '/agent_name'
+
+# Where the ticked sections collect in the data model.
+SECTIONS_PATH = '/sections'
+
+# Choosing an agent instead of pasting its link.
+PICK_AGENT = 'pick_agent'
+PASTE_INSTEAD = 'paste_link_instead'
+AGENT_PATH = '/agent'
 
 
 if SHOW_SECTIONS != progress_ui.SECTION_LIST:  # pragma: no cover
@@ -62,14 +77,29 @@ if SHOW_SECTIONS != progress_ui.SECTION_LIST:  # pragma: no cover
     )
 
 
-def name_card(state, already_published: bool = False) -> list:
-    """Name the agent, then publish it — or just rename an existing one."""
+def name_card(state, already_published: bool = False,
+              suggested: str = '') -> list:
+    """Name the agent, then publish it — or just rename an existing one.
+
+    `suggested` pre-fills the field with the name the agent already has in
+    Gemini Enterprise. It is a starting point, not the answer: one GE agent is
+    often sent to several different section sets, and each send deserves its
+    own label — "DBMS — CSE Year 2" and "DBMS — CIVIL Year 3" can be the same
+    underlying agent.
+
+    Naming here writes Sethu's own record and nothing else. There is no write
+    path to Discovery Engine from this agent, so the agent a student opens
+    keeps whatever it is called in Gemini Enterprise.
+    """
     prefix = a2ui.uid(state, 'name')
     label = 'Save Agent Name' if already_published else 'Publish'
     action = SAVE_NAME if already_published else PUBLISH
 
     components = [
         a2ui.text(f'{prefix}-title', 'What should this agent be called?', 'h3'),
+        a2ui.text(f'{prefix}-hint',
+                  'This is the name on the announcement your students get. '
+                  'It does not rename the agent itself.'),
         a2ui.text_field(f'{prefix}-field', 'Agent name', NAME_PATH, 'shortText'),
         a2ui.text(f'{prefix}-btn-label', label),
         a2ui.button_with_values(
@@ -80,33 +110,160 @@ def name_card(state, already_published: bool = False) -> list:
         ),
         a2ui.column(
             f'{prefix}-main-column',
+            [f'{prefix}-title', f'{prefix}-hint', f'{prefix}-field',
+             f'{prefix}-btn'],
+        ),
+        a2ui.card(f'{prefix}-card', f'{prefix}-main-column'),
+    ]
+    messages = a2ui.surface(prefix, components, f'{prefix}-card')
+    messages.insert(1, a2ui.data_model(prefix, {'agent_name': suggested or ''}))
+    return messages
+
+
+def result_card(state, title: str, lines: list) -> list:
+    """The outcome of a send, in a card of its own.
+
+    A send is the one irreversible thing this agent does, and its result was a
+    line of prose sitting above the menu — the same weight as every other
+    sentence in the conversation. Giving it a card and a heading makes it the
+    thing the eye lands on.
+    """
+    return a2ui.build_card(
+        a2ui.uid(state, 'result'), [title] + list(lines)
+    )
+
+
+def agent_picker_card(state, agents: list) -> list:
+    """Pick the agent to send, instead of pasting its link.
+
+    Sethu's sync knows every agent in Gemini Enterprise and now returns a
+    composed link for each, so the professor never has to find a URL. That
+    removes the step every link problem came from: an address bar carries the
+    copier's account index, their chat session and their analytics id, and
+    nothing stops them copying the wrong page entirely — two live records point
+    at an agent nobody meant to send.
+
+    Single-select: one agent goes to one set of sections.
+    """
+    prefix = a2ui.uid(state, 'agentpick')
+    # Just the agent's name. What it was called on a previous send is a
+    # property of that send, not of the agent being chosen now.
+    options = [(agent['name'], agent['id']) for agent in agents]
+
+    components = [
+        a2ui.text(f'{prefix}-title', 'Which agent do you want to send?', 'h3'),
+        a2ui.text(f'{prefix}-hint',
+                  'These are the agents Sethu can see in Gemini Enterprise.'),
+        a2ui.multiple_choice(f'{prefix}-choice', AGENT_PATH, options,
+                             max_selections=1),
+    ]
+    for suffix, label, action in (
+        ('go', 'Continue', PICK_AGENT),
+        ('paste', 'Paste a link instead', PASTE_INSTEAD),
+    ):
+        components.append(a2ui.text(f'{prefix}-{suffix}-label', label))
+        components.append(a2ui.button_with_values(
+            f'{prefix}-{suffix}', f'{prefix}-{suffix}-label', action,
+            {'agent': {'path': AGENT_PATH}}))
+    components.append(a2ui.row(f'{prefix}-buttons',
+                               [f'{prefix}-go', f'{prefix}-paste']))
+    components.append(a2ui.column(
+        f'{prefix}-main-column',
+        [f'{prefix}-title', f'{prefix}-hint', f'{prefix}-choice',
+         f'{prefix}-buttons']))
+    components.append(a2ui.card(f'{prefix}-card', f'{prefix}-main-column'))
+
+    messages = a2ui.surface(prefix, components, f'{prefix}-card')
+    messages.insert(1, a2ui.data_model(prefix, {'agent': []}))
+    return messages
+
+
+def scope_card(state, agent_name: str) -> list:
+    """How much of the college this agent goes to.
+
+    The same three choices as the Send Agent card, without the link field —
+    once an agent is picked there is no link to type.
+    """
+    return a2ui.build_card(
+        a2ui.uid(state, 'scope'),
+        [f'Who should get "{agent_name}"?'],
+        [
+            ('All Departments', SCOPE_ALL, None),
+            ('Department – All Sections', SCOPE_DEPARTMENT, None),
+            ('Manual Selection', SCOPE_MANUAL, None),
+        ],
+    )
+
+
+def link_card(state) -> list:
+    """Ask for the agent link on its own.
+
+    Needed because sections can be chosen before a link is pasted — the scope
+    buttons carry the link field, but nothing makes a professor fill it in. The
+    Send Agent card cannot be reused here: pressing one of its scope buttons
+    again would overwrite the sections they have just picked.
+    """
+    prefix = a2ui.uid(state, 'link')
+    components = [
+        a2ui.text(f'{prefix}-title', 'Paste the agent link', 'h3'),
+        a2ui.text_field(f'{prefix}-field', 'Agent link', LINK_PATH, 'shortText'),
+        a2ui.text(f'{prefix}-btn-label', 'Continue'),
+        a2ui.button_with_values(
+            f'{prefix}-btn',
+            f'{prefix}-btn-label',
+            SAVE_LINK,
+            {'agent_link': {'path': LINK_PATH}},
+        ),
+        a2ui.column(
+            f'{prefix}-main-column',
             [f'{prefix}-title', f'{prefix}-field', f'{prefix}-btn'],
         ),
         a2ui.card(f'{prefix}-card', f'{prefix}-main-column'),
     ]
     messages = a2ui.surface(prefix, components, f'{prefix}-card')
-    messages.insert(1, a2ui.data_model(prefix, {'agent_name': ''}))
+    messages.insert(1, a2ui.data_model(prefix, {'agent_link': ''}))
     return messages
 
 
-def confirm_send_card(state, sections_text: str, count, agent_id: str) -> list:
+def confirm_send_card(state, sections: list, count, agent_id: str) -> list:
     """The last step before real WhatsApp messages go out.
+
+    The sections are listed one per line rather than run together in a
+    sentence. This is the card a professor checks before something
+    irreversible, and "CSE · Year 2 · Sec A, CSE · Year 1 · Sec A and CSE ·
+    Year 3 · Sec A" is a paragraph to be parsed rather than a list to be
+    checked — the labels are long and nearly identical, which is exactly when
+    a wrong one goes unnoticed.
 
     A Yes button rather than typed text: the professor is confirming something
     that cannot be recalled, and a button carries the exact agent id, so a
     confirmation can never be applied to a different agent than the one quoted.
     """
-    prefix = a2ui.uid(state, 'confirm')
+    labels = [str(label) for label in (sections or [])]
+    students = f'{count} student' + ('' if count == 1 else 's')
+    heading = (f'{len(labels)} section' + ('' if len(labels) == 1 else 's')
+               + f' · {students}')
+
+    # Capped so a college-wide send cannot push the card past the size ceiling
+    # and vanish at the one moment it matters most.
+    shown = list(labels[:12])
+    if len(labels) > 12:
+        shown.append(f'and {len(labels) - 12} more')
+
+    lines = ['Send this agent over WhatsApp?', heading, a2ui.DIVIDER,
+             'Going to:', a2ui.bullets(shown), a2ui.DIVIDER,
+             'WhatsApp messages cannot be recalled.']
+
     return a2ui.build_card(
-        prefix,
-        [
-            'Send this agent over WhatsApp?',
-            f'{sections_text} — {count} student{"s" if count != 1 else ""}',
-            'WhatsApp messages cannot be recalled.',
-        ],
+        a2ui.uid(state, 'confirm'),
+        lines,
         [
             ('Yes, send it', CONFIRM_SEND, {'agent_id': agent_id}),
-            ('Cancel', CANCEL_SEND, None),
+            # Cancel carries the id too. The card stays on screen after the
+            # send, so a professor can scroll back and press Cancel on a send
+            # that already went out — and without the id there is no way to
+            # tell that from a genuine cancellation.
+            ('Cancel', CANCEL_SEND, {'agent_id': agent_id}),
         ],
     )
 
@@ -267,6 +424,35 @@ def send_agent_card(state) -> list:
     return messages
 
 
+def section_list_card(state, roster: list, department: str) -> list:
+    """The department's sections as a list, with nothing to press.
+
+    Browsing is not the first step of a send. Offering the same tappable
+    buttons here starts recording sections for a send the professor never
+    asked to make — which is what "Selected CIVIL · Year 4 · Sec A (1 so far)"
+    was, after a plain look at the section list.
+    """
+    rows = [s for s in roster if s.get('department') == department]
+    if not rows:
+        return []
+    lines = [f'{department} — sections']
+    lines += [
+        f'·  Year {s.get("year")} · Sec {s.get("section")}  —  '
+        f'{s.get("students") or 0} '
+        f'{"student" if (s.get("students") or 0) == 1 else "students"}'
+        for s in rows
+    ]
+    messages = a2ui.build_card(a2ui.uid(state, 'seclist'), lines)
+    # Trim rather than risk the ceiling, exactly as `section_card` does.
+    while not _fits(messages) and len(lines) > 2:
+        lines = lines[:-1]
+        messages = a2ui.build_card(
+            a2ui.uid(state, 'seclist'),
+            lines + ['Showing the first few.'],
+        )
+    return messages
+
+
 def _fits(messages: list) -> bool:
     return (
         len(json.dumps(messages, ensure_ascii=False).encode())
@@ -293,7 +479,8 @@ def department_card(state, roster: list) -> list:
     }
     return a2ui.build_card(
         a2ui.uid(state, 'depts'),
-        ['Which department?'],
+        ['Which department?',
+         'The number in brackets is how many students that department has.'],
         [
             (f'{d} ({counts[d]})', PICK_DEPARTMENT, {'department': d})
             for d in names
@@ -301,36 +488,59 @@ def department_card(state, roster: list) -> list:
     )
 
 
-def section_card(state, roster: list, department: str) -> list:
-    """Step two: which section within the chosen department.
+def section_card(state, roster: list, department: str,
+                 chosen: int = 0) -> list:
+    """Tick the sections to send to, then press Done.
 
-    Falls back to fewer buttons rather than risking the size ceiling — a
-    truncated card the professor can see beats a complete one GE discards.
+    One card, one decision. Before this the picker redrew after every tap, so
+    choosing four sections meant four round trips and four near-identical cards
+    stacked up the transcript.
+
+    `MultipleChoice` collects the ticks in the data model and Done carries them
+    back, the same way TextField carries a typed link — an array rather than a
+    string. `chosen` is how many are already held from other departments, shown
+    so a professor switching department can see nothing was lost.
     """
     rows = [s for s in roster if s.get('department') == department]
     if not rows:
         return []
 
-    def build(subset, note=None):
-        lines = [f'{department} — pick a section']
-        if note:
-            lines.append(note)
-        return a2ui.build_card(
-            a2ui.uid(state, 'secs'),
-            lines,
-            [
-                (
-                    f'Year {s.get("year")} · Sec {s.get("section")}'
-                    f' ({s.get("students") or 0})',
-                    PICK_SECTION,
-                    {'label': s['label']},
-                )
-                for s in subset
-            ],
-        )
+    prefix = a2ui.uid(state, 'secs')
+    lines = [f'{department} — choose who to send to',
+             'Tick every section this agent should go to, then press Done.']
+    if chosen:
+        lines.append(f'{chosen} already selected in other departments.')
 
-    messages = build(rows)
-    while not _fits(messages) and len(rows) > 1:
-        rows = rows[:-1]
-        messages = build(rows, 'Showing the first few; ask for more if needed.')
+    components = [a2ui.text(f'{prefix}-title', lines[0], 'h3')]
+    for index, line in enumerate(lines[1:], 1):
+        components.append(a2ui.text(f'{prefix}-line{index}', line))
+    components.append(a2ui.multiple_choice(
+        f'{prefix}-choice', SECTIONS_PATH,
+        [(f'Year {s.get("year")} · Sec {s.get("section")}'
+          f' ({s.get("students") or 0} '
+          f'{"student" if (s.get("students") or 0) == 1 else "students"})',
+          s['label']) for s in rows],
+    ))
+
+    # Both buttons carry the ticks, so switching department keeps them.
+    picked = {'sections': {'path': SECTIONS_PATH}}
+    for suffix, label, action in (
+        ('done', 'Done', DONE_PICKING),
+        ('more', 'Another Department', SCOPE_MANUAL),
+    ):
+        components.append(a2ui.text(f'{prefix}-{suffix}-label', label))
+        components.append(a2ui.button_with_values(
+            f'{prefix}-{suffix}', f'{prefix}-{suffix}-label', action, picked))
+    components.append(a2ui.row(f'{prefix}-buttons',
+                               [f'{prefix}-done', f'{prefix}-more']))
+    components.append(a2ui.column(
+        f'{prefix}-main-column',
+        [f'{prefix}-title']
+        + [f'{prefix}-line{i}' for i in range(1, len(lines))]
+        + [f'{prefix}-choice', f'{prefix}-buttons'],
+    ))
+    components.append(a2ui.card(f'{prefix}-card', f'{prefix}-main-column'))
+
+    messages = a2ui.surface(prefix, components, f'{prefix}-card')
+    messages.insert(1, a2ui.data_model(prefix, {'sections': []}))
     return messages

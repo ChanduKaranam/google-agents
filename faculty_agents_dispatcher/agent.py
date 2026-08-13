@@ -180,6 +180,11 @@ def _menu_parts(state, messages: list | None = None) -> list:
     """
     if state is None or not config.A2UI_ENABLED or _is_menu(messages):
         return []
+    # Someone Sethu will not act for gets the refusal and nothing else. The
+    # menu is a list of things they cannot do; offering it invites them to
+    # press buttons that can only fail.
+    if state.get(auth.IS_FACULTY_KEY) is False:
+        return []
     try:
         return a2ui.to_genai_parts(section_ui.main_menu(state))
     except Exception:  # A missing menu must never cost the actual answer.
@@ -207,6 +212,39 @@ def _roster(callback_context: CallbackContext) -> list:
     return roster
 
 
+def _after_sections(state, text: str):
+    """What to show once sections are chosen: the name, or the link first.
+
+    Publishing needs both, and the sections can be settled first — the scope
+    buttons carry the link field but nothing obliges a professor to type in it.
+    Asking for a name at that point produces an agent that cannot be published
+    and a question the professor has no reason to expect.
+    """
+    if not state.get(tools.PENDING_LINK):
+        return _reply(f'{text} Now paste the agent link.',
+                      section_ui.link_card(state))
+    return _reply(text, section_ui.name_card(state))
+
+
+def _sections_chosen(callback_context: CallbackContext, text: str):
+    """After sections, ask what to call this send.
+
+    An agent picked from the list arrives with a Gemini Enterprise name, which
+    pre-fills the field — but it is still asked, because one agent goes to
+    several different section sets and each send wants its own label.
+    """
+    state = callback_context.state
+    if not state.get(tools.PENDING_LINK):
+        return _reply(f'{text} Now paste the agent link.',
+                      section_ui.link_card(state))
+    return _reply(
+        text,
+        section_ui.name_card(
+            state, suggested=state.get(tools.PICKED_NAME) or ''
+        ),
+    )
+
+
 def _scope_or_sections(callback_context: CallbackContext, action: str, link: str):
     """Handle the scope buttons and the plain "Section List" button.
 
@@ -226,11 +264,11 @@ def _scope_or_sections(callback_context: CallbackContext, action: str, link: str
         state[tools.CHOSEN_SECTIONS] = labels
         state[tools.SEND_SCOPE] = action
         total = sum(s.get('students') or 0 for s in roster)
-        return _reply(
+        return _sections_chosen(
+            callback_context,
             f'Every section selected — {_plural(len(labels), "section")} across '
             f'{_plural(len(section_ui.departments(roster)), "department")}, '
             f'{_plural(total, "student")}.',
-            section_ui.name_card(state),
         )
 
     if action in (section_ui.SCOPE_DEPARTMENT, section_ui.SCOPE_MANUAL):
@@ -252,6 +290,31 @@ def _plural(n, noun: str) -> str:
     return f'{n} {noun}' if n == 1 else f'{n} {noun}s'
 
 
+def _outcome(state, title: str, lines: list, spoken: str):
+    """Announce a send outcome, then clear the send and offer the menu.
+
+    The card carries the result; `spoken` is the one line above it. Both say
+    the same thing, because the card is what a professor reads and the prose is
+    what a screen reader announces first.
+    """
+    card = section_ui.result_card(state, title, lines)
+    _clear_send(state)
+    return _reply(spoken, card)
+
+
+def _clear_send(state) -> None:
+    """Forget everything about the finished send. See `_finish`."""
+    for key in (
+        tools.PENDING_LINK,
+        tools.CHOSEN_SECTIONS,
+        tools.SEND_SCOPE,
+        tools.PENDING_UI,
+        tools.PICKED_NAME,
+        tools.PICKING_DEPARTMENT,
+    ):
+        state[key] = None
+
+
 def _finish(state, text: str):
     """End a send and offer the opening menu again.
 
@@ -265,6 +328,8 @@ def _finish(state, text: str):
         tools.CHOSEN_SECTIONS,
         tools.SEND_SCOPE,
         tools.PENDING_UI,
+        tools.PICKED_NAME,
+        tools.PICKING_DEPARTMENT,
     ):
         state[key] = None
     return _reply(text, section_ui.main_menu(state))
@@ -312,7 +377,7 @@ def _publish_and_confirm(callback_context: CallbackContext, name: str):
         f'Published "{name}".',
         section_ui.confirm_send_card(
             state,
-            _sections_text(result.get('sections') or labels),
+            result.get('sections') or labels,
             result.get('count'),
             result['agent_id'],
         ),
@@ -398,9 +463,28 @@ def _before_agent(callback_context: CallbackContext):
             if starter:
                 action = {'name': starter, 'context': {}}
             elif section_ui.is_greeting(text):
+                if auth.is_known_non_faculty(callback_context):
+                    # No menu and no card. Same rule as every other reply,
+                    # applied to the one path that passes its card in
+                    # explicitly rather than letting `_reply` add it.
+                    return _reply(
+                        'This Google account is not registered with Sethu as '
+                        'faculty, so I cannot act for it. Ask the Sethu team '
+                        'to register it, then sign in again.'
+                    )
+                # A greeting is the one moment a professor is not waiting on
+                # anything, so it is where the agent list gets refreshed. The
+                # sync runs in the background and takes minutes, which is why
+                # the reply says so rather than implying the list is current.
+                tools.request_agent_sync(callback_context)
                 who = auth.first_name(auth.display_name(callback_context))
                 hello = f'Hi {who}, how can I help you?' if who else (
                     'How can I help you?'
+                )
+                hello += (
+                    ' I am refreshing your agent list from Gemini Enterprise — '
+                    'an agent you have just created can take a few minutes to '
+                    'show up.'
                 )
                 return _reply(hello, section_ui.main_menu(callback_context.state))
             else:
@@ -414,6 +498,38 @@ def _before_agent(callback_context: CallbackContext):
         link = (context.get('agent_link') or '').strip()
         if link:
             state[tools.PENDING_LINK] = link
+
+        # So do the ticked sections, on Done and on Another Department alike —
+        # which is what stops a department switch discarding them.
+        ticked = context.get('sections')
+        if ticked:
+            if isinstance(ticked, str):
+                ticked = [part.strip() for part in ticked.split(',')]
+            chosen = list(state.get(tools.CHOSEN_SECTIONS) or [])
+            for label in ticked:
+                label = str(label).strip()
+                if label and label not in chosen:
+                    chosen.append(label)
+            state[tools.CHOSEN_SECTIONS] = chosen
+
+        if name == section_ui.DONE_PICKING:
+            chosen = list(state.get(tools.CHOSEN_SECTIONS) or [])
+            if not chosen:
+                return _reply('Pick at least one section first.',
+                              section_ui.main_menu(state))
+            return _sections_chosen(
+                callback_context, f'{_plural(len(chosen), "section")} selected.'
+            )
+
+        if name == section_ui.SAVE_LINK:
+            # The link itself was stored above, if one was typed.
+            if not state.get(tools.PENDING_LINK):
+                return _reply('I still need the agent link — paste it here.',
+                              section_ui.link_card(state))
+            if not state.get(tools.CHOSEN_SECTIONS):
+                return _reply('Link saved. Now choose who it goes to.',
+                              section_ui.send_agent_card(state))
+            return _reply('Link saved.', section_ui.name_card(state))
 
         if name in (section_ui.PUBLISH, section_ui.SAVE_NAME):
             return _publish_and_confirm(
@@ -440,22 +556,78 @@ def _before_agent(callback_context: CallbackContext):
                 # Idempotency-Key means a second attempt cannot double-message
                 # anyone who already got it.
                 return _reply(result.get('error_message', 'The send failed.'))
-            return _finish(
+            labels = list(state.get(tools.CHOSEN_SECTIONS) or [])
+            # Listed one per line, like the confirmation card. This is the
+            # record of what just happened, and the labels differ by a single
+            # digit — read as a sentence, a professor cannot check it.
+            detail = []
+            if labels:
+                shown = list(labels[:12])
+                if len(labels) > 12:
+                    shown.append(f'and {len(labels) - 12} more')
+                detail = [a2ui.DIVIDER, 'Sent to:', a2ui.bullets(shown)]
+            return _outcome(
                 state,
-                'Sent. Students in those sections will get the link on '
-                'WhatsApp.',
+                '✅  Agent sent',
+                detail + [a2ui.DIVIDER,
+                          'Students in those sections will get the link on '
+                          'WhatsApp. This cannot be undone.'],
+                'Sent.',
             )
 
         if name == section_ui.CANCEL_SEND:
-            return _finish(
+            agent_id = context.get('agent_id')
+            # Cancelling a send that already happened is not a cancellation.
+            if agent_id and tools.confirmation_status(state, agent_id) == 'sent':
+                return _outcome(
+                    state,
+                    '✅  Already sent',
+                    [tools.SENT_CANNOT_CANCEL_MESSAGE],
+                    'This agent has already been sent.',
+                )
+            return _outcome(
                 state,
-                'Nothing was sent. The agent stays published to those '
-                'sections, so you can send it later.',
+                'Not sent',
+                ['Nothing was sent. The agent stays published to those '
+                 'sections, so you can send it later.'],
+                'Nothing was sent.',
             )
 
         if name in progress_ui.MENU_VIEWS:
             return _view_card(
                 callback_context, name, (context.get('department') or '').strip()
+            )
+
+        if name == progress_ui.AMBASSADOR_VIEW:
+            payload = state.get(tools.VIEW_DATA)
+            if payload is None or state.get(tools.VIEW_NAME) != (
+                progress_ui.VIEW_AMBASSADORS
+            ):
+                return _reply(
+                    'That list is no longer loaded — ask me for it again and I '
+                    'will fetch it fresh.',
+                    section_ui.main_menu(state),
+                )
+            state[progress_ui.AMBASSADOR_FILTER] = context.get('filter')
+            return _reply('Here you go.',
+                          progress_ui.ambassador_roster(state, payload, 0))
+
+        if name == progress_ui.AGENT_VIEW:
+            # Rebuilt from the payload already in state — switching cut is a
+            # question about data we hold, not a reason to call Sethu again.
+            payload = state.get(tools.VIEW_DATA)
+            if payload is None or state.get(tools.VIEW_NAME) != (
+                progress_ui.VIEW_AGENT_USAGE
+            ):
+                return _reply(
+                    'That list is no longer loaded — ask me for it again and I '
+                    'will fetch it fresh.',
+                    section_ui.main_menu(state),
+                )
+            state[progress_ui.AGENT_FILTER] = context.get('filter')
+            return _reply(
+                'Here you go.',
+                progress_ui.agent_usage(state, payload, 0),
             )
 
         if name == progress_ui.SHOW_MORE:
@@ -482,10 +654,43 @@ def _before_agent(callback_context: CallbackContext):
             return _reply('Here is the rest.', builder(state, payload, offset))
 
         if name == section_ui.START_SEND:
+            # Offer the agents Sethu already knows about. Pasting a link stays
+            # available underneath, for an agent the sync has not reached yet.
+            found = tools.list_agent_choices(callback_context)
+            if found.get('status') == 'success':
+                return _reply(
+                    'Pick the agent you want to send.',
+                    section_ui.agent_picker_card(state, found['agents']),
+                )
             return _reply(
                 'Paste the agent link, then choose who it goes to.',
                 section_ui.send_agent_card(state),
             )
+
+        if name == section_ui.PASTE_INSTEAD:
+            return _reply(
+                'Paste the agent link, then choose who it goes to.',
+                section_ui.send_agent_card(state),
+            )
+
+        if name == section_ui.PICK_AGENT:
+            picked = context.get('agent')
+            if isinstance(picked, list):
+                picked = picked[0] if picked else None
+            choices = {a['id']: a for a in (state.get(tools.AGENT_CHOICES) or [])}
+            chosen = choices.get(str(picked or '').strip())
+            if not chosen:
+                return _reply(
+                    'Pick one of the agents first.',
+                    section_ui.agent_picker_card(
+                        state, list(state.get(tools.AGENT_CHOICES) or [])),
+                )
+            state[tools.PENDING_LINK] = chosen['link']
+            state[tools.PICKED_NAME] = chosen['name']
+            state[tools.CHOSEN_SECTIONS] = None
+            logger.info('agent picker: chose %r', chosen['name'])
+            return _reply(f'"{chosen["name"]}" it is.',
+                          section_ui.scope_card(state, chosen['name']))
 
         if name in (
             section_ui.SHOW_SECTIONS,
@@ -511,12 +716,25 @@ def _before_agent(callback_context: CallbackContext):
                     for s in roster
                     if s.get('department') == department
                 )
-                return _reply(
-                    f'All of {department} selected — {_plural(len(labels), "section")}, '
+                return _sections_chosen(
+                    callback_context,
+                    f'All of {department} selected — '
+                    f'{_plural(len(labels), "section")}, '
                     f'{_plural(total, "student")}.',
-                    section_ui.name_card(state),
                 )
-            card = section_ui.section_card(state, roster, department)
+            if state.get(tools.SEND_SCOPE) is None:
+                # Browsing, not sending. The list is the answer; there is
+                # nothing to choose and nothing to record.
+                card = section_ui.section_list_card(state, roster, department)
+                if card:
+                    return _reply(f'Here are the {department} sections.', card)
+                return _reply(f'No sections listed for {department}.')
+
+            state[tools.PICKING_DEPARTMENT] = department
+            # Sections already held from other departments. The ticks for this
+            # one live in the card's own data model until Done is pressed.
+            chosen = len(state.get(tools.CHOSEN_SECTIONS) or [])
+            card = section_ui.section_card(state, roster, department, chosen)
             if card:
                 return _reply(f'{department} — which section?', card)
             return _reply(f'No sections listed for {department}.')
@@ -529,16 +747,21 @@ def _before_agent(callback_context: CallbackContext):
             if label not in chosen:
                 chosen.append(label)
             state[tools.CHOSEN_SECTIONS] = chosen
-            # Offer the name card once there is a link to publish; until
-            # then keep letting them add sections.
-            if state.get(tools.PENDING_LINK):
+
+            # Picking stays open. Ending it on the first tap — which is what
+            # happened once a link had been pasted — made multi-section sends
+            # impossible in the order the Send Agent card asks for.
+            department = state.get(tools.PICKING_DEPARTMENT)
+            card = (section_ui.section_card(state, roster, department,
+                                            len(chosen))
+                    if roster and department else None)
+            if card:
                 return _reply(
-                    f'Selected {label} ({len(chosen)} so far).',
-                    section_ui.name_card(state),
+                    f'Selected {label} ({len(chosen)} so far).', card
                 )
             return _reply(
                 f'Selected {label} ({len(chosen)} so far). Pick another, or '
-                'paste the agent link to publish.',
+                'press Done.',
                 section_ui.department_card(state, roster) if roster else None,
             )
     except Exception:  # A broken card must never cost the professor an answer.

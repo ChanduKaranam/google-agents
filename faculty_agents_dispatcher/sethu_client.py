@@ -246,10 +246,24 @@ def list_faculty_sections(token: str) -> list:
     Requires a token carrying an `email` claim. A token without one gets 403,
     which is what blocked this endpoint all morning.
     """
+    return list_faculty_scope(token)[1]
+
+
+def list_faculty_scope(token: str) -> tuple[str, list]:
+    """The roster, plus the department Sethu resolved the caller to.
+
+    Same call as `list_faculty_sections`; this one keeps the `department` the
+    payload carries alongside the roster instead of dropping it. It is the only
+    place the caller's own department is available — the progress and
+    ambassador endpoints return it too, but return "" for an admin or
+    non-roster email, which is exactly the case that needs telling apart.
+
+    Returns ("", roster) when Sethu does not name a department.
+    """
     payload = _request('GET', '/faculty/sections', headers=_bearer_headers(token))
     if isinstance(payload, dict):
-        payload = payload.get('sections')
-    return payload or []
+        return (payload.get('department') or ''), (payload.get('sections') or [])
+    return '', (payload or [])
 
 
 def get_department_progress(token: str, department: str | None = None) -> dict:
@@ -301,6 +315,25 @@ def get_ambassadors(token: str) -> dict:
     """
     return _request(
         'GET', '/faculty/ambassadors', headers=_bearer_headers(token)
+    ) or {}
+
+
+def trigger_agent_sync(token: str) -> dict:
+    """Ask Sethu to re-read Gemini Enterprise now.
+
+    Fire and forget. The sync enumerates every agent under the engine and can
+    take minutes, so this returns as soon as Sethu accepts the request — the
+    caller must not wait for the result or promise the professor a fresh list.
+
+    Given a short timeout of its own: this runs on a greeting, and a professor
+    saying hello should not sit watching a spinner because a background job is
+    slow.
+    """
+    return _request(
+        'POST',
+        '/faculty/agents/sync',
+        headers=_bearer_headers(token),
+        timeout=config.SYNC_TRIGGER_TIMEOUT_SECONDS,
     ) or {}
 
 

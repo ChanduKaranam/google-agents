@@ -5,10 +5,14 @@ Extracted from a live agent (Campus Ambassador, painting in GE since
 production -- a card that does not render logs NOTHING server-side, and at best
 shows a red "This content could not be displayed" box in the chat.
 
-The catalog is closed and small: no Table, no ProgressBar, no ChoicePicker, no
-link primitive. Only Button carries an action, so any value a user types
-reaches the agent solely through a Button's action.context via a data-model
-path.
+The catalog is closed and small: no Table, no ProgressBar, no link primitive.
+Only Button carries an action, so any value a user picks or types reaches the
+agent solely through a Button's action.context via a data-model path.
+
+Read from the published catalog on 2026-08-12, the full component list is:
+AudioPlayer, Button, Card, CheckBox, Column, DateTimeInput, Divider, Icon,
+Image, List, Modal, MultipleChoice, Row, Slider, Tabs, Text, TextField, Video.
+Only the ones used here are known to render in Gemini Enterprise.
 
 Usage:
     from .a2ui import (build_card, to_genai_parts, uid, parse_user_action,
@@ -119,6 +123,27 @@ def button_with_values(component_id: str, label_id: str, name: str,
     }
 
 
+def multiple_choice(component_id: str, path: str,
+                    options: list[tuple[str, str]],
+                    max_selections: int | None = None) -> dict:
+    """A tick-list bound to an array in the data model.
+
+    `options` is a list of (label, value). The chosen values collect at `path`,
+    and reach the agent when a Button carrying `{"key": {"path": path}}` is
+    pressed — the same mechanism as TextField, an array instead of a string.
+    """
+    choice = {
+        "selections": {"path": path},
+        "options": [
+            {"label": {"literalString": label}, "value": value}
+            for label, value in options
+        ],
+    }
+    if max_selections is not None:
+        choice["maxAllowedSelections"] = max_selections
+    return {"id": component_id, "component": {"MultipleChoice": choice}}
+
+
 def button_rows(prefix: str, labels: list[str], button_ids: list[str],
                 budget: int | None = None,
                 cap: int | None = None) -> tuple[list[dict], list[str]]:
@@ -151,6 +176,30 @@ def button_rows(prefix: str, labels: list[str], button_ids: list[str],
         components.append(row(row_id, [button_ids[i] for i in group]))
         row_ids.append(row_id)
     return components, row_ids
+
+
+def divider(component_id: str, axis: str = "horizontal") -> dict:
+    return {"id": component_id, "component": {"Divider": {"axis": axis}}}
+
+
+def list_of(component_id: str, children: list[str],
+            direction: str = "vertical") -> dict:
+    """A List container. Like Column, but the client renders it as a list."""
+    return {
+        "id": component_id,
+        "component": {"List": {"children": {"explicitList": children},
+                               "direction": direction}},
+    }
+
+
+# Markers usable in `build_card`'s `lines`, so a card can ask for a rule or a
+# list without hand-building its components.
+DIVIDER = {"__a2ui__": "divider"}
+
+
+def bullets(items: list[str]) -> dict:
+    """Mark these lines as one List rather than separate paragraphs."""
+    return {"__a2ui__": "list", "items": list(items)}
 
 
 def column(component_id: str, children: list[str]) -> dict:
@@ -225,8 +274,33 @@ def build_card(surface_id: str, lines: list[str],
     """
     components, children = [], []
     for index, line in enumerate(lines):
+        # A line may be a plain string; (text, usageHint) to override the
+        # default; `DIVIDER` for a rule; or `bullets([...])` for a List.
+        # Section headings inside a card need to look like headings, and Text's
+        # usageHint is how you say so — Button is the only pill-shaped
+        # component and it dispatches an action when tapped, so it cannot be
+        # used as decoration.
+        if isinstance(line, dict) and line.get("__a2ui__") == "divider":
+            rule_id = f"{surface_id}-div{index}"
+            components.append(divider(rule_id))
+            children.append(rule_id)
+            continue
+        if isinstance(line, dict) and line.get("__a2ui__") == "list":
+            item_ids = []
+            for position, item in enumerate(line["items"]):
+                item_id = f"{surface_id}-li{index}x{position}"
+                components.append(text(item_id, item))
+                item_ids.append(item_id)
+            list_id = f"{surface_id}-list{index}"
+            components.append(list_of(list_id, item_ids))
+            children.append(list_id)
+            continue
+        if isinstance(line, (tuple, list)):
+            content, hint = line[0], line[1]
+        else:
+            content, hint = line, ("h3" if index == 0 else "body")
         line_id = f"{surface_id}-line{index}"
-        components.append(text(line_id, line, "h3" if index == 0 else "body"))
+        components.append(text(line_id, content, hint))
         children.append(line_id)
 
     button_ids = []

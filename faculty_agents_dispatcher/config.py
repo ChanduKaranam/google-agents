@@ -63,6 +63,23 @@ DEPARTMENT_SWITCH_ENABLED = (
     os.environ.get('FACULTY_DEPARTMENT_SWITCH', '') == '1'
 )
 
+# Gemini Enterprise agents that are ours, not a professor's.
+#
+# Sethu's sync ingests every GE agent with a creator in the audit log, so this
+# agent and its siblings arrive as claimable "faculty agents" — measured
+# 2026-08-13, a freshly created faculty agent and our own dispatcher are
+# byte-identical in the API response apart from their ids. Until Sethu filters
+# them out, or exposes a creator so we can, the ids are listed here.
+#
+# Comma-separated GE agent ids, as they appear at the end of an openUrl.
+HIDDEN_GE_AGENT_IDS = frozenset(
+    part.strip() for part in os.environ.get(
+        'FACULTY_HIDDEN_GE_AGENTS',
+        # Champion Faculty (A2UI), the retired Champion Faculty (ADK).
+        '5115760108249648706,12220860024771704401',
+    ).split(',') if part.strip()
+)
+
 # Local-development escape hatches, for running outside Gemini Enterprise where
 # no caller identity is forwarded.
 #   ..._GOOGLE_ACCESS_TOKEN — a Google OAuth access token, exchanged normally.
@@ -94,6 +111,13 @@ REQUEST_TIMEOUT_SECONDS = float(os.environ.get('SETHU_API_TIMEOUT', '60'))
 # the one failure where we cannot tell a professor whether their students were
 # messaged. Given a longer rope for that reason.
 NOTIFY_TIMEOUT_SECONDS = float(os.environ.get('SETHU_NOTIFY_TIMEOUT', '120'))
+
+# How long to wait for Sethu to accept a sync request. Short on purpose: this
+# fires while a professor is being greeted, and the answer is not needed — the
+# sync runs in the background either way.
+SYNC_TRIGGER_TIMEOUT_SECONDS = float(
+    os.environ.get('SETHU_SYNC_TRIGGER_TIMEOUT', '10')
+)
 
 # Re-exchange a Sethu token once it is within this many days of expiring,
 # rather than letting a long conversation fail mid-flight.

@@ -8,6 +8,7 @@ share link and the sections together, and a separate `notify` does the send.
 
 import logging
 import uuid
+from urllib.parse import parse_qsl, urlsplit, urlunsplit
 
 from google.adk.tools import ToolContext
 
@@ -29,6 +30,15 @@ CHOSEN_SECTIONS = 'chosen_sections'
 # later department tap means: pick every section in that department, or drill
 # down to one.
 SEND_SCOPE = 'send_scope'
+
+# The department whose sections are currently on screen, so a pick can redraw
+# the same card instead of sending the professor back to the department list
+# after every section.
+PICKING_DEPARTMENT = 'picking_department'
+
+# The name of the agent chosen from the picker. Gemini Enterprise already
+# named it, so the professor is not asked to name it again.
+PICKED_NAME = 'picked_agent_name'
 
 # The link the professor pasted into the card's text field.
 PENDING_LINK = 'pending_agent_link'
@@ -65,6 +75,15 @@ SEND_UNCONFIRMED_MESSAGE = (
     'went out. They may have. Check the agent in Sethu before trying again — '
     'if you do try again, students who already received it will not be '
     'messaged twice.'
+)
+
+# Cancel, pressed on a send that has already gone out. Saying "nothing was
+# sent" here would be false in the one direction that matters: the professor
+# walks away believing their students were not messaged when they were.
+SENT_CANNOT_CANCEL_MESSAGE = (
+    'This agent has already been sent, and WhatsApp messages cannot be '
+    'recalled — so cancelling now changes nothing. The students in those '
+    'sections have the link.'
 )
 
 # What a repeat confirmation is answered with, in code rather than by the
@@ -108,6 +127,69 @@ def confirmation_status(state, agent_id: str) -> str:
 
 
 logger = logging.getLogger(__name__)
+
+
+# Gemini Enterprise's web host. Share links are addresses in this app, not
+# tokens it mints — GE's API has no share-URL field at all, so a professor's
+# only source is the browser bar, and what is there describes their session as
+# much as it describes the agent.
+_GE_HOST = 'vertexaisearch.cloud.google.com'
+
+# Query parameters that describe the person who copied the link rather than
+# what it points at.
+# `_gl` is Google Analytics' cross-domain linker. Decoded, it carries the
+# copier's GA client id and session count — a pseudonymous fingerprint of the
+# person who copied the link, which would then travel to every student in the
+# section. It expires in about two minutes so the tracking is inert by the time
+# anyone clicks, but it identifies a person and has no reason to be in a link
+# we store and send on.
+_PERSONAL_QUERY = frozenset({'hl', 'authuser', '_gl'})
+
+
+def normalise_agent_link(link: str) -> str:
+    """Reduce a copied browser URL to the part that identifies the agent.
+
+    Measured 2026-08-11 against real records. The shape is:
+
+        /u/{account index}/home/cid/{client id}/r/agent/{agent id}/session/{id}
+
+    Three pieces of it belong to whoever did the copying, not to the agent:
+
+    * `/u/2/` is their position in Google's account switcher. A student whose
+      accounts are ordered differently lands on the wrong one, or on none.
+    * a numeric `session` is one of their conversations. `-` is the form GE
+      itself uses for "start a new session", and one of the observed links
+      already had it.
+    * `hl` / `authuser` carry their locale and account.
+
+    Anything not recognisable as a GE link is returned untouched. A link this
+    function does not understand is one it must not rewrite: `publish_agent`
+    creates a record Sethu cannot delete, so a mangled URL is permanent.
+    """
+    link = (link or '').strip()
+    try:
+        parts = urlsplit(link)
+    except ValueError:
+        return link
+    if parts.netloc != _GE_HOST:
+        return link
+
+    segments = parts.path.split('/')
+    # ['', 'u', '2', 'home', ...] -> ['', 'home', ...]
+    if len(segments) > 3 and segments[1] == 'u' and segments[2].isdigit():
+        segments = [segments[0]] + segments[3:]
+    if 'session' in segments:
+        index = segments.index('session')
+        if index + 1 < len(segments):
+            segments[index + 1] = '-'
+        else:
+            segments.append('-')
+
+    query = '&'.join(
+        f'{k}={v}' for k, v in parse_qsl(parts.query, keep_blank_values=True)
+        if k not in _PERSONAL_QUERY
+    )
+    return urlunsplit((parts.scheme, parts.netloc, '/'.join(segments), query, ''))
 
 
 def _error(message: str) -> dict:
@@ -219,7 +301,14 @@ def _call(tool_context: ToolContext, action):
 
 
 def _same_link(a: str, b: str) -> bool:
-    return bool(a) and bool(b) and a.strip().rstrip('/') == b.strip().rstrip('/')
+    """Whether two links point at the same agent.
+
+    Compared after normalising, so a professor pasting their own `/u/2/…`
+    address matches the canonical link already stored against the agent —
+    otherwise `find_agent_by_link` misses it and they publish a duplicate.
+    """
+    a, b = normalise_agent_link(a).rstrip('/'), normalise_agent_link(b).rstrip('/')
+    return bool(a) and bool(b) and a == b
 
 
 def show_main_menu(tool_context: ToolContext) -> dict:
@@ -322,6 +411,7 @@ def show_department_progress(tool_context: ToolContext,
     if not progress or not progress.get('sections'):
         return _error('Sethu returned no activation data for this department.')
     _log_scope(tool_context, progress)
+    progress = _narrow_progress(progress, _own_department(tool_context))
 
     # The idle-sections figure lives on a different endpoint. It is worth one
     # extra call on an already-woken API, but not worth failing the whole card
@@ -329,7 +419,11 @@ def show_department_progress(tool_context: ToolContext,
     ambassadors = None
     if config.AMBASSADOR_VIEW_ENABLED:
         try:
-            ambassadors = _call(tool_context, sethu_client.get_ambassadors)
+            ambassadors = _narrow_ambassadors(
+                _call(tool_context, sethu_client.get_ambassadors),
+                _own_department(tool_context),
+                _departments_roster(tool_context),
+            )
         except SethuError:
             logger.info('ambassadors unavailable; dashboard drops the idle count')
 
@@ -352,16 +446,91 @@ def show_department_progress(tool_context: ToolContext,
     }
 
 
+# The department Sethu resolves this professor to, cached per session. Empty
+# for an admin or non-roster email, which is the case that must not be narrowed
+# — there is no "own department" to narrow to.
+OWN_DEPARTMENT = 'own_department'
+
+
 def _departments_roster(tool_context: ToolContext) -> list:
     """The full college roster, fetched once per session."""
     roster = tool_context.state.get(ROSTER_CACHE)
     if not roster:
         try:
-            roster = _call(tool_context, sethu_client.list_faculty_sections)
+            department, roster = _call(
+                tool_context, sethu_client.list_faculty_scope
+            )
         except SethuError:
             return []
         tool_context.state[ROSTER_CACHE] = roster
+        tool_context.state[OWN_DEPARTMENT] = department
+        logger.info('scope: Sethu resolves this caller to department %r',
+                    department or '(none — admin or non-roster)')
     return roster or []
+
+
+def _own_department(tool_context: ToolContext) -> str:
+    """This professor's department, or "" if Sethu does not give them one."""
+    if tool_context.state.get(OWN_DEPARTMENT) is None:
+        _departments_roster(tool_context)
+    return tool_context.state.get(OWN_DEPARTMENT) or ''
+
+
+def _narrow_progress(progress: dict, department: str) -> dict:
+    """Cut a whole-college progress response down to one department.
+
+    Sethu already scopes this per caller; this only bites when it hands back
+    the whole college (`department: ""`) for someone who does have a
+    department. Faculty are meant to see their own progress, while still being
+    able to send an agent anywhere in the college.
+
+    The server's ordering is kept exactly as given — pooling included — and
+    only the printed positions are renumbered, so a filtered list still reads
+    #1, #2, #3 without this code ever deciding who outranks whom.
+    """
+    if not department or (progress.get('department') or ''):
+        return progress
+    sections = [s for s in (progress.get('sections') or [])
+                if s.get('department') == department]
+    if not sections:
+        return progress
+
+    sections = sorted(sections,
+                      key=lambda s: (s.get('rank') is None, s.get('rank') or 0))
+    renumbered = [{**s, 'rank': i} for i, s in enumerate(sections, 1)]
+    return {
+        **progress,
+        'department': department,
+        'sections': renumbered,
+        # Recomputed, never inherited: the college totals would describe an
+        # audience this card is no longer showing.
+        'activated': sum(s.get('activated') or 0 for s in renumbered),
+        'total': sum(s.get('total') or 0 for s in renumbered),
+    }
+
+
+def _narrow_ambassadors(data: dict, department: str, roster: list) -> dict:
+    """The same narrowing for the ambassador roster.
+
+    Ambassadors carry a section label rather than a department, so the roster
+    supplies which labels belong to this department.
+    """
+    if not department or (data.get('department') or ''):
+        return data
+    labels = {str(s.get('label')) for s in roster
+              if s.get('department') == department and s.get('label')}
+    if not labels:
+        return data
+    return {
+        **data,
+        'department': department,
+        'ambassadors': [a for a in (data.get('ambassadors') or [])
+                        if str(a.get('section')) in labels],
+        'sectionsWithoutAmbassador': [
+            s for s in (data.get('sectionsWithoutAmbassador') or [])
+            if str(s.get('section')) in labels
+        ],
+    }
 
 
 def _departments(tool_context: ToolContext) -> list:
@@ -456,6 +625,7 @@ def show_leaderboard(tool_context: ToolContext,
     if not progress or not progress.get('sections'):
         return _error('Sethu returned no activation data for this department.')
     _log_scope(tool_context, progress)
+    progress = _narrow_progress(progress, _own_department(tool_context))
 
     _staged(tool_context, progress_ui.VIEW_LEADERBOARD, {
         'progress': progress,
@@ -497,12 +667,18 @@ def show_ambassadors(tool_context: ToolContext) -> dict:
         return _error(str(exc))
     if not data:
         return _error('Sethu returned no ambassador data for this department.')
+    data = _narrow_ambassadors(
+        data, _own_department(tool_context), _departments_roster(tool_context)
+    )
 
     logger.info(
         'scope: ambassadors returned %d for %r, %d section(s) with none',
         len(data.get('ambassadors') or []), data.get('department'),
         len(data.get('sectionsWithoutAmbassador') or []),
     )
+    # Opening the card starts from the full roster, whatever cut was last
+    # chosen in this session.
+    tool_context.state[progress_ui.AMBASSADOR_FILTER] = None
     _staged(tool_context, progress_ui.VIEW_AMBASSADORS, data)
     return {
         'status': 'success',
@@ -532,16 +708,194 @@ def show_agent_usage(tool_context: ToolContext) -> dict:
     if not agents:
         return _error('This professor has no published agents yet.')
 
+    # Which usage fields Sethu is actually populating. `statsSyncedAt` is the
+    # gate the card renders on, so a value present without it is as good as
+    # absent — worth seeing both counts separately rather than inferring.
+    synced = [a for a in agents if a.get('statsSyncedAt')]
+    def _have(field):
+        return sum(1 for a in agents
+                   if (a.get('stats') or {}).get(field) is not None)
     logger.info(
-        'scope: agents returned %d, %d of them sent to sections',
-        len(agents), sum(1 for a in agents if a.get('sections')),
+        'scope: agents returned %d, %d sent to sections, %d with '
+        'statsSyncedAt; populated: questionsThisWeek=%d usedBy=%d '
+        'signInsCaused=%d topUnanswered=%d',
+        len(agents), sum(1 for a in agents if a.get('sections')), len(synced),
+        _have('questionsThisWeek'), _have('usedBy'),
+        _have('signInsCaused'), _have('topUnanswered'),
     )
+    # What a Gemini Enterprise share link actually looks like. GE's own API has
+    # no share-URL field — `sharingConfig` carries only a scope enum — so the
+    # only way to learn the format is to read one Sethu has stored. If the ids
+    # in these are the agent ids, the link is derivable and nobody needs to
+    # copy it out of a browser bar.
+    for a in [x for x in agents if x.get(_LINK_FIELD)][:3]:
+        logger.info('geUrl sample: id=%s name=%r unclaimed=%s url=%s',
+                    a.get('id'), a.get('name'), a.get('unclaimed'),
+                    a.get(_LINK_FIELD))
+    logger.info('geUrl coverage: %d of %d agents carry a link, %d unclaimed',
+                sum(1 for a in agents if a.get(_LINK_FIELD)), len(agents),
+                sum(1 for a in agents if a.get('unclaimed')))
+
+    newest = sorted(agents, key=lambda a: str(a.get('publishedAt') or ''),
+                    reverse=True)[:3]
+    for a in newest:
+        logger.info('newest row: %s',
+                    {k: v for k, v in a.items() if k != 'shareToken'})
+
+    # Whether a picker is buildable turns entirely on the unclaimed records —
+    # the ones Sethu's GE sync found on its own, which is what a no-code agent
+    # built in Gemini Enterprise looks like before anyone pastes a link. A
+    # picker needs them to (a) belong to this professor and (b) carry a usable
+    # link. Every field is logged rather than just the counts, because it is
+    # not yet known which of them the sync fills in.
+    unclaimed = [a for a in agents if a.get('unclaimed')]
+    logger.info('unclaimed: %d of %d agents; %d carry a link',
+                len(unclaimed), len(agents),
+                sum(1 for a in unclaimed if a.get(_LINK_FIELD)))
+    for a in unclaimed[:8]:
+        # Everything except the share token, which is a bearer value for the
+        # /go link and has no business in a log.
+        redacted = {k: v for k, v in a.items() if k != 'shareToken'}
+        logger.info('unclaimed record: %s', redacted)
+    # Which of the URL-ish fields is actually filled in, across every row.
+    for field in ('geUrl', 'openUrl', 'geAgentId', 'createdByEmail',
+                  'createdByYou'):
+        present = sum(1 for a in agents if a.get(field))
+        if present or any(field in a for a in agents):
+            logger.info('field %s: present on %d of %d rows, %d on unclaimed',
+                        field, present, len(agents),
+                        sum(1 for a in unclaimed if a.get(field)))
+
+    if synced:
+        sample = synced[0]
+        logger.info('scope: sample synced agent %r stats=%s syncedAt=%s',
+                    sample.get('name'), sample.get('stats'),
+                    sample.get('statsSyncedAt'))
+    # Opening the card starts from the whole list, whatever cut was last
+    # chosen in this session.
+    tool_context.state[progress_ui.AGENT_FILTER] = None
     _staged(tool_context, progress_ui.VIEW_AGENT_USAGE, agents)
     return {
         'status': 'success',
         'agent_count': len(agents),
         'note': 'The card shows each agent. Do not repeat the figures.',
     }
+
+
+# Where the picker keeps the agents it offered, so a choice can be resolved to
+# a link without asking Sethu again.
+AGENT_CHOICES = 'agent_choices'
+
+# The composed Gemini Enterprise link Sethu now returns on every row, including
+# ones no professor has pasted a link for.
+_OPEN_LINK_FIELD = 'openUrl'
+
+
+def ge_agent_id(link: str) -> str:
+    """The GE agent id inside a share link, or "" if it is not one."""
+    parts = [p for p in str(link or '').split('/') if p]
+    if 'agent' in parts:
+        index = parts.index('agent')
+        if index + 1 < len(parts):
+            return parts[index + 1].split('?')[0]
+    return ''
+
+
+def choosable_agents(agents: list) -> list:
+    """The agents worth offering a professor, newest first.
+
+    One entry per Gemini Enterprise agent, under the name it has in GE.
+
+    `/faculty/agents` returns a row per *send*, not per agent: publishing to a
+    second set of sections creates another row, renamed for that send. Listing
+    those back is listing a professor's own past sends as if they were things
+    to send — "Hackashop", "Hackashop — already sent to 1 sections" and
+    "DOC CIVIL 3 SEC" were three rows over the same underlying agent.
+
+    So rows are grouped by the GE agent id inside their link, and the row that
+    represents the agent itself wins: the one the sync created, which carries
+    the GE name. Only if the sync never saw it — an agent known solely from a
+    pasted link — does the earliest send stand in for it.
+
+    Excludes anything with no link to send, and the dispatcher agents Sethu's
+    sync ingests as if a professor had made them.
+    """
+    best = {}
+    for agent in agents or []:
+        link = agent.get(_OPEN_LINK_FIELD) or agent.get(_LINK_FIELD)
+        if not link:
+            continue
+        ge_id = ge_agent_id(link)
+        if ge_id in config.HIDDEN_GE_AGENT_IDS:
+            continue
+        entry = {
+            'id': str(agent.get('id')),
+            'name': str(agent.get('name') or 'Untitled agent'),
+            'link': normalise_agent_link(link),
+            'sections': list(agent.get('sections') or []),
+            'unclaimed': bool(agent.get('unclaimed')),
+            'publishedAt': str(agent.get('publishedAt') or ''),
+        }
+        # Rows with no id in their link cannot be grouped, so each keeps itself.
+        key = ge_id or f'row:{entry["id"]}'
+        current = best.get(key)
+        if current is None:
+            best[key] = entry
+        elif entry['unclaimed'] and not current['unclaimed']:
+            best[key] = entry
+        elif entry['unclaimed'] == current['unclaimed'] and (
+            entry['publishedAt'] < current['publishedAt']
+        ):
+            best[key] = entry
+
+    offered = sorted(best.values(), key=lambda a: a['publishedAt'], reverse=True)
+    return offered
+
+
+# Set once a sync has been asked for in this session, so a professor typing
+# "hi" five times does not queue five enumerations of the whole engine.
+SYNC_REQUESTED = 'sync_requested'
+
+
+def request_agent_sync(tool_context: ToolContext) -> bool:
+    """Ask Sethu to re-read Gemini Enterprise. Best effort, never raises.
+
+    Returns True if Sethu accepted the request. A failure is logged and
+    swallowed: the greeting must not fail because a background job could not be
+    started, and the professor is told the list may lag regardless.
+    """
+    if tool_context.state.get(SYNC_REQUESTED):
+        return False
+    tool_context.state[SYNC_REQUESTED] = True
+    try:
+        result = _call(tool_context, sethu_client.trigger_agent_sync)
+        logger.info('agent sync requested: %s', result)
+        return True
+    except SethuError as exc:
+        logger.warning('could not request an agent sync: %s', exc)
+        return False
+    except Exception:
+        logger.exception('could not request an agent sync')
+        return False
+
+
+def list_agent_choices(tool_context: ToolContext) -> dict:
+    """Fetch the professor's agents and remember what was offered.
+
+    Returns:
+        A dict with 'status'. On success, 'agents' is the offered list.
+    """
+    try:
+        agents = _call(tool_context, sethu_client.list_faculty_agents)
+    except SethuError as exc:
+        return _error(str(exc))
+    offered = choosable_agents(agents)
+    tool_context.state[AGENT_CHOICES] = offered
+    logger.info('agent picker: offering %d of %d rows', len(offered),
+                len(agents or []))
+    if not offered:
+        return _error('No agents to choose from yet.')
+    return {'status': 'success', 'agents': offered}
 
 
 def _summarise(agent: dict) -> dict:
@@ -612,7 +966,7 @@ def find_agent_by_link(agent_link: str, tool_context: ToolContext) -> dict:
         'agent' describes it, including the sections it currently goes to.
         'not_published' means it needs `publish_agent`.
     """
-    link = agent_link.strip()
+    link = normalise_agent_link(agent_link)
     if not link.startswith('https://'):
         return _error(
             'That does not look like an agent link. Ask the professor for the '
@@ -659,7 +1013,12 @@ def publish_agent(
         A dict with 'status'. On success, 'agent_id' identifies it and 'count'
         is the number of students it would reach.
     """
-    link = agent_link.strip()
+    # Normalised before anything is written. Publishing is irreversible, so a
+    # link carrying someone's account index and chat session would be stored
+    # against students permanently.
+    link = normalise_agent_link(agent_link)
+    if link != agent_link.strip():
+        logger.info('normalised agent link before publishing')
     if not link.startswith('https://'):
         return _error('That is not a valid https:// share link.')
     if not sections:

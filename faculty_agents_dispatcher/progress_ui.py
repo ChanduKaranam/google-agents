@@ -32,6 +32,28 @@ import json
 
 from . import a2ui, config
 
+# Which cut of the agent list is on screen. Held in session state rather than
+# passed through the builder, so a "Show more" inside a filtered view pages the
+# filtered list instead of silently reverting to all agents.
+AGENT_FILTER = 'agent_usage_filter'
+
+# Filter buttons on the agents card.
+AGENT_VIEW = 'agent_view'
+FILTER_ALL = 'all'
+FILTER_MOST_USED = 'most_used'
+FILTER_MOST_ACTIVATED = 'most_activated'
+FILTER_NO_ACTIVATION = 'no_activation'
+FILTER_NOT_SENT = 'not_sent'
+
+# Which cut of the ambassador roster is on screen, and the button that changes
+# it. Same shape as the agents card: the payload is already in state, so
+# switching costs no call to Sethu.
+AMBASSADOR_FILTER = 'ambassador_filter'
+AMBASSADOR_VIEW = 'ambassador_view'
+AMB_ALL = 'all'
+AMB_LEADERBOARD = 'leaderboard'
+AMB_UNCOVERED = 'uncovered'
+
 # Paging. The offset travels in the button's action context; the rows it pages
 # through are already in session state, so a page turn costs no API call.
 SHOW_MORE = 'show_more_rows'
@@ -122,6 +144,16 @@ _MONTHS = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
 
 
+def _stamp(synced_at) -> str:
+    """A timestamp a professor reads, e.g. "as of 11 Aug, 06:00"."""
+    text = str(synced_at)
+    try:
+        return (f'as of {int(text[8:10])} {_MONTHS[int(text[5:7]) - 1]}, '
+                f'{text[11:16]}')
+    except (ValueError, IndexError):
+        return f'as of {text[:16].replace("T", " ")}'
+
+
 def _synced_line(synced_at) -> str:
     """Say how fresh the numbers are, or that they have never been fresh."""
     if not synced_at:
@@ -137,7 +169,8 @@ def _synced_line(synced_at) -> str:
 
 
 def _paged(state, base: str, header: list, rows: list, footer: str | None,
-           view: str, offset: int, buttons: list | None = None) -> list:
+           view: str, offset: int, buttons: list | None = None,
+           row_budget: int | None = None, row_cap: int | None = None) -> list:
     # `footer` may be a single line or several.
     """Fit what fits, page the rest behind a button.
 
@@ -159,14 +192,22 @@ def _paged(state, base: str, header: list, rows: list, footer: str | None,
                 {'view': view, 'offset': offset + count},
             ))
         tail = ([footer] if isinstance(footer, str) else list(footer or []))
-        lines = header + shown + tail
-        messages = a2ui.build_card(prefix, lines, page_buttons)
+        # Rules where the card changes subject: the rollup ends and the list
+        # begins, the list ends and the footnotes begin.
+        lines = (header
+                 + ([a2ui.DIVIDER] if shown else [])
+                 + shown
+                 + ([a2ui.DIVIDER] if tail else [])
+                 + tail)
+        messages = a2ui.build_card(prefix, lines, page_buttons,
+                                   row_budget=row_budget, row_cap=row_cap)
         if _fits(messages):
             return messages
     tail = ([footer] if isinstance(footer, str) else list(footer or []))
     # Only say there is nothing when nothing else on the card explains why.
     empty = [] if (rows or tail) else ['Nothing to show yet.']
-    return a2ui.build_card(prefix, header + empty + tail, extra)
+    return a2ui.build_card(prefix, header + empty + tail, extra,
+                           row_budget=row_budget, row_cap=row_cap)
 
 
 def _department_buttons(data: dict, progress: dict, action: str) -> tuple[list, str | None]:
@@ -278,7 +319,11 @@ def department_dashboard(state, data: dict, offset: int = 0) -> list:
         ('Section List', SECTION_LIST, None),
     ]
 
-    rows = [_section_entry(s) for s in sorted(sections, key=worst_first)]
+    # A heading between the department's own figures and the per-section list.
+    # Without it the summary's last line and the first section run together —
+    # both are body text, and a reader cannot tell where the rollup stops.
+    rows = [[_heading('Sections')]]
+    rows += [_section_entry(s) for s in sorted(sections, key=worst_first)]
     return _paged(state, 'deptprog', header, rows,
                   _synced_line(progress.get('syncedAt')),
                   VIEW_DEPARTMENT, offset, buttons)
@@ -325,9 +370,17 @@ def leaderboard(state, data: dict, offset: int = 0) -> list:
         if any(s.get('pooled') for s in sections):
             footer += ' Sections under 30 students rank last.'
 
-    buttons, caveat = _department_buttons(data, progress, MENU_LEADERBOARD)
+    switch_buttons, caveat = _department_buttons(data, progress, MENU_LEADERBOARD)
     if caveat:
         header.append(caveat)
+
+    # The way back. This card is reached from the department card, and without
+    # these it is a dead end — the only thing under it was the opening menu,
+    # which starts the professor over rather than returning them.
+    buttons = switch_buttons + [
+        ('DEPT Progress', MENU_DEPARTMENT, None),
+        ('Section List', SECTION_LIST, None),
+    ]
     return _paged(state, 'leaderb', header, rows, footer,
                   VIEW_LEADERBOARD, offset, buttons)
 
@@ -400,35 +453,80 @@ def ambassador_summary(data: dict) -> str:
     return ' '.join(parts)
 
 
+def _amb_rate(ambassador: dict) -> float:
+    total = ambassador.get('total') or 0
+    return (ambassador.get('activated') or 0) / total if total else 0.0
+
+
 def ambassador_roster(state, data: dict, offset: int = 0) -> list:
-    """The roster in the order Sethu returned it — worst first."""
+    """The department's ambassadors, or one cut of them.
+
+    Three views over the same payload. The default keeps Sethu's own order —
+    worst first — because the card is asked who needs attention. The
+    leaderboard reverses that question, and the uncovered list answers a third
+    one the ambassador list cannot: which sections have nobody at all, which is
+    why Sethu returns it separately.
+    """
     people = list(data.get('ambassadors') or [])
-    header = [
-        f'Ambassadors in {data.get("department") or "the college"}',
-        ambassador_summary(data),
-    ]
-    # Pointless above a single row, and it is the ordering that needs
-    # explaining, not the list.
-    if len(people) > 1:
-        header.append('Quietest sections are listed first.')
-    rows = [
-        [
-            f'{a.get("name")} — {a.get("section")}',
-            f'{_bar(a.get("activated"), a.get("total"))}  '
-            f'{_pct(a.get("activated"), a.get("total"))} · '
-            f'{_ratio(a.get("activated"), a.get("total"))} · {_idle_phrase(a)}',
+    uncovered = list(data.get('sectionsWithoutAmbassador') or [])
+    where = data.get('department') or 'the college'
+    chosen = (state or {}).get(AMBASSADOR_FILTER) or AMB_ALL
+
+    if chosen == AMB_LEADERBOARD:
+        shown = sorted(people, key=lambda a: (-_amb_rate(a), _agent_name(a)))
+        header = [f'Ambassador Leaderboard — {where}']
+        if shown:
+            header.append('Ranked on % of their section activated.')
+        top = _amb_rate(shown[0]) if shown else 0.0
+        rows = []
+        for position, a in enumerate(shown, 1):
+            activated, total = a.get('activated'), a.get('total')
+            bar = (_bar(round(_amb_rate(a) * 100), round(top * 100))
+                   if top else _bar(0, 0))
+            rows.append([
+                f'#{position}  {a.get("name")} — {a.get("section")}',
+                f'{bar}  {_pct(activated, total)} · {_ratio(activated, total)}',
+            ])
+        footer = ['No ambassadors are listed for this department.'] if not shown else []
+
+    elif chosen == AMB_UNCOVERED:
+        header = [f'Sections With No Ambassador — {where}']
+        rows = [[f'·  {s.get("section")}'
+                 + (f'  —  {_plural(s.get("total") or 0, "student")}'
+                    if s.get('total') else '')]
+                for s in uncovered]
+        footer = ([] if uncovered else
+                  ['Every section in this department has an ambassador.'])
+
+    else:
+        chosen = AMB_ALL
+        header = [f'Ambassadors in {where}', ambassador_summary(data)]
+        if len(people) > 1:
+            header.append('Quietest sections are listed first.')
+        rows = [
+            [
+                f'{a.get("name")} — {a.get("section")}',
+                f'{_bar(a.get("activated"), a.get("total"))}  '
+                f'{_pct(a.get("activated"), a.get("total"))} · '
+                f'{_ratio(a.get("activated"), a.get("total"))} · {_idle_phrase(a)}',
+            ]
+            for a in people
         ]
-        for a in people
-    ]
-    # Kept, but to one line. The rows already say "no activation in their
-    # section", so this only has to stop "quiet" being read as an accusation
-    # about the person — it does not need to explain Sethu's data model.
-    footer = (
-        'Quiet means no student activations in that section, not the '
-        'ambassador\'s own activity.'
-    )
+        footer = [
+            'Quiet means no student activations in that section, not the '
+            "ambassador's own activity."
+        ]
+
+    buttons = [(label, AMBASSADOR_VIEW, {'filter': key}) for label, key in (
+        ('Leaderboard', AMB_LEADERBOARD),
+        ('Section with No Ambassador', AMB_UNCOVERED),
+    ) if key != chosen]
+    if chosen != AMB_ALL:
+        buttons.append(('All Ambassadors', AMBASSADOR_VIEW, {'filter': AMB_ALL}))
+
     return _paged(state, 'ambass', header, rows, footer,
-                  VIEW_AMBASSADORS, offset)
+                  VIEW_AMBASSADORS, offset, buttons,
+                  row_budget=70, row_cap=5)
 
 
 # --- "How are my agents used?" --------------------------------------------
@@ -444,110 +542,165 @@ def _where(sections: list) -> str:
     return f'{len(sections)} sections'
 
 
-def _agent_entry(agent: dict, busiest: int) -> list:
-    """One agent as a name and a line of what is known about it.
+def _chats(agent: dict):
+    """Conversations this week, or None if nothing has measured them.
 
-    `busiest` is the highest sign-in count in the list, so the bar shows each
-    agent against the best-performing one. When nothing has any sign-ins there
-    is no bar: ten empty bars in a column say nothing and read as broken.
+    `statsSyncedAt` is the gate. A count without it is a value nobody wrote,
+    and `0` from an unsynced record would be reported as a measured silence.
     """
+    if not agent.get('statsSyncedAt'):
+        return None
+    return (agent.get('stats') or {}).get('questionsThisWeek')
+
+
+def _has_usage(agent: dict) -> bool:
+    """Whether anything has actually been measured for this agent.
+
+    An agent can be used without ever having been sent to a section — a
+    professor's own Gemini Enterprise agent gets opened directly, so it has
+    conversations and no Sethu audience. Measured 2026-08-11: one such agent
+    had 100 conversations while every section-published agent had none.
+    """
+    if not agent.get('statsSyncedAt'):
+        return False
     stats = agent.get('stats') or {}
-    signins = stats.get('signInsCaused') or 0
+    return any(stats.get(f) is not None
+               for f in ('questionsThisWeek', 'usedBy'))
 
-    bits = [_where(agent.get('sections') or [])]
-    if agent.get('studentCount'):
-        bits.append(_plural(agent['studentCount'], 'student'))
-    bits.append(_plural(signins, 'sign-in') if signins else 'no sign-ins yet')
 
-    # Only shown once something has actually synced. Printing `usedBy: 0` and
-    # `questionsThisWeek: null` as "0 chats" would report a quiet agent as a
-    # measured fact when nothing has ever measured it.
-    detail = ' · '.join(bits)
-    if busiest:
-        detail = f'{_bar(signins, busiest)}  {detail}'
-    lines = [agent.get('name') or 'Untitled agent', detail]
+def _agent_name(agent: dict) -> str:
+    """What to call an agent, preferring the name the professor gave it.
 
-    # Usage from the GE sync, on its own line. Appended to the one above it
-    # made a run-on that wrapped to three lines in the chat pane.
-    if agent.get('statsSyncedAt'):
-        extra = []
-        if stats.get('usedBy') is not None:
-            extra.append(f'used by {_plural(stats["usedBy"], "student")}')
-        if stats.get('questionsThisWeek') is not None:
-            extra.append(f'{stats["questionsThisWeek"]} chats this week')
-        if stats.get('topUnanswered'):
-            extra.append(f'most asked, least answered: {stats["topUnanswered"]}')
-        if extra:
-            lines.append(' · '.join(extra))
-    return lines
+    `name` is whatever `publish_agent` sent, so for anything a professor
+    published it is already their own wording. A record Sethu's GE sync
+    discovered was never published by anyone, so it carries the Gemini
+    Enterprise name — there is no publish-time name to prefer. `subject` is the
+    only other human label on the record and is used when `name` is missing.
+    """
+    for field in ('name', 'subject'):
+        value = str(agent.get(field) or '').strip()
+        if value:
+            return value
+    return 'Untitled agent'
+
+
+def _heading(title: str) -> tuple:
+    """A section heading inside a card.
+
+    Rendered with the same usage hint as the card's own title, which is the
+    strongest visual break the v0.8 catalog allows. There is no non-clickable
+    button in it, and a real Button dispatches an action when tapped — a
+    professor pressing a decorative one would send the agent a message.
+    """
+    return (title, 'h3')
+
+
+def _signins(agent: dict) -> int:
+    return (agent.get('stats') or {}).get('signInsCaused') or 0
 
 
 def agent_usage(state, agents: list, offset: int = 0) -> list:
-    """The professor's agents, busiest first, with the unsent ones summarised.
+    """The professor's agents, or one cut of them.
 
-    Two groups, because they are two different things. An agent published to
-    sections is doing a job and can be compared with the others; an agent that
-    was never sent to anyone has no audience, no sign-ins and nothing to rank —
-    listing it row-for-row alongside the rest fills the card with zeroes and
-    buries the four agents the professor actually wants to see.
+    Every cut but one is about agents that were actually sent to sections. An
+    agent nobody has been given cannot have activation or conversations, so
+    listing it beside agents that do is a row of blanks that pushes the real
+    ones off the card. Those live behind "Not Sent Yet", which is a to-do list
+    rather than a measurement.
+
+    The current cut lives in session state so paging stays inside it.
     """
     agents = list(agents or [])
     sent = [a for a in agents if a.get('sections')]
     unsent = [a for a in agents if not a.get('sections')]
+    chosen = (state or {}).get(AGENT_FILTER) or FILTER_ALL
 
-    def busiest_first(agent):
-        stats = agent.get('stats') or {}
-        return (
-            -(stats.get('signInsCaused') or 0),
-            -(agent.get('studentCount') or 0),
-            str(agent.get('name') or ''),
-        )
+    if chosen == FILTER_MOST_USED:
+        shown = sorted([a for a in sent if (_chats(a) or 0) > 0],
+                       key=lambda a: (-(_chats(a) or 0), _agent_name(a)))
+        title, empty = 'Most Used', 'No sent agent has conversations yet.'
+    elif chosen == FILTER_MOST_ACTIVATED:
+        shown = sorted([a for a in sent if _signins(a) > 0],
+                       key=lambda a: (-_signins(a), _agent_name(a)))
+        title, empty = 'Most Successful Activation', 'No sent agent has an activation yet.'
+    elif chosen == FILTER_NO_ACTIVATION:
+        shown = sorted([a for a in sent if _signins(a) == 0], key=_agent_name)
+        title, empty = 'No Activation', 'Every sent agent has at least one activation.'
+    elif chosen == FILTER_NOT_SENT:
+        shown = sorted(unsent, key=_agent_name)
+        title, empty = 'Not Sent Yet', 'Every agent has been sent.'
+    else:
+        chosen = FILTER_ALL
+        # Ranked by activation, which is also what the bar measures.
+        shown = sorted(sent, key=lambda a: (-_signins(a), _agent_name(a)))
+        title, empty = 'Your agents', 'No agent has been sent to a section yet.'
 
-    sent.sort(key=busiest_first)
-    busiest = max(
-        ((a.get('stats') or {}).get('signInsCaused') or 0) for a in sent
-    ) if sent else 0
+    def volume(agent):
+        chats = _chats(agent)
+        return (_plural(chats, 'chat') + ' this week' if chats is not None
+                else 'chat volume not synced')
 
-    # Student counts cannot be summed across agents -- several of these go to
-    # the same section, and adding them would invent an audience far larger
-    # than the college has. Distinct sections is the honest reach.
-    reach = len({str(s) for a in sent for s in (a.get('sections') or [])})
+    rows = []
+    if chosen == FILTER_MOST_USED:
+        top = _chats(shown[0]) or 0 if shown else 0
+        rows = [[_agent_name(a),
+                 f'{_bar(_chats(a) or 0, top)}  '
+                 f'{_plural(_chats(a) or 0, "chat")} this week'] for a in shown]
+    elif chosen == FILTER_MOST_ACTIVATED:
+        top = _signins(shown[0]) if shown else 0
+        rows = [[_agent_name(a),
+                 f'{_bar(_signins(a), top)}  {_plural(_signins(a), "activation")}']
+                for a in shown]
+    elif chosen == FILTER_NOT_SENT:
+        rows = [[f'·  {_agent_name(a)}'] for a in shown]
+    elif chosen == FILTER_NO_ACTIVATION:
+        # Every row here has zero activations, so printing that is a column of
+        # identical noise. Conversations are the one thing that varies — an
+        # agent used without a single activation is worth seeing — so it is
+        # shown when there is one and left off entirely when there is not.
+        for a in shown:
+            chats = _chats(a) or 0
+            rows.append([f'·  {_agent_name(a)}' + (
+                f'  —  {_plural(chats, "chat")} this week' if chats else '')])
+    else:
+        # Bar measures activation, the same thing this list is ordered by.
+        # With nothing activated there is no scale, so no bar is drawn.
+        top = max((_signins(a) for a in shown), default=0)
+        for a in shown:
+            detail = f'{_plural(_signins(a), "activation")} · {volume(a)}'
+            if top:
+                detail = f'{_bar(_signins(a), top)}  {detail}'
+            rows.append([_agent_name(a), detail])
 
-    summary = _plural(len(agents), 'agent')
-    if sent:
-        summary += (f' — {len(sent)} sent to '
-                    f'{_plural(reach, "section")}')
+    header = [title]
+    if chosen == FILTER_ALL:
+        summary = f'{_plural(len(sent), "agent")} sent'
         if unsent:
             summary += f', {len(unsent)} not sent yet'
-    elif unsent:
-        summary += ' — none sent to students yet'
+        header.append(summary)
 
-    header = ['Your agents', summary]
-    if sent:
-        header.append('Busiest first.')
-    elif unsent:
-        # The footer names them; a bare "nothing to show" over a list of
-        # agents the professor can see reads as a contradiction.
-        header.append('None of them has been sent to a section yet.')
-    rows = [_agent_entry(a, busiest) for a in sent]
+    buttons = [(label, AGENT_VIEW, {'filter': key}) for label, key in (
+        ('Most Used', FILTER_MOST_USED),
+        ('Top Activation', FILTER_MOST_ACTIVATED),
+        ('No Activation', FILTER_NO_ACTIVATION),
+        ('Not Sent Yet', FILTER_NOT_SENT),
+    ) if key != chosen]
+    if chosen != FILTER_ALL:
+        buttons.append(('All Agents', AGENT_VIEW, {'filter': FILTER_ALL}))
 
     footer = []
-    if unsent:
-        names = ', '.join(str(a.get('name') or 'Untitled') for a in unsent[:4])
-        if len(unsent) > 4:
-            names += f', and {len(unsent) - 4} more'
-        footer.append(f'Not sent to anyone yet: {names}.')
-    # Judged over every agent, not just the sent ones: with nothing sent, an
-    # empty `sent` list would otherwise report the figures as live and current.
-    if agents and all(a.get('statsSyncedAt') for a in agents):
-        footer.append('Sign-in counts come from share-link clicks and are live.')
-    else:
-        footer.append(
-            'Sign-ins come from share-link clicks. Chat volume and unanswered '
-            'topics have not synced yet.'
-        )
+    if not shown:
+        footer.append(empty)
+    stamps = [a.get('statsSyncedAt') for a in agents if a.get('statsSyncedAt')]
+    if stamps:
+        footer.append(f'Usage figures {_stamp(max(stamps))}.')
+    # One row of buttons. The four labels total 48 characters; the measured
+    # pane fitted about 65 before Gemini Enterprise clipped one, so this stays
+    # inside that with room to spare while the conservative default would wrap
+    # them onto two lines.
     return _paged(state, 'agentuse', header, rows, footer,
-                  VIEW_AGENT_USAGE, offset)
+                  VIEW_AGENT_USAGE, offset, buttons,
+                  row_budget=70, row_cap=5)
 
 
 # Which builder a paged view re-enters, so a "Show more" tap redraws the same

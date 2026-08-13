@@ -42,6 +42,13 @@ _USER_ID_KEY = 'user:sethu_user_id'
 _TENANT_KEY = 'user:sethu_tenant_id'
 _ROLE_KEY = 'user:sethu_role'
 
+# Whether Sethu will act for this caller at all. True once it has answered for
+# them, False once it has refused them by name — a Google account with no Sethu
+# record, or one Sethu will not treat as faculty. Absent while unknown, which
+# is not the same as False: a network failure must not turn a professor into a
+# stranger for the rest of their session.
+IS_FACULTY_KEY = 'user:sethu_is_faculty'
+
 # Google OAuth access tokens are opaque and start with this.
 _ACCESS_TOKEN_PREFIX = 'ya29.'
 
@@ -181,16 +188,38 @@ def resolve_identity(ctx) -> str | None:
     """
     cached = ctx.state.get(_NAME_KEY)
     if cached:
+        ctx.state[IS_FACULTY_KEY] = True
         return cached
     try:
         session = get_session(ctx)
         me = sethu_client.get_me(session['token'])
-    except SethuError:
+    except NotRegisteredError:
+        # Sethu knows who this is and will not act for them. A settled answer,
+        # so it is recorded — the caller is signed in but is not faculty.
+        ctx.state[IS_FACULTY_KEY] = False
         return None
+    except NoIdentityError:
+        # No sign-in reached us at all. Says nothing about whether the person
+        # is faculty, so nothing is recorded.
+        return None
+    except SethuError:
+        # Sethu is unreachable or broke. Also not an answer about this person.
+        return None
+    ctx.state[IS_FACULTY_KEY] = True
     name = (me or {}).get('name')
     if name:
         ctx.state[_NAME_KEY] = name
     return name
+
+
+def is_known_non_faculty(ctx) -> bool:
+    """True only when Sethu has explicitly refused to act for this caller.
+
+    Deliberately not the inverse of "is faculty": while the answer is unknown —
+    no token yet, Sethu down — this stays False, so a professor is never
+    treated as an outsider because of a bad minute on the network.
+    """
+    return ctx.state.get(IS_FACULTY_KEY) is False
 
 
 def get_session(tool_context: ToolContext) -> dict:
