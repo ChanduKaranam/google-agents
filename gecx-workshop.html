@@ -1,0 +1,1241 @@
+<title>From Prompt to Agent — GECX Workshop</title>
+
+<style>
+  /* ================= Tilicho tokens ================= */
+  :root{
+    --ink:#0A0E16; --ink2:#0F141E; --ink3:#161D29;
+    --ink-line:rgba(255,255,255,.09);
+    --paper:#F2F3F1; --paper2:#FBFBFA;
+    --paper-line:rgba(10,14,22,.10);
+    --signal:#E00917; --signal-deep:#7E0A11;
+    --telemetry:#39B98A;
+    --t-hi-d:#EBEEF3; --t-lo-d:#8A96A6; --t-mu-d:#5E6A7A;
+    --t-hi-l:#11161E; --t-lo-l:#525C69; --t-mu-l:#8A929C;
+
+    --display:"Space Grotesk","Segoe UI",Arial,sans-serif;
+    --body:"IBM Plex Sans","Segoe UI",Arial,sans-serif;
+    --mono:"IBM Plex Mono","Cascadia Mono",Consolas,monospace;
+    --ez:cubic-bezier(.2,.7,.3,1);
+  }
+
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; background:var(--ink); color:var(--t-hi-d);
+    font-family:var(--body); font-size:16px; line-height:1.6;
+    -webkit-font-smoothing:antialiased; overflow:hidden;
+  }
+
+  /* ================= deck shell ================= */
+  #deck{ position:fixed; inset:0; }
+  .slide{
+    position:absolute; inset:0; display:none;
+    flex-direction:column;
+    --bg:var(--ink); --bg2:var(--ink2); --line:var(--ink-line);
+    --hi:var(--t-hi-d); --lo:var(--t-lo-d); --mu:var(--t-mu-d);
+    --red:var(--signal); --ok:var(--telemetry);
+    background:var(--bg); color:var(--hi);
+  }
+  .slide.on{ display:flex; }
+  .slide.paper{
+    --bg:var(--paper); --bg2:var(--paper2); --line:var(--paper-line);
+    --hi:var(--t-hi-l); --lo:var(--t-lo-l); --mu:var(--t-mu-l);
+    --red:var(--signal-deep); --ok:#1E7D5C;
+  }
+
+  .stage{
+    flex:1; overflow-y:auto; overflow-x:hidden;
+    padding:clamp(34px,5.5vh,72px) clamp(30px,6vw,110px) 10px;
+    display:flex; flex-direction:column; justify-content:center;
+    position:relative;
+  }
+  .stage > .inner{ max-width:1180px; width:100%; position:relative; z-index:2; }
+
+  .foot{
+    height:52px; flex:none; border-top:1px solid var(--line);
+    display:flex; align-items:center; justify-content:space-between; gap:20px;
+    padding:0 clamp(30px,6vw,110px);
+    font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--mu); position:relative; z-index:2;
+  }
+  .pips{ display:flex; gap:6px; align-items:center; }
+  .pips i{
+    width:6px; height:6px; border-radius:50%; display:block;
+    border:1px solid var(--mu); background:transparent;
+    transition:background .2s, border-color .2s;
+  }
+  .pips i.lit{ background:var(--red); border-color:var(--red); }
+
+  .ghost{
+    position:absolute; right:2vw; bottom:-4vh; z-index:1;
+    font-family:var(--display); font-weight:600;
+    font-size:clamp(240px,42vh,520px); line-height:1;
+    color:currentColor; opacity:.04; pointer-events:none; user-select:none;
+    letter-spacing:-.04em;
+  }
+
+  /* ================= type ================= */
+  .kicker{
+    font-family:var(--mono); font-size:11px; font-weight:500;
+    letter-spacing:.22em; text-transform:uppercase; color:var(--mu);
+    margin:0 0 20px; display:flex; align-items:center; gap:12px;
+  }
+  .kicker .tick{ width:22px; height:2px; background:var(--red); flex:none; }
+
+  h1{
+    font-family:var(--display); font-weight:600;
+    font-size:clamp(38px,5.4vw,66px); line-height:1.04;
+    letter-spacing:-.02em; margin:0 0 22px; text-wrap:balance; max-width:22ch;
+  }
+  h1 .r{ color:var(--red); }
+  h2{
+    font-family:var(--display); font-weight:600;
+    font-size:clamp(24px,2.9vw,38px); line-height:1.12;
+    letter-spacing:-.015em; margin:0 0 16px; text-wrap:balance; max-width:24ch;
+  }
+  h2 .r{ color:var(--red); }
+  .lede{
+    font-size:clamp(15px,1.5vw,17px); line-height:1.65;
+    color:var(--lo); margin:0 0 24px; max-width:56ch;
+  }
+  .lede b{ color:var(--hi); font-weight:600; }
+  .mono{ font-family:var(--mono); }
+
+  .stmt{
+    font-family:var(--display); font-weight:600;
+    font-size:clamp(34px,4.8vw,60px); line-height:1.1;
+    letter-spacing:-.02em; margin:0; max-width:20ch; text-wrap:balance;
+  }
+  .stmt .r{ color:var(--red); }
+  .sub{ margin:24px 0 0; font-size:clamp(15px,1.5vw,17px); color:var(--lo); max-width:52ch; line-height:1.65; }
+
+  /* ================= components ================= */
+  .kv{ border-top:1px solid var(--line); max-width:1180px; }
+  .kv > div{
+    display:grid; grid-template-columns:minmax(140px,24%) 1fr; gap:22px;
+    padding:13px 2px; border-bottom:1px solid var(--line); align-items:baseline;
+  }
+  .kv .k{
+    font-family:var(--mono); font-size:11px; font-weight:500;
+    letter-spacing:.16em; text-transform:uppercase; color:var(--mu); margin:0;
+  }
+  .kv .v{ margin:0; font-size:clamp(14px,1.25vw,16px); line-height:1.55; color:var(--lo); }
+  .kv .v b{ color:var(--hi); font-weight:600; }
+
+  .quote{
+    font-family:var(--mono); font-size:clamp(12px,1.1vw,14px); line-height:1.7;
+    background:var(--bg2); border:1px solid var(--line);
+    padding:18px 20px; color:var(--lo); white-space:pre-wrap; overflow-x:auto;
+  }
+  .quote b{ color:var(--hi); font-weight:600; }
+
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{
+    font-family:var(--mono); font-size:11px; letter-spacing:.04em;
+    border:1px solid var(--line); padding:6px 11px; color:var(--lo); background:var(--bg2);
+  }
+
+  ol.steps{ list-style:none; margin:0; padding:0; counter-reset:s; border-top:1px solid var(--line); }
+  ol.steps li{
+    counter-increment:s; position:relative;
+    padding:14px 2px 14px 60px; border-bottom:1px solid var(--line);
+    font-size:clamp(14px,1.3vw,17px); color:var(--lo); line-height:1.5;
+  }
+  ol.steps li b{ color:var(--hi); font-weight:600; }
+  ol.steps li::before{
+    content:counter(s,decimal-leading-zero); position:absolute; left:2px; top:17px;
+    font-family:var(--mono); font-size:12px; color:var(--mu); letter-spacing:.08em;
+  }
+
+  .split{ display:grid; grid-template-columns:1fr 1fr; gap:clamp(22px,3.4vw,54px); align-items:start; }
+
+  .arrowline{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    font-family:var(--mono); font-size:clamp(12px,1.2vw,15px); color:var(--lo);
+  }
+  .arrowline .a{ color:var(--mu); }
+  .arrowline .hot{ color:var(--red); }
+
+  .note{
+    font-family:var(--mono); font-size:12px; line-height:1.6; letter-spacing:.02em;
+    color:var(--mu); border-top:1px solid var(--line);
+    padding-top:14px; margin-top:22px; max-width:1180px;
+  }
+  .note b{ color:var(--hi); font-weight:500; }
+
+  .div-n{
+    font-family:var(--mono); font-size:12px; letter-spacing:.22em;
+    text-transform:uppercase; color:var(--mu); margin:0 0 14px;
+    display:flex; gap:12px; align-items:center;
+  }
+  .div-n .tick{ width:22px; height:2px; background:var(--signal); }
+
+  .lockup{ display:flex; align-items:center; gap:10px; font-family:var(--display); font-weight:600; font-size:15px; letter-spacing:-.01em; }
+  .lockup .mk{ color:var(--signal); font-size:17px; letter-spacing:-.14em; }
+  .lockup .l2{ color:var(--mu); font-weight:500; }
+
+  /* ================= SCENE PRIMITIVES ================= */
+  .scene{ position:relative; margin-top:4px; }
+
+  .ln{
+    font-family:var(--display); font-weight:600;
+    font-size:clamp(18px,2vw,26px); line-height:1.45; letter-spacing:-.01em;
+    color:var(--hi); min-height:2.9em; max-width:660px;
+  }
+  .ln .car{ color:var(--red); }
+  .ln .new{ animation:pop .3s var(--ez) backwards; }
+  @keyframes pop{ from{ opacity:0; } to{ opacity:1; } }
+
+  .dist{ margin-top:14px; min-height:98px; max-width:530px; }
+  .row{
+    display:grid; grid-template-columns:104px 1fr 52px; gap:14px; align-items:center;
+    padding:3px 0; font-family:var(--mono); font-size:12px; color:var(--mu);
+  }
+  .row .w{ text-align:right; white-space:nowrap; overflow:hidden; }
+  .row .bar{ height:7px; border:1px solid var(--line); position:relative; display:block; }
+  .row .bar i{
+    position:absolute; left:0; top:0; bottom:0; width:0; display:block;
+    background:var(--mu); transition:width .44s var(--ez);
+  }
+  .row.hot{ color:var(--hi); }
+  .row.hot .bar i{ background:var(--red); }
+  .row.ok{ color:var(--hi); }
+  .row.ok .bar i{ background:var(--ok); }
+
+  .cap{
+    font-family:var(--mono); font-size:12px; line-height:1.6; color:var(--mu);
+    opacity:0; transition:opacity .45s; margin-top:12px; max-width:70ch;
+  }
+  .cap.on{ opacity:1; }
+  .cap b{ color:var(--hi); font-weight:500; }
+
+  .fly{
+    position:absolute; font-family:var(--mono); font-size:12px; color:var(--red);
+    white-space:nowrap; z-index:6; pointer-events:none;
+    transition:transform .34s var(--ez), font-size .34s var(--ez), color .34s;
+  }
+
+  /* prompt scene */
+  .two{ display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+  .pbox{ border:1px solid var(--line); background:var(--bg2); padding:14px 16px; min-height:132px; }
+  .plab{ font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--mu); margin-bottom:9px; }
+  .ptxt{ font-family:var(--mono); font-size:12.5px; line-height:1.65; color:var(--hi); white-space:pre-wrap; }
+  .ptxt .add{ color:var(--red); }
+  .otxt{ font-size:14px; line-height:1.6; color:var(--lo); min-height:60px; }
+  .dials{ display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  .dial{
+    font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+    border:1px solid var(--line); padding:5px 11px; color:var(--mu);
+    transition:color .3s, border-color .3s;
+  }
+  .dial.lit{ color:var(--red); border-color:var(--red); }
+
+  /* desk scene */
+  .desk{
+    display:flex; align-items:flex-end; min-height:118px;
+    position:relative; padding:6px 0; overflow:hidden;
+    border-bottom:1px solid var(--line); max-width:760px;
+  }
+  .msg{
+    width:60px; margin-right:7px; flex:none; height:0;
+    border:1px solid var(--line); background:var(--bg2);
+    position:relative; overflow:hidden;
+    transition:height .32s var(--ez), transform .5s var(--ez), opacity .5s,
+               width .5s var(--ez), margin-right .5s var(--ez);
+  }
+  .msg span{
+    position:absolute; left:0; right:0; top:0; bottom:0; background:var(--red);
+    opacity:0; display:block;
+  }
+  .msg.sweep span{ animation:sw .45s ease-out; }
+  @keyframes sw{ 0%{ opacity:.5 } 100%{ opacity:0 } }
+  .msg.off{ transform:translateX(-26px); opacity:0; width:0; margin-right:0; border-width:0; }
+  .deskstat{
+    font-family:var(--mono); font-size:12px; color:var(--mu); margin-top:12px;
+    min-height:1.6em; transition:color .3s;
+  }
+  .deskstat.warn{ color:var(--red); }
+
+  /* grounding scene */
+  .docs{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .doc{
+    font-family:var(--mono); font-size:11px; border:1px solid var(--line);
+    padding:6px 11px; color:var(--mu); background:var(--bg2);
+    opacity:0; transform:translateX(34px);
+    transition:opacity .38s var(--ez), transform .38s var(--ez), color .3s, border-color .3s;
+  }
+  .doc.in{ opacity:1; transform:none; }
+  .doc.found{ color:var(--ok); border-color:var(--ok); }
+  .passage{
+    margin-top:12px; border-left:2px solid var(--ok); padding:0 0 0 14px;
+    font-family:var(--mono); font-size:12px; line-height:1.7; color:var(--lo);
+    max-height:0; opacity:0; overflow:hidden;
+    transition:max-height .4s var(--ez), opacity .4s;
+  }
+  .passage.in{ max-height:120px; opacity:1; }
+  .cite{
+    display:inline-block; font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+    color:var(--ok); border:1px solid var(--ok); padding:3px 8px; margin-top:10px;
+    opacity:0; transition:opacity .35s;
+  }
+  .cite.in{ opacity:1; }
+
+  /* tools scene */
+  .track{ display:flex; align-items:center; gap:0; margin-top:18px; max-width:820px; }
+  .node{
+    font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+    border:1px solid var(--line); background:var(--bg2); padding:14px 16px; color:var(--lo);
+    flex:none; transition:color .3s, border-color .3s;
+  }
+  .node.live{ color:var(--red); border-color:var(--red); }
+  .node.ok{ color:var(--ok); border-color:var(--ok); }
+  .wire{ flex:1; height:1px; background:var(--line); position:relative; min-width:80px; }
+  .pkt{
+    position:absolute; top:-9px; left:0; height:19px; padding:0 8px;
+    display:flex; align-items:center;
+    font-family:var(--mono); font-size:10px; letter-spacing:.08em; white-space:nowrap;
+    background:var(--bg); color:var(--red); border:1px solid var(--red);
+    opacity:0; transition:transform .7s var(--ez), opacity .25s;
+  }
+  .pkt.ok{ color:var(--ok); border-color:var(--ok); }
+  .pkt.show{ opacity:1; }
+
+  /* mcp scene */
+  .mcpwrap{ margin-top:8px; max-width:860px; }
+  .mcpwrap svg{ width:100%; height:auto; display:block; }
+  .mcpwrap .lbl{ font-family:var(--mono); font-size:11px; fill:var(--lo); }
+  .mcpwrap .box{ fill:var(--bg2); stroke:var(--line); }
+  .mcpwrap .tangle{ stroke:var(--mu); stroke-width:1; fill:none; opacity:.45; transition:opacity .5s; }
+  .mcpwrap .tangle.gone{ opacity:0; }
+  .mcpwrap .clean{
+    stroke:var(--red); stroke-width:1.5; fill:none;
+    stroke-dasharray:400; stroke-dashoffset:400;
+    transition:stroke-dashoffset .6s var(--ez);
+  }
+  .mcpwrap .clean.drawn{ stroke-dashoffset:0; }
+  .mcpwrap .hub{ fill:var(--bg2); stroke:var(--red); stroke-width:1.5; opacity:0; transition:opacity .4s; }
+  .mcpwrap .hub.in{ opacity:1; }
+  .mcpwrap .hublbl{ font-family:var(--mono); font-size:12px; fill:var(--red); opacity:0; transition:opacity .4s; }
+  .mcpwrap .hublbl.in{ opacity:1; }
+
+  /* agent scene */
+  .lanes{ display:grid; gap:22px; margin-top:14px; max-width:820px; }
+  .lane{ }
+  .llab{ font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--mu); display:block; margin-bottom:9px; }
+  .path{ position:relative; display:flex; align-items:center; gap:0; }
+  .nd{
+    font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+    border:1px solid var(--line); background:var(--bg2); padding:11px 14px; color:var(--mu);
+    flex:none; transition:color .25s, border-color .25s;
+  }
+  .nd.lit{ color:var(--hi); border-color:var(--red); }
+  .seg{ flex:1; height:1px; background:var(--line); min-width:24px; }
+  .dot{
+    position:absolute; top:50%; left:0; width:9px; height:9px; margin-top:-4.5px; margin-left:-4.5px;
+    background:var(--red); border-radius:50%; opacity:0; z-index:3;
+    transition:transform .42s var(--ez), opacity .25s;
+  }
+  .dot.show{ opacity:1; }
+  .lapcount{ font-family:var(--mono); font-size:11px; color:var(--red); opacity:0; transition:opacity .3s; margin-top:10px; }
+  .lapcount.on{ opacity:1; }
+
+  /* ================= chrome ================= */
+  #notes{
+    position:fixed; right:0; bottom:0; width:min(430px,44vw); max-height:58vh;
+    background:var(--ink2); border:1px solid var(--ink-line); border-right:0; border-bottom:0;
+    padding:18px 22px 22px; overflow-y:auto; display:none; z-index:40;
+    font-size:14px; line-height:1.65; color:var(--t-lo-d);
+  }
+  #notes.on{ display:block; }
+  #notes h4{
+    font-family:var(--mono); font-size:10px; font-weight:500; letter-spacing:.22em;
+    text-transform:uppercase; color:var(--signal); margin:0 0 10px;
+  }
+  #notes ul{ margin:0; padding-left:18px; display:grid; gap:8px; }
+
+  #ov{ position:fixed; inset:0; background:var(--ink); z-index:60; display:none; overflow-y:auto; padding:38px clamp(24px,4vw,60px); }
+  #ov.on{ display:block; }
+  #ov .oh{ font-family:var(--mono); font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--t-mu-d); margin:0 0 20px; display:flex; gap:12px; align-items:center; }
+  #ov .oh .tick{ width:22px; height:2px; background:var(--signal); }
+  #ov .og{ display:grid; grid-template-columns:repeat(auto-fill,minmax(215px,1fr)); gap:10px; }
+  #ov button{
+    text-align:left; background:var(--ink2); border:1px solid var(--ink-line);
+    padding:13px 15px; cursor:pointer; font:inherit; color:var(--t-lo-d);
+    display:flex; flex-direction:column; gap:5px; min-height:80px;
+    border-left:2px solid transparent; transition:border-color .15s,color .15s;
+  }
+  #ov button:hover, #ov button:focus-visible{ border-left-color:var(--signal); color:var(--t-hi-d); }
+  #ov button .on-n{ font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--t-mu-d); }
+  #ov button .on-t{ font-family:var(--display); font-weight:600; font-size:15px; line-height:1.25; }
+
+  #help{
+    position:fixed; left:50%; bottom:12px; transform:translateX(-50%);
+    font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--t-mu-d); z-index:30; background:var(--ink); padding:5px 12px;
+    border:1px solid var(--ink-line); pointer-events:none; transition:opacity .5s;
+  }
+  #bar{ position:fixed; left:0; top:0; height:2px; background:var(--signal); z-index:50; transition:width .28s var(--ez); }
+
+  :focus-visible{ outline:2px solid var(--signal); outline-offset:3px; }
+
+  .slide.on .inner > *{ animation:rise .4s var(--ez) backwards; }
+  .slide.on .inner > *:nth-child(2){ animation-delay:.06s; }
+  .slide.on .inner > *:nth-child(3){ animation-delay:.12s; }
+  .slide.on .inner > *:nth-child(4){ animation-delay:.18s; }
+  @keyframes rise{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
+
+  @media (prefers-reduced-motion:reduce){
+    .slide.on .inner > *{ animation:none; }
+    #bar,.row .bar i,.doc,.passage,.pkt,.dot,.msg,.clean,.fly{ transition:none !important; }
+    .msg.sweep span{ animation:none; }
+  }
+
+  @media (max-width:820px){
+    .split,.two{ grid-template-columns:1fr; }
+    .stage{ padding:26px 22px 8px; }
+    .foot{ padding:0 22px; }
+    .ghost{ font-size:180px; }
+  }
+</style>
+
+<div id="bar"></div>
+<div id="deck"></div>
+<div id="notes"></div>
+<div id="ov"><p class="oh"><span class="tick"></span>All slides — click to jump</p><div class="og"></div></div>
+<div id="help">← → move · R replay · N notes · O overview · F fullscreen</div>
+
+<script>
+const PHASES = ["Opening","Foundations","Gemini Enterprise","What We Built","Close"];
+
+const SLIDES = [
+
+/* ============ OPENING ============ */
+{p:0,t:"Cover",s:"ink",h:`
+  <p class="kicker"><span class="tick"></span>GECX Workshop · Gemini Enterprise</p>
+  <h1>From prompt<br>to agent<span class="r">.</span></h1>
+  <p class="lede">What AI actually is. What Gemini Enterprise actually does.<br>And the agents already running on this campus.</p>
+  <div class="lockup" style="margin-top:48px"><span class="mk">»</span><span>tilicho</span><span class="l2">labs</span></div>`,
+n:["Open with a question, not a slide: who here has used ChatGPT or Gemini? Every hand. Who knows what happens after you press enter? Silence. That gap is the next 12 minutes.","Set the contract: no code today. By the end they will watch an agent get built in under five minutes.","Navigation: → advances the animation one beat at a time, then moves to the next slide. The dots in the footer tell you how many beats are left. R replays the current animation."]},
+
+{p:0,t:"Agenda",s:"paper",h:`
+  <p class="kicker"><span class="tick"></span>Fifty minutes</p>
+  <h2>Three phases, one thread</h2>
+  <div class="kv">
+    <div><p class="k">01 · 12 min</p><p class="v"><b>Foundations</b> — six ideas that make everything else readable.</p></div>
+    <div><p class="k">02 · 20 min</p><p class="v"><b>Gemini Enterprise</b> — the platform, and a live build.</p></div>
+    <div><p class="k">03 · 15 min</p><p class="v"><b>What we built</b> — six agents, one shape, four rules.</p></div>
+  </div>
+  <p class="note">The thread: a model that talks → a model that acts → a platform anyone can build on → what's already running here.</p>`,
+n:["Say the thread out loud. Structure is what people retain.","Keep ~5 min for questions. If running long, cut from Phase 1's middle, never the live build."]},
+
+/* ============ PHASE 1 ============ */
+{p:1,t:"Phase 1",s:"ink",g:"01",h:`
+  <p class="div-n"><span class="tick"></span>Phase 01</p>
+  <h1>Foundations</h1>
+  <p class="lede">Six words. Everything in this field is a product name on top of them.</p>
+  <div class="chips">
+    <span class="chip">model</span><span class="chip">prompt</span><span class="chip">context</span>
+    <span class="chip">grounding</span><span class="chip">tools</span><span class="chip">agent</span>
+  </div>`,
+n:["Promise: after these six words, every AI headline they read for the next two years decomposes into pieces they know.","From here on, each slide runs a live demonstration. Let it play while you talk — press → when your sentence lands."]},
+
+{p:1,t:"AI · ML · LLM",s:"paper",h:`
+  <p class="kicker"><span class="tick"></span>Sorting the words</p>
+  <h2>AI is the field.<br>An LLM is one thing inside it.</h2>
+  <div class="arrowline" style="margin:24px 0 26px">
+    <span>ARTIFICIAL INTELLIGENCE</span><span class="a">⊃</span>
+    <span>MACHINE LEARNING</span><span class="a">⊃</span>
+    <span class="hot">LARGE LANGUAGE MODEL</span>
+  </div>
+  <div class="kv">
+    <div><p class="k">AI</p><p class="v">Any machine doing what we'd call thinking. Chess engines, face unlock. Decades old.</p></div>
+    <div><p class="k">ML</p><p class="v">Show it examples instead of writing rules. Spam filters, recommendations.</p></div>
+    <div><p class="k">LLM</p><p class="v">ML trained on an enormous amount of text. Gemini, GPT, Claude. <b>What you've been talking to.</b></p></div>
+  </div>`,
+n:["Nesting dolls. Thirty seconds, move on — this one is deliberately not animated because containment is a static relationship.","Gentle hype-check: AI is not new; 2022 is just when it got good at language."]},
+
+{p:1,t:"The mechanism",s:"ink",sc:"mech",h:`
+  <p class="kicker"><span class="tick"></span>The one mechanism</p>
+  <h2>It predicts the next word<span class="r">.</span> That's it.</h2>
+  <div class="scene">
+    <div class="ln"><span class="txt">The capital of Telangana is</span><span class="car">▮</span></div>
+    <div class="dist"></div>
+    <div class="cap">Every token above is one prediction. Nothing was retrieved. Nothing was looked up.</div>
+  </div>`,
+n:["The most important slide in the deck. Do not rush it.","Beat 1 — the candidate list. Say: it is not looking anything up, it is scoring every word it could possibly say next.","Beat 2 — it commits. Once that word is on the page it cannot be taken back; the next prediction is made assuming it was right.","Beat 3 — punctuation is a prediction too.","Beat 4 — let the fast run play out, then land the caption: fluency is a side effect of prediction, not of understanding."]},
+
+{p:1,t:"The prompt",s:"paper",sc:"prompt",h:`
+  <p class="kicker"><span class="tick"></span>Your half of the deal</p>
+  <h2>The prompt is a brief, not a wish</h2>
+  <div class="scene">
+    <div class="two">
+      <div class="pbox"><div class="plab">Prompt</div><div class="ptxt"></div></div>
+      <div class="pbox"><div class="plab">What comes back</div><div class="otxt"></div></div>
+    </div>
+    <div class="dials">
+      <span class="dial" data-d="0">Task</span>
+      <span class="dial" data-d="1">Context</span>
+      <span class="dial" data-d="2">Format</span>
+      <span class="dial" data-d="3">Audience</span>
+    </div>
+  </div>`,
+n:["Start on the vague prompt. Ask the room: is that answer wrong? No — it's just useless. That's the point.","Add one dial per beat and let them watch the output sharpen. You are demonstrating cause and effect, not listing tips.","Land it: prompting is not a secret trick. It is writing a clear brief, exactly as you would for a junior teammate.","Same four dials work in Agent Designer in Phase 2 — except there you write them once instead of every message."]},
+
+{p:1,t:"Context",s:"ink",sc:"desk",h:`
+  <p class="kicker"><span class="tick"></span>Why it loses the plot</p>
+  <h2>It has no memory. It has a desk<span class="r">.</span></h2>
+  <div class="scene">
+    <div class="desk"></div>
+    <div class="deskstat"></div>
+    <div class="cap">The desk is the <b>context window</b>. Large, but finite — and everything on it is re-read from scratch on every single turn.</div>
+  </div>`,
+n:["Beat 1 — watch the red sweep: that is the model re-reading the entire conversation. It does that every message. It remembers nothing on its own.","Beat 2 — more turns, same full re-read. Cost and latency grow with the desk.","Beat 3 — the desk is full.","Beat 4 — the earliest cards slide off. Now ask it about turn 1 and it genuinely cannot answer. It is not being lazy; the constraint fell off the desk.","Practical takeaway: one chat per task, and restate what matters."]},
+
+{p:1,t:"Hallucination",s:"paper",sc:"halluc",h:`
+  <p class="kicker"><span class="tick"></span>The failure mode</p>
+  <h2>It will be confidently wrong</h2>
+  <div class="scene">
+    <div class="ln"><span class="txt">The lab-exam attendance requirement at this college is</span><span class="car">▮</span></div>
+    <div class="dist"></div>
+    <div class="cap">No winner, no signal, no way to say <b>"I don't know"</b> — and it commits anyway. The sentence above is invented.</div>
+  </div>`,
+n:["Same machine as three slides ago. That is the whole argument — point at it explicitly.","Beat 1 — look at the bars: nearly equal. There is no knowledge here, only noise.","Beat 2 — and it picks one anyway, in red, and writes it as confidently as it wrote Hyderabad. There is no internal signal for uncertainty.","Say the rule: trust structure and phrasing; verify every name, number, citation and link; and never trust it on your own institution's facts — it was never trained on them.","That last point is exactly why Gemini Enterprise exists. This is the bridge into Phase 2."]},
+
+{p:1,t:"Grounding",s:"ink",sc:"ground",h:`
+  <p class="kicker"><span class="tick"></span>The fix</p>
+  <h2>Give it the book, then ask the question</h2>
+  <div class="scene">
+    <div class="ln"><span class="txt">The lab-exam attendance requirement at this college is</span><span class="car">▮</span></div>
+    <div class="docs"></div>
+    <div class="passage"></div>
+    <div class="dist"></div>
+    <div class="cap">Same question, same model — one retrieval step in front of it. Now it summarises instead of recalling, and it can show you where. <b>RAG</b> is the long name.</div>
+  </div>`,
+n:["Run this immediately after the hallucination slide so the contrast is live in their heads.","Beat 1 — the real documents arrive. Beat 2 — the system finds the passage; green means status, not decoration. Beat 3 — the passage goes on the desk. Beat 4 — now watch the bars spike, and note the citation.","Closed-book exams invite guessing. Open-book exams do not. That is the entire idea.","If asked about fine-tuning: a different, far more expensive lever. Grounding covers almost every campus use case."]},
+
+{p:1,t:"Tools",s:"paper",sc:"tools",h:`
+  <p class="kicker"><span class="tick"></span>The leap</p>
+  <h2>From saying to doing</h2>
+  <div class="scene">
+    <div class="ln"><span class="txt">Your attendance in Data Structures this semester is</span><span class="car">▮</span></div>
+    <div class="track">
+      <div class="node n1">Model</div>
+      <div class="wire"><span class="pkt"></span></div>
+      <div class="node n2">Attendance system</div>
+    </div>
+    <div class="cap">Nobody wrote an if-statement here. The tools were described in plain English and the model decided <b>when</b> to reach for one.</div>
+  </div>`,
+n:["Beat 1 — it stalls. No amount of prediction can produce a number that lives in a database it has never seen.","Beat 2 — it emits a tool call. This is the leap: text out, action out.","Beat 3 — real data comes back. Green = live status.","Beat 4 — and only now can it finish the sentence.","The strange, powerful part: the developer describes the tools, the model does the routing. That is what makes agents buildable in plain language.","Note it says 'draft a message', never 'send'. That design choice returns in Phase 3."]},
+
+{p:1,t:"MCP",s:"ink",sc:"mcp",h:`
+  <p class="kicker"><span class="tick"></span>One acronym worth knowing</p>
+  <h2>MCP — a standard plug for tools</h2>
+  <div class="scene">
+    <div class="mcpwrap"></div>
+    <div class="cap">Build a tool once; any model that speaks <b>Model Context Protocol</b> can use it. Same reason USB-C replaced a drawer full of chargers.</div>
+  </div>`,
+n:["Beat 1 — the tangle. Three models, four tools, twelve custom integrations. Add one model and you write four more.","Beat 2 — one standard in the middle, and it collapses to seven. That is N×M becoming N+M.","Open standard: published by Anthropic in late 2024, adopted across Google, OpenAI and Microsoft through 2025. It won because it is open, not because one company pushed it.","Campus example: wrap the exam-results database in one MCP server and every agent in Phase 3 can read it — no per-agent wiring.","You will see 'custom MCP' again on the connectors slide in Phase 2."]},
+
+{p:1,t:"Agent",s:"paper",sc:"agent",h:`
+  <p class="kicker"><span class="tick"></span>The word everyone is using</p>
+  <h2>An agent is a model with a job, tools, and a loop</h2>
+  <div class="scene">
+    <div class="lanes">
+      <div class="lane" data-l="bot">
+        <span class="llab">Chatbot</span>
+        <div class="path">
+          <span class="nd">Ask</span><span class="seg"></span><span class="nd">Answer</span>
+          <span class="dot"></span>
+        </div>
+      </div>
+      <div class="lane" data-l="agt">
+        <span class="llab">Agent</span>
+        <div class="path">
+          <span class="nd">Ask</span><span class="seg"></span>
+          <span class="nd">Plan</span><span class="seg"></span>
+          <span class="nd">Act</span><span class="seg"></span>
+          <span class="nd">Check</span><span class="seg"></span>
+          <span class="nd">Answer</span>
+          <span class="dot"></span>
+        </div>
+        <div class="lapcount"></div>
+      </div>
+    </div>
+    <div class="cap">The loop is the difference. <b>"Find companies hiring for my skills"</b> is one request — and about nine passes around that circuit.</div>
+  </div>`,
+n:["Beat 1 — the chatbot: one hop, done. Nothing wrong with it; it just cannot pursue a goal.","Beat 2 — the agent starts, and then watch it cycle. Act, check, act, check. It keeps going until the job is actually done.","Beat 3 — only then does it answer.","One more thing before Phase 2: stuffing every instruction into one agent makes it worse, so real systems split into a coordinator that routes and specialists that each do one job — a hospital triage desk. Watch for that shape six times in Phase 3.","Recap the six words: model, prompt, context, grounding, tools, agent. Ask if anything is muddy before moving on."]},
+
+/* ============ PHASE 2 ============ */
+{p:2,t:"Phase 2",s:"ink",g:"02",h:`
+  <p class="div-n"><span class="tick"></span>Phase 02</p>
+  <h1>Gemini Enterprise</h1>
+  <p class="lede">Everything from Phase 1, running on your institution's own data — with a builder anyone in this room can use.</p>`,
+n:["Transition line: public Gemini knows the internet. Gemini Enterprise knows your institution."]},
+
+{p:2,t:"What it is",s:"paper",h:`
+  <p class="kicker"><span class="tick"></span>Plain definition</p>
+  <h2>Google-quality search over your own data — plus agents that act on it</h2>
+  <div class="kv" style="margin-top:8px">
+    <div><p class="k">Public Gemini</p><p class="v">Knows the internet up to its training date. Knows nothing about you.</p></div>
+    <div><p class="k">Gemini Enterprise</p><p class="v"><b>Also</b> knows your documents, mail, records — and only what <b>you</b> already have permission to see.</p></div>
+  </div>
+  <p class="note">Launched as Agentspace, renamed October 2025 — older tutorials under that name are the same product. 1,000+ US universities run Gemini for Education; UC Riverside built a campus assistant on it for 25,000 people.</p>`,
+n:["The rename matters when they search for tutorials later — mention it once.","UC Riverside ('The Grove') makes it concrete that this is production, not demo."]},
+
+{p:2,t:"Four doors",s:"ink",h:`
+  <p class="kicker"><span class="tick"></span>What you see when you log in</p>
+  <h2>Four doors, one index</h2>
+  <div class="kv">
+    <div><p class="k">Search</p><p class="v">One box across every connected system — docs, mail, tickets, chats.</p></div>
+    <div><p class="k">Chat</p><p class="v">Plain-language answers, grounded in those documents, cited to the source.</p></div>
+    <div><p class="k">Agents</p><p class="v"><b>The gallery.</b> Browse, run, build, share. Where we spend today.</p></div>
+    <div><p class="k">Notebooks</p><p class="v">NotebookLM, enterprise edition — sources in, study guides and audio out.</p></div>
+  </div>
+  <p class="note">Connect a system once; every door can see it.</p>`,
+n:["If a live tenant is up, switch to it and just show the navigation. Ten seconds of real UI beats this slide."]},
+
+{p:2,t:"Connectors",s:"paper",h:`
+  <p class="kicker"><span class="tick"></span>Where the knowledge comes from</p>
+  <h2>Connect once, ask anywhere</h2>
+  <div class="chips" style="margin:6px 0 24px">
+    <span class="chip">Drive</span><span class="chip">Gmail</span><span class="chip">Calendar</span>
+    <span class="chip">Chat</span><span class="chip">SharePoint</span><span class="chip">OneDrive</span>
+    <span class="chip">Outlook</span><span class="chip">Teams</span><span class="chip">Confluence</span>
+    <span class="chip">Jira</span><span class="chip">ServiceNow</span><span class="chip">Salesforce</span>
+    <span class="chip">BigQuery</span><span class="chip">custom MCP</span>
+  </div>
+  <p class="lede">For a campus: the regulations PDF, the exam timetable, the placement records, the notice archive — one question, one answer, one citation. Instead of four portals and a WhatsApp group.</p>`,
+n:["Ask the room: how many places do you check to find one exam date? That's the pitch.","Point at 'custom MCP' and call back to the Phase 1 animation — that is the standard plug, and this is where it gets used."]},
+
+{p:2,t:"Permissions",s:"ink",h:`
+  <p class="kicker"><span class="tick"></span>Why an institution can say yes</p>
+  <p class="stmt">Same question,<br>different answers —<br><span class="r">correctly.</span></p>
+  <p class="sub">It inherits the access rules already set in Drive and everywhere else, enforced at query time. A student asking about grading gets the handbook. A faculty member gets the handbook <b>and</b> the moderation notes — because their account could already open them.</p>
+  <p class="note">Single sign-on · permissions enforced per query · full audit logging · customer-managed encryption. Contrast: pasting an internal document into a public chatbot.</p>`,
+n:["The slide IT and faculty care about most — keep it even for a student room; it's why the college can deploy this at all.","Nothing is re-shared or re-permissioned. The AI sees what you see, no more."]},
+
+{p:2,t:"Three rungs",s:"paper",h:`
+  <p class="kicker"><span class="tick"></span>Ways to build</p>
+  <h2>Three rungs.<br>One needs code.</h2>
+  <div class="kv" style="margin-top:8px">
+    <div><p class="k">No code</p><p class="v"><b>Agent Designer</b> — describe it in a sentence; it builds it. Flow canvas, connectors, scheduling. <b>Anyone. Today, you.</b></p></div>
+    <div><p class="k">Low code</p><p class="v"><b>Agent Studio</b> — visual builder with real control over steps and conditions.</p></div>
+    <div><p class="k">Full code</p><p class="v"><b>Agent Development Kit</b> — Python, total control. Phase 3 lives here.</p></div>
+  </div>
+  <p class="note">The rungs interoperate — a no-code agent and a Python agent sit in the same gallery and can call each other.</p>`,
+n:["A ladder, not a hierarchy. Most useful campus agents never need rung three.","Say explicitly: everything in Phase 3 is rung three. That's why those demos look richer."]},
+
+{p:2,t:"Live build",s:"ink",h:`
+  <p class="kicker"><span class="tick"></span>Live · four minutes</p>
+  <h2>Watch one get built</h2>
+  <ol class="steps" style="margin-top:6px;max-width:720px">
+    <li><b>New agent</b> — Agents → New agent.</li>
+    <li><b>Describe it</b> — one paragraph, plain English. Submit.</li>
+    <li><b>Refine</b> — "add sub-agents as needed." Watch the canvas fill.</li>
+    <li><b>Create</b> — it registers itself.</li>
+    <li><b>Chat</b> — test with a real question.</li>
+    <li><b>Share</b> — ⋯ on the card → add usernames.</li>
+  </ol>`,
+n:["DO THIS LIVE. It is the moment the room believes the talk.","Have a screen recording as fallback — conference wifi is conference wifi.","Narrate what you type. The point is that it's ordinary English.","Admin one-time setup (done beforehand): create the app, Google Identity sign-in, enable Agent Designer + agent sharing under Feature Management."]},
+
+{p:2,t:"The build prompt",s:"paper",h:`
+  <p class="kicker"><span class="tick"></span>Step 02, up close</p>
+  <h2>You're writing a job description, not code</h2>
+  <div class="split" style="margin-top:6px">
+    <div class="quote">Create an agent named <b>Semester Planner</b>
+that helps a final-year student plan their
+week. Read my timetable and deadlines from
+Drive, flag anything due in 7 days, propose
+a study schedule around class hours, warn
+me when two deadlines collide.
+
+Include any subtasks needed.</div>
+    <div class="kv" style="border-top:1px solid var(--line)">
+      <div><p class="k">Name</p><p class="v">Findable in the gallery.</p></div>
+      <div><p class="k">Who it serves</p><p class="v">Shapes every answer.</p></div>
+      <div><p class="k">Verbs</p><p class="v">Read, flag, propose, warn — each tends to become a step.</p></div>
+      <div><p class="k">Data source</p><p class="v">Named → connector wired.</p></div>
+      <div><p class="k">Last line</p><p class="v">Makes it decompose itself.</p></div>
+    </div>
+  </div>`,
+n:["Call back to the prompt animation in Phase 1 — same four dials, except here you write them once instead of every message.","Higher-engagement option: ask the room for an agent idea and build theirs instead.","Design heuristic worth saying: if the description contains 'and then', it wants to be multi-step. The Schedule tab makes it run alone — every Monday 8am, nobody present."]},
+
+{p:2,t:"As a student",s:"ink",h:`
+  <p class="kicker"><span class="tick"></span>What's in it for you</p>
+  <h2>Five worth building this semester</h2>
+  <div class="kv">
+    <div><p class="k">Study</p><p class="v">Lecture PDFs → revision guide, question bank, audio overview.</p></div>
+    <div><p class="k">Placement</p><p class="v">Resume scored against a real posting — exact gaps, not generic advice.</p></div>
+    <div><p class="k">Project</p><p class="v">Scheduled paper-scout — weekly digest on your topic, mailed to you.</p></div>
+    <div><p class="k">Admin</p><p class="v">Rules and deadlines answered from the actual handbook, page cited.</p></div>
+    <div><p class="k">Doubts</p><p class="v">A tutor grounded in your syllabus, not the internet's average.</p></div>
+  </div>
+  <p class="note"><b>The real one:</b> "I designed and shipped an agent that does X" is a portfolio line. Very few graduates have it yet.</p>`,
+n:["Land the note line hard — for this audience it's the most valuable sentence in the deck.","Push: build one badly this week rather than perfectly never."]},
+
+{p:2,t:"Three lines",s:"paper",h:`
+  <p class="kicker"><span class="tick"></span>Say this part out loud</p>
+  <h2>Three lines not to cross</h2>
+  <ol class="steps" style="margin-top:6px;max-width:860px">
+    <li><b>Its writing submitted as yours is plagiarism.</b> Plan, critique, revise with it — the submitted sentences are yours.</li>
+    <li><b>Verify anything carrying a name, number or citation.</b> Grounding cuts hallucination sharply; it doesn't erase it.</li>
+    <li><b>Personal data goes in the governed tool, never the public one.</b> Especially data about another student.</li>
+  </ol>
+  <p class="note">One habit to keep: an agent that <b>drafts</b> while a human <b>sends</b> is almost always the right design. Watch us make exactly that choice next.</p>`,
+n:["Thirty seconds, plainly stated, no moralising.","Point back at the hallucination animation for line 2 — they have already seen the machine invent a number with total confidence."]},
+
+/* ============ PHASE 3 ============ */
+{p:3,t:"Phase 3",s:"ink",g:"03",h:`
+  <p class="div-n"><span class="tick"></span>Phase 03</p>
+  <h1>What we built</h1>
+  <p class="lede">Six agents, live on this campus. Built on the Agent Development Kit, registered into Gemini Enterprise. One story, not six.</p>`,
+n:["Energy shift: phases 1–2 were teaching, this is show and tell.","If you can demo even one live, do that instead of narrating slides."]},
+
+{p:3,t:"The six",s:"paper",h:`
+  <p class="kicker"><span class="tick"></span>One campus, six jobs</p>
+  <h2>Every role on campus gets one</h2>
+  <div class="kv" style="margin-top:6px">
+    <div><p class="k">Students</p><p class="v"><b>Job Helper</b> — resume in, tracked placement pipeline out · <b>Placement Assistant</b> — ATS scoring + interview coaching · <b>Doubt Solver</b> — 11 department specialists behind one front desk · <b>MS Buddy</b> — the study-abroad application companion</p></div>
+    <div><p class="k">Faculty</p><p class="v"><b>Faculty Agent</b> — rubrics and lesson plans, research only when asked</p></div>
+    <div><p class="k">Ambassadors</p><p class="v"><b>Ambassador Agent</b> — a live cockpit for one section: who stalled, who to nudge, where you rank</p></div>
+  </div>
+  <p class="note">Different jobs, same construction. That construction is the actual lesson.</p>`,
+n:["One breath per agent, no deep dive here — the next two slides carry the insight.","Job Helper: 8 specialists — reads resume, finds companies, finds real alumni, verifies every link, ranks referrals, names resume gaps, drafts outreach, tracks applications.","Placement Assistant: 'help me get a job' is ambiguous → it asks ONE question (resume or interview?) instead of guessing.","Doubt Solver: front desk routes across all 6 schools; 'networks' could be CSE or ECE → one clarifying question, never a silent guess.","MS Buddy: newest, still moving — VERIFY scope with the owning team before presenting.","Faculty: never invents a criterion a faculty member didn't give; relays specialists' questions instead of guessing.","Ambassador: sees her section only — enforced by the login token, not the prompt. Interactive cards, not walls of text."]},
+
+{p:3,t:"One shape",s:"ink",h:`
+  <p class="kicker"><span class="tick"></span>Under the hood — all six</p>
+  <p class="stmt">One shape<span class="r">.</span><br>Six times.</p>
+  <div class="arrowline" style="margin:30px 0 0">
+    <span>coordinator reads intent</span><span class="a">→</span>
+    <span>routes to a narrow specialist</span><span class="a">→</span>
+    <span>specialist calls real tools</span><span class="a">→</span>
+    <span class="hot">answer, from live data</span>
+  </div>
+  <p class="sub">The coordinator answers as little as possible itself. Each specialist has one job and a few tools. Nothing important comes from the model's memory — this is the triage desk from Phase 1, in production.</p>`,
+n:["Explicit callback: 'remember the loop animation, and the triage desk? Here it is, six times.'","Ambiguity handling is part of the shape: one short clarifying question beats a confident wrong branch — Doubt Solver and Placement Assistant both do this.","If asked why: one generalist stuffed with every instruction degrades. Narrow briefs stay accurate."]},
+
+{p:3,t:"Four rules",s:"paper",h:`
+  <p class="kicker"><span class="tick"></span>Written into every one, in plain English</p>
+  <h2>Four rules that make them trustworthy</h2>
+  <ol class="steps" style="margin-top:6px;max-width:880px">
+    <li><b>Never invent</b> — no person without a real, verified link; no number that didn't come from a live tool call.</li>
+    <li><b>Never guess</b> — ambiguous? Ask one short question, then route.</li>
+    <li><b>Never overclaim</b> — it drafts the message; the human sends it. It never says "sent."</li>
+    <li><b>Never leak</b> — one user's view never contains another user's data. Enforced by identity, not by politeness.</li>
+  </ol>
+  <p class="note">Guardrails are instructions in plain English — which is exactly why they must be written carefully and tested. These four transfer to anything you build, on any rung.</p>`,
+n:["This is the transferable takeaway of Phase 3. Whatever they build in Agent Designer, these four carry over verbatim.","Rule 1 is the hallucination animation, solved by process: an agent that invents an alumnus sends a student to embarrass themselves in a real stranger's inbox. That's why Job Helper verifies every link before showing it."]},
+
+/* ============ CLOSE ============ */
+{p:4,t:"Do one thing",s:"ink",h:`
+  <p class="kicker"><span class="tick"></span>Before you leave</p>
+  <h2>Do one thing this week</h2>
+  <ol class="steps" style="margin-top:6px;max-width:820px">
+    <li><b>Build one agent. A bad one.</b> Twenty minutes. The gap between reading and doing is smaller than it looks.</li>
+    <li><b>Automate a chore you actually repeat</b> — deadline sweeps, note summaries, resume tailoring. Not a demo.</li>
+    <li><b>Share it.</b> An agent nobody uses taught you the tool; one three people use taught you the problem.</li>
+  </ol>
+  <p class="note">Six words to keep: model · prompt · context · grounding · tools · agent.</p>`,
+n:["End on the assignment, not on thanks. Give them tonight's task.","Then open the floor — keep five minutes."]},
+
+{p:4,t:"Questions",s:"ink",h:`
+  <h1>Questions<span class="r">.</span></h1>
+  <div class="kv" style="margin-top:10px;max-width:820px">
+    <div><p class="k">Read</p><p class="v mono" style="font-size:13px">cloud.google.com/gemini/enterprise/docs/agent-designer</p></div>
+    <div><p class="k">Try</p><p class="v mono" style="font-size:13px">codelabs.developers.google.com → Gemini Enterprise</p></div>
+    <div><p class="k">Build</p><p class="v mono" style="font-size:13px">google.github.io/adk-docs</p></div>
+  </div>
+  <div class="lockup" style="margin-top:48px"><span class="mk">»</span><span>tilicho</span><span class="l2">labs</span></div>`,
+n:["Be ready for: Is it free for students? Will it do my assignment? Does the college see my chats? Can I put this on my resume?","The last one: yes — and be specific about what you built and what it does."]}
+];
+
+/* ================= scene helpers ================= */
+const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let gen = 0;
+let pend = [];
+
+/* Every timed step inside a beat is queued, so that a beat can be *settled* —
+   its remaining steps run instantly and in order — when the presenter advances
+   before the animation has finished. Without this, pressing -> quickly commits
+   tokens out of order. */
+function later(ms, fn){
+  const g = gen;
+  const rec = { fn };
+  rec.id = setTimeout(() => {
+    if (g !== gen) return;
+    const k = pend.indexOf(rec);
+    if (k >= 0) pend.splice(k, 1);
+    fn();
+  }, REDUCED ? 0 : ms);
+  pend.push(rec);
+}
+function clearTimers(){ pend.forEach(r => clearTimeout(r.id)); pend = []; }
+function settle(){
+  let guard = 0;
+  while (pend.length && guard++ < 400){
+    const q = pend; pend = [];
+    q.forEach(r => clearTimeout(r.id));
+    q.forEach(r => { try { r.fn(); } catch (e) { console.warn(e); } });
+  }
+}
+
+const $ = (r, s) => r.querySelector(s);
+const $$ = (r, s) => [...r.querySelectorAll(s)];
+
+function bars(host, cands, mark){
+  host.innerHTML = cands.map((c, k) => {
+    const cls = (mark && k === 0) ? ' ' + mark : '';
+    return `<div class="row${cls}"><span class="w">${c[0]}</span><span class="bar"><i></i></span><span class="p">${c[1]}%</span></div>`;
+  }).join('');
+  const draw = () => $$(host, '.bar i').forEach((b, k) => {
+    b.style.width = Math.max(2, Math.min(100, cands[k][1])) + '%';
+  });
+  REDUCED ? draw() : requestAnimationFrame(draw);
+}
+
+function say(root, word){
+  const t = $(root, '.ln .txt');
+  const glue = /^[.,;:!?]/.test(word) ? '' : ' ';
+  const s = document.createElement('span');
+  s.className = 'new';
+  s.textContent = glue + word;
+  t.appendChild(s);
+}
+
+function flyWord(root, word, done){
+  const scene = $(root, '.scene');
+  const src = $(scene, '.row.hot .w') || $(scene, '.row.ok .w');
+  const car = $(scene, '.ln .car');
+  if (!src || !car || REDUCED){ say(root, word); done && done(); return; }
+  const p = scene.getBoundingClientRect(), a = src.getBoundingClientRect(), c = car.getBoundingClientRect();
+  const g = document.createElement('span');
+  g.className = 'fly'; g.textContent = word;
+  g.style.left = (a.left - p.left) + 'px';
+  g.style.top = (a.top - p.top) + 'px';
+  scene.appendChild(g);
+  requestAnimationFrame(() => {
+    g.style.transform = `translate(${c.left - a.left + 2}px, ${c.top - a.top - 4}px)`;
+    g.style.fontSize = getComputedStyle(car).fontSize;
+    g.style.color = 'var(--hi)';
+  });
+  later(350, () => { g.remove(); say(root, word); done && done(); });
+}
+
+function typeInto(el, text, speed){
+  if (REDUCED){ el.textContent = text; return; }
+  el.textContent = '';
+  let k = 0;
+  const step = () => {
+    if (k > text.length) return;
+    el.textContent = text.slice(0, k);
+    k += 2;
+    later(speed, step);
+  };
+  step();
+}
+
+/* ================= scenes ================= */
+const SCENES = {
+
+/* ---- 1. next-word prediction ---- */
+mech: {
+  reset(r){
+    $(r, '.ln .txt').textContent = 'The capital of Telangana is';
+    $(r, '.dist').innerHTML = '';
+    $(r, '.cap').classList.remove('on');
+  },
+  beats: [
+    r => {},
+    r => bars($(r, '.dist'), [['Hyderabad', 94], ['a', 2], ['located', 1], ['Warangal', 0.4]], ''),
+    r => {
+      bars($(r, '.dist'), [['Hyderabad', 94], ['a', 2], ['located', 1], ['Warangal', 0.4]], 'hot');
+      later(420, () => flyWord(r, 'Hyderabad', () => later(160, () => $(r, '.dist').innerHTML = '')));
+    },
+    r => {
+      bars($(r, '.dist'), [['.', 61], [',', 18], ['—', 9], ['and', 5]], 'hot');
+      later(520, () => flyWord(r, '.', () => later(160, () => $(r, '.dist').innerHTML = '')));
+    },
+    r => {
+      const run = ['It', 'is', 'also', 'the', 'largest', 'city', 'in', 'the', 'state.'];
+      run.forEach((w, k) => later(k * 260, () => {
+        bars($(r, '.dist'), [[w, Math.max(41, 74 - k * 3)], ['—', 12], ['—', 5]], 'hot');
+        later(140, () => say(r, w));
+      }));
+      later(run.length * 260 + 320, () => $(r, '.cap').classList.add('on'));
+    }
+  ]
+},
+
+/* ---- 2. the prompt ---- */
+prompt: {
+  reset(r){
+    $(r, '.ptxt').textContent = 'write about my project';
+    $(r, '.otxt').textContent = '';
+    $$(r, '.dial').forEach(d => d.classList.remove('lit'));
+  },
+  beats: (() => {
+    const P = [
+      'write about my project',
+      'Write an abstract for my final-year project.',
+      'Write an abstract for my final-year project\non flood prediction from rainfall sensor data.',
+      'Write a 150-word abstract for my final-year\nproject on flood prediction from rainfall\nsensor data. Method and result, one line each.',
+      'Write a 150-word abstract for my final-year\nproject on flood prediction from rainfall\nsensor data. Method and result, one line each.\nAudience: an examiner who is not from CSE.'
+    ];
+    const O = [
+      'Your project is an important undertaking that demonstrates dedication and a range of valuable skills.',
+      'This abstract presents a final-year project undertaken to explore a relevant problem in the field.',
+      'This abstract presents a flood-prediction system developed using rainfall sensor data collected over time.',
+      'Method: an LSTM trained on five years of gauge readings. Result: six-hour lead time at 88% recall.',
+      'Method: the system learns flood patterns from five years of rainfall records. Result: it warns six hours ahead and catches about nine in ten events.'
+    ];
+    return P.map((p, k) => r => {
+      $(r, '.ptxt').textContent = p;
+      typeInto($(r, '.otxt'), O[k], 14);
+      $$(r, '.dial').forEach((d, j) => d.classList.toggle('lit', j < k));
+    });
+  })()
+},
+
+/* ---- 3. the desk ---- */
+desk: {
+  reset(r){
+    const d = $(r, '.desk');
+    d.innerHTML = '';
+    [44, 66, 52].forEach(h => {
+      const m = document.createElement('div');
+      m.className = 'msg'; m.innerHTML = '<span></span>';
+      d.appendChild(m);
+      requestAnimationFrame(() => m.style.height = h + 'px');
+    });
+    $(r, '.deskstat').textContent = '';
+    $(r, '.deskstat').classList.remove('warn');
+    $(r, '.cap').classList.remove('on');
+  },
+  beats: [
+    r => {},
+    r => {
+      sweep(r, 'Turn 4 — the whole conversation is re-read, top to bottom.');
+      addMsg(r, 70);
+    },
+    r => {
+      [58, 72, 48, 64].forEach((h, k) => later(k * 170, () => addMsg(r, h)));
+      later(760, () => sweep(r, 'Turn 8 — still re-reading everything. The desk is nearly full.'));
+    },
+    r => {
+      addMsg(r, 60);
+      later(240, () => {
+        const all = $$(r, '.msg');
+        all.slice(0, 2).forEach((m, k) => later(k * 140, () => m.classList.add('off')));
+        const s = $(r, '.deskstat');
+        s.textContent = 'Turn 12 — the first two turns fall off the desk.';
+        s.classList.add('warn');
+      });
+    },
+    r => {
+      const s = $(r, '.deskstat');
+      s.textContent = '"What did I ask you at the start?"  →  it genuinely cannot say.';
+      s.classList.add('warn');
+      $(r, '.cap').classList.add('on');
+    }
+  ]
+},
+
+/* ---- 4. hallucination ---- */
+halluc: {
+  reset(r){
+    $(r, '.ln .txt').textContent = 'The lab-exam attendance requirement at this college is';
+    $(r, '.dist').innerHTML = '';
+    $(r, '.cap').classList.remove('on');
+  },
+  beats: [
+    r => {},
+    r => bars($(r, '.dist'), [['75', 26], ['80', 25], ['70', 24], ['65', 22]], ''),
+    r => {
+      bars($(r, '.dist'), [['75', 26], ['80', 25], ['70', 24], ['65', 22]], 'hot');
+      later(460, () => flyWord(r, '75%', () => {
+        later(180, () => { say(r, '— attendance is compulsory for all lab sessions.'); $(r, '.cap').classList.add('on'); });
+      }));
+    }
+  ]
+},
+
+/* ---- 5. grounding ---- */
+ground: {
+  reset(r){
+    $(r, '.ln .txt').textContent = 'The lab-exam attendance requirement at this college is';
+    $(r, '.docs').innerHTML = ['academic-regulations.pdf', 'exam-handbook.pdf', 'timetable.xlsx']
+      .map(d => `<span class="doc">${d}</span>`).join('');
+    const p = $(r, '.passage');
+    p.classList.remove('in');
+    p.innerHTML = '';
+    $(r, '.dist').innerHTML = '';
+    $(r, '.cap').classList.remove('on');
+  },
+  beats: [
+    r => {},
+    r => $$(r, '.doc').forEach((d, k) => later(k * 130, () => d.classList.add('in'))),
+    r => {
+      $$(r, '.doc')[0].classList.add('found');
+      const p = $(r, '.passage');
+      p.innerHTML = '§4.2 — A student must attend not fewer than <b>80%</b> of scheduled<br>laboratory sessions to be eligible for the lab examination.<span class="cite">academic-regulations.pdf · p.14</span>';
+      later(120, () => p.classList.add('in'));
+      later(420, () => $(r, '.cite').classList.add('in'));
+    },
+    r => {
+      bars($(r, '.dist'), [['80', 97], ['75', 1], ['70', 0.6], ['65', 0.3]], 'ok');
+      later(560, () => flyWord(r, '80%', () => {
+        later(180, () => { say(r, '— per §4.2 of the regulations.'); $(r, '.cap').classList.add('on'); });
+      }));
+    }
+  ]
+},
+
+/* ---- 6. tools ---- */
+tools: {
+  reset(r){
+    $(r, '.ln .txt').textContent = 'Your attendance in Data Structures this semester is';
+    $(r, '.n1').className = 'node n1';
+    $(r, '.n2').className = 'node n2';
+    const p = $(r, '.pkt');
+    p.className = 'pkt'; p.textContent = ''; p.style.transform = 'translateX(0)';
+    $(r, '.cap').classList.remove('on');
+  },
+  beats: [
+    r => {},
+    r => {
+      say(r, '…');
+      $(r, '.n1').classList.add('live');
+    },
+    r => {
+      const p = $(r, '.pkt');
+      p.textContent = 'get_attendance(student, "CS201")';
+      p.classList.add('show');
+      later(60, () => { p.style.transform = 'translateX(calc(100% - ' + p.offsetWidth + 'px))'; });
+      later(760, () => $(r, '.n2').classList.add('live'));
+    },
+    r => {
+      const p = $(r, '.pkt');
+      $(r, '.n2').className = 'node n2 ok';
+      p.className = 'pkt show ok';
+      p.textContent = '{ "present": 41, "held": 46 }';
+      later(60, () => p.style.transform = 'translateX(0)');
+      later(780, () => $(r, '.n1').className = 'node n1 ok');
+    },
+    r => {
+      say(r, '89% — 41 of 46 sessions held.');
+      $(r, '.cap').classList.add('on');
+    }
+  ]
+},
+
+/* ---- 7. MCP ---- */
+mcp: {
+  reset(r){
+    const M = ['Gemini', 'Claude', 'GPT'], T = ['Drive', 'Results DB', 'Timetable', 'Jira'];
+    const my = k => 44 + k * 58, ty = k => 26 + k * 52;
+    let tangle = '', clean = '', labels = '';
+    M.forEach((m, i) => {
+      labels += `<rect class="box" x="14" y="${my(i) - 15}" width="96" height="30"></rect>` +
+                `<text class="lbl" x="62" y="${my(i) + 4}" text-anchor="middle">${m}</text>`;
+      T.forEach((t, j) => { tangle += `<path class="tangle" d="M112 ${my(i)} C 260 ${my(i)}, 430 ${ty(j)}, 578 ${ty(j)}"></path>`; });
+      clean += `<path class="clean" d="M112 ${my(i)} C 210 ${my(i)}, 250 100, 316 100"></path>`;
+    });
+    T.forEach((t, j) => {
+      labels += `<rect class="box" x="580" y="${ty(j) - 15}" width="116" height="30"></rect>` +
+                `<text class="lbl" x="638" y="${ty(j) + 4}" text-anchor="middle">${t}</text>`;
+      clean += `<path class="clean" d="M404 100 C 470 100, 500 ${ty(j)}, 578 ${ty(j)}"></path>`;
+    });
+    $(r, '.mcpwrap').innerHTML =
+      `<svg viewBox="0 0 710 210" role="img" aria-label="Model to tool connections, before and after MCP">
+         <g class="tangles">${tangle}</g>
+         <g class="cleans">${clean}</g>
+         <rect class="hub" x="316" y="82" width="88" height="36"></rect>
+         <text class="hublbl" x="360" y="105" text-anchor="middle">MCP</text>
+         ${labels}
+       </svg>`;
+    $(r, '.cap').classList.remove('on');
+  },
+  beats: [
+    r => {
+      $$(r, '.tangle').forEach((p, k) => { p.style.opacity = '0'; later(k * 45, () => p.style.opacity = '.45'); });
+    },
+    r => {
+      $$(r, '.tangle').forEach(p => p.classList.add('gone'));
+      later(300, () => { $(r, '.hub').classList.add('in'); $(r, '.hublbl').classList.add('in'); });
+      later(520, () => $$(r, '.clean').forEach((p, k) => later(k * 90, () => p.classList.add('drawn'))));
+      later(1500, () => $(r, '.cap').classList.add('on'));
+    }
+  ]
+},
+
+/* ---- 8. agent loop ---- */
+agent: {
+  reset(r){
+    $$(r, '.nd').forEach(n => n.classList.remove('lit'));
+    $$(r, '.dot').forEach(d => { d.classList.remove('show'); d.style.transform = 'translateX(0)'; });
+    $(r, '.lapcount').classList.remove('on');
+    $(r, '.lapcount').textContent = '';
+    $(r, '.cap').classList.remove('on');
+  },
+  beats: [
+    r => {},
+    r => {
+      const lane = $(r, '[data-l="bot"]'), dot = $(lane, '.dot'), nds = $$(lane, '.nd');
+      dot.classList.add('show');
+      moveDot(lane, dot, nds[0]);
+      later(360, () => { nds[0].classList.add('lit'); moveDot(lane, dot, nds[1]); });
+      later(820, () => nds[1].classList.add('lit'));
+    },
+    r => {
+      const lane = $(r, '[data-l="agt"]'), dot = $(lane, '.dot'), nds = $$(lane, '.nd');
+      const lap = $(lane, '.lapcount');
+      lap.classList.add('on');
+      dot.classList.add('show');
+      const seq = [0, 1, 2, 3, 2, 3, 2, 3];
+      seq.forEach((idx, k) => later(k * 480, () => {
+        nds.forEach(n => n.classList.remove('lit'));
+        nds[idx].classList.add('lit');
+        moveDot(lane, dot, nds[idx]);
+        if (idx === 3) lap.textContent = 'pass ' + (Math.floor((k - 1) / 2) + 1) + ' — not done yet, going round again';
+      }));
+    },
+    r => {
+      const lane = $(r, '[data-l="agt"]'), dot = $(lane, '.dot'), nds = $$(lane, '.nd');
+      nds.forEach(n => n.classList.remove('lit'));
+      nds[4].classList.add('lit');
+      moveDot(lane, dot, nds[4]);
+      $(lane, '.lapcount').textContent = 'goal met — answer';
+      later(400, () => $(r, '.cap').classList.add('on'));
+    }
+  ]
+}
+};
+
+function moveDot(lane, dot, node){
+  const path = $(lane, '.path');
+  const p = path.getBoundingClientRect(), n = node.getBoundingClientRect();
+  /* sit in the node's left padding, never on top of its label */
+  dot.style.transform = 'translateX(' + ((n.left - p.left) + 7) + 'px)';
+}
+
+function sweep(r, msg){
+  $$(r, '.msg').forEach((m, k) => later(k * 55, () => {
+    m.classList.remove('sweep'); void m.offsetWidth; m.classList.add('sweep');
+  }));
+  if (msg) $(r, '.deskstat').textContent = msg;
+}
+
+function addMsg(r, h){
+  const d = $(r, '.desk');
+  const m = document.createElement('div');
+  m.className = 'msg'; m.innerHTML = '<span></span>';
+  d.appendChild(m);
+  requestAnimationFrame(() => m.style.height = h + 'px');
+}
+
+/* ================= engine ================= */
+const deck = document.getElementById('deck');
+const notes = document.getElementById('notes');
+const bar = document.getElementById('bar');
+const ov = document.getElementById('ov');
+const ovGrid = ov.querySelector('.og');
+let i = 0, beat = -1, showNotes = false;
+
+SLIDES.forEach((s, idx) => {
+  const sec = document.createElement('section');
+  sec.className = 'slide' + (s.s === 'paper' ? ' paper' : '');
+  sec.setAttribute('aria-hidden', 'true');
+  sec.innerHTML =
+    `<div class="stage">${s.g ? `<div class="ghost">${s.g}</div>` : ''}<div class="inner">${s.h}</div></div>` +
+    `<div class="foot"><span>${PHASES[s.p]}</span><span class="pips"></span><span>${String(idx + 1).padStart(2, '0')} / ${SLIDES.length}</span></div>`;
+  deck.appendChild(sec);
+
+  const b = document.createElement('button');
+  b.innerHTML = `<span class="on-n">${String(idx + 1).padStart(2, '0')} · ${PHASES[s.p]}</span><span class="on-t">${s.t}</span>`;
+  b.addEventListener('click', () => { go(idx); ov.classList.remove('on'); });
+  ovGrid.appendChild(b);
+});
+
+const secs = [...deck.children];
+
+function scene(){ const sc = SLIDES[i].sc; return sc ? SCENES[sc] : null; }
+
+function pips(){
+  const host = secs[i].querySelector('.pips');
+  const sc = scene();
+  if (!sc){ host.innerHTML = ''; return; }
+  host.innerHTML = sc.beats.map((_, k) => `<i class="${k <= beat ? 'lit' : ''}"></i>`).join('');
+}
+
+function runBeat(){
+  const sc = scene();
+  if (!sc || beat >= sc.beats.length - 1) return false;
+  settle();
+  beat++;
+  try { sc.beats[beat](secs[i]); } catch (e) { console.warn('beat failed', e); }
+  pips();
+  return true;
+}
+
+function go(n){
+  i = Math.max(0, Math.min(SLIDES.length - 1, n));
+  gen++; clearTimers();
+  beat = -1;
+
+  secs.forEach((el, k) => {
+    const on = k === i;
+    el.classList.toggle('on', on);
+    el.setAttribute('aria-hidden', String(!on));
+  });
+
+  const sc = scene();
+  if (sc){
+    try { sc.reset(secs[i]); } catch (e) { console.warn('reset failed', e); }
+    if (REDUCED){ sc.beats.forEach((b, k) => { beat = k; try { b(secs[i]); } catch (e) {} }); }
+    else { requestAnimationFrame(() => { runBeat(); }); }
+  }
+  pips();
+
+  bar.style.width = ((i + 1) / SLIDES.length * 100) + '%';
+  const ns = SLIDES[i].n;
+  notes.innerHTML = ns
+    ? `<h4>Notes — ${SLIDES[i].t}</h4><ul>${ns.map(x => `<li>${x}</li>`).join('')}</ul>`
+    : `<h4>Notes</h4><p>None.</p>`;
+  /* blocked in some embedded/data-URL contexts; deep-linking is a nicety */
+  try { location.hash = i + 1; } catch (e) {}
+}
+
+function advance(){ if (!runBeat()) go(i + 1); }
+
+addEventListener('keydown', e => {
+  if (e.key === 'Escape'){ ov.classList.remove('on'); return; }
+  const k = e.key.toLowerCase();
+  if (k === 'n'){ showNotes = !showNotes; notes.classList.toggle('on', showNotes); return; }
+  if (k === 'o'){ ov.classList.toggle('on'); return; }
+  if (k === 'r'){ go(i); return; }
+  if (k === 'f'){
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen?.();
+    return;
+  }
+  if (['ArrowRight', ' '].includes(e.key)){ e.preventDefault(); advance(); return; }
+  if (['ArrowDown', 'PageDown'].includes(e.key)){ e.preventDefault(); go(i + 1); return; }
+  if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)){ e.preventDefault(); go(i - 1); return; }
+  if (e.key === 'Home'){ go(0); }
+  if (e.key === 'End'){ go(SLIDES.length - 1); }
+});
+
+deck.addEventListener('click', e => {
+  if (e.target.closest('a,button')) return;
+  if (e.clientX < innerWidth * 0.28) go(i - 1); else advance();
+});
+
+let tx = 0;
+addEventListener('touchstart', e => { tx = e.changedTouches[0].clientX; }, { passive: true });
+addEventListener('touchend', e => {
+  const d = e.changedTouches[0].clientX - tx;
+  if (Math.abs(d) > 55){ d < 0 ? advance() : go(i - 1); }
+}, { passive: true });
+
+go(Math.max(0, (parseInt(location.hash.slice(1), 10) || 1) - 1));
+setTimeout(() => { document.getElementById('help').style.opacity = '0'; }, 6000);
+</script>

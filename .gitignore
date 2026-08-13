@@ -12,3 +12,5 @@ __pycache__/
 # local adk session/artifact storage
 .adk/
 .claude/settings.local.json
+# git worktrees created by tooling
+.claude/worktrees/
