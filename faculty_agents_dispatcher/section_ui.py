@@ -435,6 +435,7 @@ def section_list_card(state, roster: list, department: str) -> list:
     rows = [s for s in roster if s.get('department') == department]
     if not rows:
         return []
+
     lines = [f'{department} — sections']
     lines += [
         f'·  Year {s.get("year")} · Sec {s.get("section")}  —  '
@@ -442,13 +443,30 @@ def section_list_card(state, roster: list, department: str) -> list:
         f'{"student" if (s.get("students") or 0) == 1 else "students"}'
         for s in rows
     ]
-    messages = a2ui.build_card(a2ui.uid(state, 'seclist'), lines)
-    # Trim rather than risk the ceiling, exactly as `section_card` does.
+
+    # The other departments, on the card itself. Browsing the roster means
+    # comparing departments, and going back to the department list between
+    # every one of them makes that a round trip each time.
+    others = [d for d in departments(roster) if d != department]
+    counts = {
+        d: sum(s.get('students') or 0 for s in roster
+               if s.get('department') == d)
+        for d in others
+    }
+    buttons = [(f'{d} ({counts[d]})', PICK_DEPARTMENT, {'department': d})
+               for d in others]
+    if buttons:
+        lines.append('Another department:')
+
+    prefix = a2ui.uid(state, 'seclist')
+    messages = a2ui.build_card(prefix, lines, buttons)
+    # Trim sections rather than risk the ceiling, exactly as `section_card`
+    # does — the department buttons are the way out of this card and are kept
+    # even when the list is cut short.
     while not _fits(messages) and len(lines) > 2:
-        lines = lines[:-1]
+        lines.pop(1)
         messages = a2ui.build_card(
-            a2ui.uid(state, 'seclist'),
-            lines + ['Showing the first few.'],
+            prefix, lines + ['Showing the first few.'], buttons
         )
     return messages
 
