@@ -80,9 +80,50 @@ _MOCK_OUTCOMES = [
 ]
 
 
+# Scripted outcomes for the showcase dataset, keyed by a fragment of the
+# prospect's name. A lead that matches gets exactly this result on every run;
+# anyone else falls through to the hashed outcomes below. Split: 4 interested,
+# 3 call-later, 2 not interested, 2 no answer.
+_SCRIPTED = {
+    'amir hassan': ('contacted',
+                    'interested — meeting booked Sat 10:00 with Daniel Lim'),
+    'tan wei ming': ('contacted', 'interested — wants a quote by email'),
+    'siti zulaikha': ('contacted', 'interested — video call Tue 6pm'),
+    'wong kai jie': ('contacted',
+                     'interested — wants a retirement illustration'),
+    'nurul aisyah': ('contacted',
+                     'asked to call later — retry tomorrow 6pm, '
+                     'WhatsApp summary sent'),
+    'muhammad irfan': ('contacted',
+                       'asked to call later — retry Saturday morning, '
+                       'WhatsApp summary sent'),
+    'ganesh pillai': ('contacted',
+                      'asked to call later — retry Monday, '
+                      'WhatsApp summary sent'),
+    'rajesh kumar': ('contacted', 'not interested — do-not-call for 90 days'),
+    'chen xiu ying': ('contacted', 'not interested — moved to nurture list'),
+    'ahmad faizal': ('failed',
+                     'no answer — WhatsApp summary sent, retry in 2 days'),
+    'ong boon keat': ('failed',
+                      'no answer — WhatsApp summary sent, retry in 2 days'),
+}
+
+
 def _mock_result(lead: dict, attempt: int) -> dict:
     lead_id = str(lead.get('lead_id') or '')
     seed = hashlib.sha256(f'{lead_id}:{attempt}'.encode()).digest()[0]
+
+    name = str(lead.get('name') or '').strip().lower()
+    for fragment, (outcome, detail) in _SCRIPTED.items():
+        if fragment in name:
+            return {
+                'lead_id': lead_id,
+                'outcome': outcome,
+                'detail': f'[MOCK] {detail}',
+                'call_id': f'mock-{lead_id}-{attempt}',
+                'attempts': 1,
+                'mock': True,
+            }
 
     if not str(lead.get('phone') or '').strip():
         # No number on the row. The mock will not pretend to have dialled it —

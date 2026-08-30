@@ -97,43 +97,35 @@ def mock_calls() -> bool:
 
 # --- underwriting thresholds -------------------------------------------------
 #
-# Every number the recommendation rules turn on, in one place. They come from
-# `singapore_policy_guidelines.md`, which is the catalogue the Policy Analysis
-# Agent is written against; change a threshold here and the agent's prompt
-# moves with it, because the prompt interpolates these values rather than
-# repeating them.
-#
-# If the agency moves a line, move it here — not in the prompt.
+# Every number the recommendation rules turn on, in one place. The rules
+# themselves are deterministic and live in `tools.py` (`_assess`) — the
+# analysis agent explains them, it does not decide them — so the same
+# spreadsheet always produces the same gaps, priorities and products.
 
-# Existing cover at or below which a lead is treated as having a protection
-# gap. MediShield Life alone leaves B2/C ward coverage only, so this is what
-# makes Integrated Shield the baseline recommendation.
-LOW_EXISTING_COVER_SGD = float(
-    os.environ.get('LODESTAR_LOW_EXISTING_COVER_SGD', '50000')
-)
+# Needed cover = this multiple of annual income (LIA Singapore guideline).
+INCOME_MULTIPLE = float(os.environ.get('LODESTAR_INCOME_MULTIPLE', '9'))
 
-# Term Life to 65 is the budget protection play: high cover, low premium, for
-# people whose liabilities have just jumped but whose income has not.
-TERM_LIFE_MAX_INCOME_SGD = float(
-    os.environ.get('LODESTAR_TERM_LIFE_MAX_INCOME_SGD', '60000')
-)
+# HOT: a qualifying life event (new child / home loan / marriage), a gap above
+# this (in S$K), and existing cover still thin relative to income. The cover
+# ratio is what separates "just bought a home, well covered" (warm) from
+# "just bought a home, exposed" (hot).
+HOT_MIN_GAP_K = float(os.environ.get('LODESTAR_HOT_MIN_GAP_K', '450'))
+HOT_MAX_COVER_RATIO = float(os.environ.get('LODESTAR_HOT_MAX_COVER_RATIO', '2.1'))
 
-# Investment-Linked needs both a long horizon and spare cash flow, so it is
-# gated on age and income together.
-ILP_MAX_AGE = int(os.environ.get('LODESTAR_ILP_MAX_AGE', '35'))
-ILP_MIN_INCOME_SGD = float(os.environ.get('LODESTAR_ILP_MIN_INCOME_SGD', '80000'))
+# WARM: a real gap plus someone depending on the income (or a smoker, whose
+# cover only gets dearer).
+WARM_MIN_GAP_K = float(os.environ.get('LODESTAR_WARM_MIN_GAP_K', '250'))
 
-# CareShield Life pays ~S$600/month for severe disability, which does not cover
-# a helper or a nursing facility here. The supplement is aimed at people close
-# enough to needing it to care, with the income to fund it.
-CARESHIELD_MIN_AGE = int(os.environ.get('LODESTAR_CARESHIELD_MIN_AGE', '40'))
-CARESHIELD_MIN_INCOME_SGD = float(
-    os.environ.get('LODESTAR_CARESHIELD_MIN_INCOME_SGD', '50000')
-)
+# Age 48+ with substantial cover already in place shifts the conversation from
+# protection to retirement/legacy.
+LEGACY_MIN_AGE = int(os.environ.get('LODESTAR_LEGACY_MIN_AGE', '48'))
+LEGACY_MIN_COVER_K = float(os.environ.get('LODESTAR_LEGACY_MIN_COVER_K', '1000'))
 
-# Term Life to 65 is written for people still inside their working and
-# mortgage-paying years.
-TERM_LIFE_MAX_AGE = int(os.environ.get('LODESTAR_TERM_LIFE_MAX_AGE', '45'))
+# Under this age with no dependents, the starter products apply.
+STARTER_MAX_AGE = int(os.environ.get('LODESTAR_STARTER_MAX_AGE', '30'))
+
+# At or below this gap (S$K) with no event, a top-up is all there is to say.
+SMALL_GAP_K = float(os.environ.get('LODESTAR_SMALL_GAP_K', '250'))
 
 # Session-state key the batch ledger lives under. Namespaced so it cannot
 # collide with anything a sub-agent writes.

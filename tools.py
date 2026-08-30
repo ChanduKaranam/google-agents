@@ -53,6 +53,103 @@ def _field(row: dict, *names: str):
     return None
 
 
+# --- deterministic underwriting ---------------------------------------------
+#
+# Gap, priority and product are computed here, not by the model, so the same
+# sheet always produces the same numbers. The analysis agent's job is the
+# "Why" sentence and the pitch notes — never the arithmetic.
+
+HOT, WARM, COLD = 'HOT', 'WARM', 'COLD'
+
+
+def _clean_key(key: str) -> str:
+    return re.sub(r'[^a-z]', '', str(key).lower())
+
+
+def _row_value(row: dict, *fragments: str):
+    """A field matched by substring of its cleaned header.
+
+    "Income (S$K)", "Annual Income (SGD)" and "income_sgd" all reach the same
+    fragment 'income'. First fragment that matches any key wins.
+    """
+    cleaned = {_clean_key(k): v for k, v in row.items()}
+    for fragment in fragments:
+        for key, value in cleaned.items():
+            if fragment in key and value not in (None, ''):
+                return value
+    return None
+
+
+def _num(value) -> float:
+    match = re.search(r'-?\d+(?:\.\d+)?', str(value or '').replace(',', ''))
+    return float(match.group()) if match else 0.0
+
+
+def _thousands(value: float) -> float:
+    # "120" in an S$K column and "120000" in an SGD column mean the same money.
+    return value / 1000 if value >= 10000 else value
+
+
+def _assess(row: dict) -> dict:
+    """Gap (S$K), priority and product for one raw lead row."""
+    income_k = _thousands(_num(_row_value(row, 'income')))
+    cover_k = _thousands(_num(_row_value(row, 'cover')))
+    age = int(_num(_row_value(row, 'age')))
+    dependents = int(_num(_row_value(row, 'dependent', 'dep')))
+    smoker = str(_row_value(row, 'tobacco', 'smok') or '').strip().lower() in (
+        'y', 'yes', 'true', 'smoker', '1')
+    event = str(_row_value(row, 'event') or '').strip().lower()
+
+    gap_k = max(0.0, round(config.INCOME_MULTIPLE * income_k - cover_k))
+
+    qualifying_event = any(w in event for w in ('child', 'loan', 'marriage'))
+    if (qualifying_event and gap_k > config.HOT_MIN_GAP_K
+            and cover_k < config.HOT_MAX_COVER_RATIO * income_k):
+        priority = HOT
+    elif gap_k > config.WARM_MIN_GAP_K and (dependents >= 1 or smoker):
+        priority = WARM
+    else:
+        priority = COLD
+
+    if 'child' in event:
+        policy = 'Term + Child Education Plan'
+    elif 'loan' in event:
+        policy = 'Mortgage-linked Term'
+    elif 'marriage' in event:
+        policy = 'Term + Whole Life'
+    elif age >= config.LEGACY_MIN_AGE and cover_k >= config.LEGACY_MIN_COVER_K:
+        policy = 'Retirement / Legacy Plan'
+    elif smoker:
+        policy = 'Term top-up + CI rider'
+    elif age < config.STARTER_MAX_AGE and dependents == 0:
+        policy = 'Savings + CI starter'
+    elif gap_k <= config.SMALL_GAP_K:
+        policy = 'Health / CI top-up'
+    else:
+        policy = 'Term top-up'
+    if smoker and 'CI' not in policy:
+        policy += ' + CI rider'
+
+    # A HOT term lead gets a suggested sum assured: the gap, rounded up to the
+    # nearest S$100K, so "gap 980" is pitched as "Term S$1M".
+    if priority == HOT and policy.startswith('Term'):
+        sum_k = int(-(-gap_k // 100) * 100)
+        label = f'S${sum_k / 1000:g}M' if sum_k >= 1000 else f'S${sum_k:d}K'
+        policy = policy.replace('Term', f'Term {label}', 1)
+
+    return {
+        'income_k': income_k,
+        'cover_k': cover_k,
+        'age': age,
+        'dependents': dependents,
+        'smoker': smoker,
+        'life_event': event,
+        'gap_k': gap_k,
+        'priority': priority,
+        'policy': policy,
+    }
+
+
 def _parse_rows(text: str) -> list[dict]:
     """Rows out of whatever delimited text the model passed through.
 
@@ -94,6 +191,40 @@ def _parse_rows(text: str) -> list[dict]:
         if any(item.values()):
             cleaned.append(item)
     return cleaned
+
+
+def _xlsx_rows(data: bytes) -> list[dict] | None:
+    """Rows out of an .xlsx, or None if the bytes are not one.
+
+    The first sheet's first row is the header. Hidden columns are read like
+    any other — that is where the demo sheet keeps its phone numbers.
+    """
+    if not data[:2] == b'PK':
+        return None
+    try:
+        from openpyxl import load_workbook
+        sheet = load_workbook(io.BytesIO(data), read_only=True,
+                              data_only=True).worksheets[0]
+        rows = sheet.iter_rows(values_only=True)
+        header = [str(h).strip() if h is not None else '' for h in next(rows)]
+    except Exception:  # noqa: BLE001 - not an xlsx after all
+        return None
+    parsed = []
+    for row in rows:
+        item = {
+            h: ('' if v is None else str(v).strip())
+            for h, v in zip(header, row) if h
+        }
+        if any(item.values()):
+            parsed.append(item)
+    return parsed
+
+
+def _artifact_bytes(part) -> bytes | None:
+    data = getattr(getattr(part, 'inline_data', None), 'data', None)
+    if isinstance(data, (bytes, bytearray)):
+        return bytes(data)
+    return None
 
 
 def _artifact_text(part) -> str | None:
@@ -151,6 +282,11 @@ def _counts(batch: dict) -> dict:
     stages = [lead['stage'] for lead in leads.values()]
     return {
         'total': len(leads),
+        'hot': sum(1 for l in leads.values() if l.get('priority') == HOT),
+        'warm': sum(1 for l in leads.values() if l.get('priority') == WARM),
+        'cold': sum(1 for l in leads.values() if l.get('priority') == COLD),
+        'combined_gap_sgd_k': round(
+            sum(l.get('gap_k', 0) for l in leads.values())),
         'analysed': sum(1 for s in stages if s != RECEIVED and s != FLAGGED),
         'ready_to_call': sum(
             1 for lead in leads.values()
@@ -202,6 +338,7 @@ def _open_from_rows(leads: list[dict], source: str,
         lead_id = str(
             _field(row, 'lead_id', 'id') or f'L{index:03d}'
         )
+        assessment = _assess(row)
         batch['leads'][lead_id] = {
             'lead_id': lead_id,
             'name': str(_field(row, 'name', 'full_name', 'lead_name') or ''),
@@ -210,7 +347,10 @@ def _open_from_rows(leads: list[dict], source: str,
                 'contact_number', 'mobile_number',
             ) or ''),
             'stage': RECEIVED,
-            'policy': '',
+            'gap_k': assessment['gap_k'],
+            'priority': assessment['priority'],
+            'age': assessment['age'],
+            'policy': assessment['policy'],
             'reasoning': '',
             'pitch_notes': '',
             'profile': {},
@@ -344,6 +484,14 @@ async def open_batch_from_file(filename: str,
             'error_message': f'There is no attached file called {name!r}.',
         }
 
+    data = _artifact_bytes(part)
+    if data is not None:
+        rows = _xlsx_rows(data)
+        if rows is not None:
+            if not rows:
+                return {'status': 'error', 'error_message': _UNREADABLE}
+            return _open_from_rows(rows, name, tool_context)
+
     text = _artifact_text(part)
     if text is None:
         mime = getattr(getattr(part, 'inline_data', None), 'mime_type', '') or 'unknown'
@@ -423,9 +571,10 @@ def record_analysis(profiles_json: str, tool_context: ToolContext) -> dict:
             # the totals disagree with the file the batch came from.
             unknown.append(lead_id or '(missing lead_id)')
             continue
-        # The analysis agent returns `recommended_policy`; `policy` is
-        # accepted too so a reshaped prompt does not silently flag the batch.
-        policy = str(
+        # The ledger's computed policy is authoritative — the analysis agent
+        # explains it, it does not choose it. The agent's own answer is only a
+        # fallback for a row the deterministic rules could not read.
+        policy = lead['policy'] or str(
             profile.get('recommended_policy') or profile.get('policy') or ''
         ).strip()
         if not policy:
@@ -499,6 +648,8 @@ def leads_ready_to_call(tool_context: ToolContext) -> dict:
             'lead_id': lead['lead_id'],
             'name': lead['name'],
             'phone': lead['phone'],
+            'priority': lead.get('priority', ''),
+            'gap_k': lead.get('gap_k', 0),
             'policy': lead['policy'],
             'pitch_notes': lead['pitch_notes'],
             'reasoning': lead['reasoning'],
@@ -719,6 +870,9 @@ def batch_status(tool_context: ToolContext) -> dict:
                 'lead_id': lead['lead_id'],
                 'name': lead['name'],
                 'stage': lead['stage'],
+                'priority': lead.get('priority', ''),
+                'gap_k': lead.get('gap_k', 0),
+                'age': lead.get('age', 0),
                 'policy': lead['policy'],
                 'pitch_notes': lead['pitch_notes'],
                 'attempts': lead['attempts'],
