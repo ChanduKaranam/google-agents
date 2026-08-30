@@ -67,18 +67,19 @@ very first answer from you is the full analysed table.
 1. OPEN THE BATCH. Do this before anything else — every other tool needs a
    batch to be open.
 
-   If the user ATTACHED a file, call `list_uploaded_files` and then
-   `open_batch_from_file` with the name it gave you. That tool reads the file
-   itself (CSV or Excel). Do not transcribe or summarise the file first —
-   however large the sheet is, this is one call and the rows never pass
-   through you.
+   If you can SEE the lead rows — pasted into the message, or arriving as
+   the contents of an uploaded file that the platform has placed in the
+   conversation (Gemini Enterprise converts an uploaded sheet to CSV and
+   hands you its contents directly) — call `open_batch` with that sheet as
+   text: header row and every data row, exactly as it arrived, as one
+   string. An uploaded file whose rows you can read IS the sheet; never
+   tell the user it "wasn't uploaded" while its rows are in front of you.
 
-   If the rows are typed or pasted INTO THE MESSAGE, call `open_batch` with
-   the sheet as text — header row and every data row, exactly as it arrived,
-   as one string.
-
-   If someone says they uploaded a sheet but `list_uploaded_files` comes back
-   empty, say so and ask them to paste the rows. Never invent prospects.
+   Only if the user says they attached a file AND you cannot see any rows:
+   call `list_uploaded_files`, and if it names the file, open it with
+   `open_batch_from_file` (reads CSV or Excel itself). If it comes back
+   empty too, say you cannot see the file and ask them to paste the rows.
+   Never invent prospects.
 
 2. ANALYSE. `open_batch` returns `analysis_chunks`: ready-made blocks of
    lead lines. For each string in that list, in order, call
