@@ -1,0 +1,516 @@
+"""The batch ledger.
+
+Lodestar is asked to keep a high-level overview of a batch across many turns —
+how many leads came in, how many were analysed, how many were reached, which
+ones are owed a retry. A model asked to carry that in its head reports numbers
+that drift, and the numbers here are the ones a human is told before a hundred
+strangers get phoned. So the ledger is real: these tools write it to session
+state and read it back, and the orchestrator is told never to quote a figure it
+did not get from `batch_status`.
+
+Every tool returns a plain dict with a `status` of 'success' or 'error'.
+"""
+
+import logging
+import uuid
+from datetime import datetime, timezone
+
+from google.adk.tools.tool_context import ToolContext
+
+from . import config
+
+logger = logging.getLogger(__name__)
+
+# Where a lead has got to. A lead moves forward only through these tools.
+RECEIVED = 'received'    # in the batch, not yet analysed
+ANALYSED = 'analysed'    # has a profile and a recommended policy
+CALLED = 'called'        # reached — the outreach specialist got through
+IN_PROGRESS = 'in_progress'  # dialled, still live; result not known yet
+UNATTEMPTED = 'unattempted'  # the call did not happen; retryable
+FAILED = 'failed'        # the call was attempted and did not connect
+FLAGGED = 'flagged'      # out of the pipeline, waiting on a human
+
+
+def _field(row: dict, *names: str):
+    """One field from a spreadsheet row, however the column was capitalised.
+
+    Lead sheets arrive with "Name", "name", "Phone Number", "phone_number" and
+    worse in the same column across two files from the same agency. Matching
+    exactly meant a header case change silently blanked every phone number.
+    """
+    normalised = {
+        str(key).strip().lower().replace(' ', '_').replace('-', '_'): value
+        for key, value in row.items()
+    }
+    for name in names:
+        value = normalised.get(name)
+        if value not in (None, ''):
+            return value
+    return None
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec='seconds')
+
+
+def _batch(tool_context: ToolContext) -> dict | None:
+    return tool_context.state.get(config.BATCH_STATE_KEY)
+
+
+def _save(tool_context: ToolContext, batch: dict) -> None:
+    tool_context.state[config.BATCH_STATE_KEY] = batch
+
+
+def _no_batch() -> dict:
+    return {
+        'status': 'error',
+        'error_message': (
+            'No batch is open. Call open_batch with the raw leads before '
+            'anything else.'
+        ),
+    }
+
+
+def _counts(batch: dict) -> dict:
+    """The tally the orchestrator is allowed to quote."""
+    leads = batch['leads']
+    stages = [lead['stage'] for lead in leads.values()]
+    return {
+        'total': len(leads),
+        'analysed': sum(1 for s in stages if s != RECEIVED and s != FLAGGED),
+        'ready_to_call': sum(
+            1 for lead in leads.values()
+            if lead['stage'] == ANALYSED and lead['attempts'] == 0
+        ),
+        'contacted': sum(1 for s in stages if s == CALLED),
+        'awaiting_result': sum(1 for s in stages if s == IN_PROGRESS),
+        'simulated_calls': sum(1 for lead in leads.values() if lead['mock']),
+        'pending_retry': sum(
+            1
+            for lead in leads.values()
+            if lead['stage'] in (UNATTEMPTED, FAILED)
+            and lead['attempts'] < config.MAX_CALL_ATTEMPTS
+            and lead['retry_rounds'] < config.MAX_CALL_ATTEMPTS
+        ),
+        'flagged': sum(1 for s in stages if s == FLAGGED),
+        'awaiting_analysis': sum(1 for s in stages if s == RECEIVED),
+    }
+
+
+def open_batch(leads: list[dict], source: str,
+               tool_context: ToolContext) -> dict:
+    """Register a new batch of raw leads and start its ledger.
+
+    Call this the moment a batch arrives, before any analysis. It records the
+    leads as received; it does not analyse them.
+
+    Args:
+        leads: The raw lead rows exactly as they were parsed, one dict per
+            lead. Whatever columns the file had are kept as-is.
+        source: Where the batch came from, e.g. the file name.
+
+    Returns:
+        The batch id and the opening counts.
+    """
+    if not leads:
+        return {
+            'status': 'error',
+            'error_message': 'That batch has no leads in it. Nothing to open.',
+        }
+
+    batch = {
+        'batch_id': f'batch-{uuid.uuid4().hex[:8]}',
+        'source': source,
+        'opened_at': _now(),
+        'confirmed': not config.CONFIRM_BEFORE_CALLS,
+        'leads': {},
+    }
+
+    for index, row in enumerate(leads, start=1):
+        row = row if isinstance(row, dict) else {'value': row}
+        # Identity is best-effort and never invented. A row with no usable name
+        # or phone still gets a ledger entry — it has to, or the totals stop
+        # matching the file — and analysis is what decides whether it is
+        # workable.
+        lead_id = str(
+            _field(row, 'lead_id', 'id') or f'L{index:03d}'
+        )
+        batch['leads'][lead_id] = {
+            'lead_id': lead_id,
+            'name': str(_field(row, 'name', 'full_name', 'lead_name') or ''),
+            'phone': str(_field(
+                row, 'phone', 'phone_number', 'mobile', 'contact',
+                'contact_number', 'mobile_number',
+            ) or ''),
+            'stage': RECEIVED,
+            'policy': '',
+            'reasoning': '',
+            'pitch_notes': '',
+            'profile': {},
+            'attempts': 0,
+            'retry_rounds': 0,
+            'call_id': '',
+            'mock': False,
+            'last_status': '',
+            'note': '',
+            'raw': row,
+        }
+
+    _save(tool_context, batch)
+    no_phone = [l['lead_id'] for l in batch['leads'].values() if not l['phone']]
+    logger.info('opened %s from %r with %d leads (%d without a number)',
+                batch['batch_id'], source, len(batch['leads']), len(no_phone))
+    return {
+        'status': 'success',
+        'batch_id': batch['batch_id'],
+        'source': source,
+        'counts': _counts(batch),
+        'confirmation_required': config.CONFIRM_BEFORE_CALLS,
+        'chunk_size': config.ANALYSIS_CHUNK_SIZE,
+        # Said here rather than discovered at dialling time. A whole file with
+        # no phone column is the likeliest version of this, and it is worth
+        # knowing before the analysis runs.
+        'leads_without_a_phone_number': no_phone,
+        'calls_are_simulated': config.mock_calls(),
+    }
+
+
+def record_analysis(profiles: list[dict], tool_context: ToolContext) -> dict:
+    """Record what the Policy Analysis Agent returned.
+
+    Anything missing a lead id or a recommended policy is flagged rather than
+    recorded, and comes back in `incomplete` — those leads are not called.
+
+    Args:
+        profiles: One dict per lead from the analysis specialist, in the JSON
+            shape it returns. Each needs a `lead_id` and a
+            `recommended_policy`; `reasoning`, `pitch_notes`,
+            `extracted_profile` and `lead_name` are carried through to the
+            caller if present.
+
+    Returns:
+        The counts after recording, plus any profiles that could not be used.
+    """
+    batch = _batch(tool_context)
+    if batch is None:
+        return _no_batch()
+
+    recorded, incomplete, unknown = [], [], []
+    for profile in profiles or []:
+        if not isinstance(profile, dict):
+            incomplete.append({'profile': profile, 'reason': 'not a record'})
+            continue
+        lead_id = str(profile.get('lead_id') or '')
+        lead = batch['leads'].get(lead_id)
+        if lead is None:
+            # A lead id that was never in the batch. Recording it would make
+            # the totals disagree with the file the batch came from.
+            unknown.append(lead_id or '(missing lead_id)')
+            continue
+        # The analysis agent returns `recommended_policy`; `policy` is
+        # accepted too so a reshaped prompt does not silently flag the batch.
+        policy = str(
+            profile.get('recommended_policy') or profile.get('policy') or ''
+        ).strip()
+        if not policy:
+            lead['stage'] = FLAGGED
+            lead['note'] = (
+                str(profile.get('reasoning') or '').strip()
+                or 'analysis returned no recommended policy'
+            )
+            incomplete.append({'lead_id': lead_id, 'reason': lead['note']})
+            continue
+
+        lead['stage'] = ANALYSED
+        lead['policy'] = policy
+        lead['reasoning'] = str(profile.get('reasoning') or '').strip()
+        # Written as bullets, and sometimes as a list of them. Both reach the
+        # caller as one block of text; this is the only place the difference
+        # exists, so it is flattened here rather than in the outreach prompt.
+        pitch = profile.get('pitch_notes') or profile.get('note') or ''
+        if isinstance(pitch, (list, tuple)):
+            pitch = '\n'.join(str(line).strip() for line in pitch if str(line).strip())
+        lead['pitch_notes'] = str(pitch).strip()
+        lead['profile'] = profile.get('extracted_profile') or {}
+        lead['note'] = lead['reasoning']
+        # A name from the file is what the caller should use; the analysis
+        # agent's `lead_name` fills in only where the row had none.
+        if not lead['name']:
+            lead['name'] = str(profile.get('lead_name') or '').strip()
+        recorded.append(lead_id)
+
+    # Leads the specialist simply did not answer for. Silence is not a pass:
+    # left at `received` they would sit in the batch forever, counted as
+    # neither reached nor flagged.
+    missing = [
+        lead_id for lead_id, lead in batch['leads'].items()
+        if lead['stage'] == RECEIVED
+    ]
+
+    _save(tool_context, batch)
+    return {
+        'status': 'success',
+        'recorded': len(recorded),
+        'incomplete': incomplete,
+        'unknown_lead_ids': unknown,
+        'still_awaiting_analysis': missing,
+        'counts': _counts(batch),
+    }
+
+
+def leads_ready_to_call(tool_context: ToolContext) -> dict:
+    """The leads the Outreach Agent should be given next.
+
+    Returns analysed leads that have never been called, and separately the ones
+    owed a retry. Read this rather than working out the list yourself.
+    """
+    batch = _batch(tool_context)
+    if batch is None:
+        return _no_batch()
+
+    if not batch['confirmed']:
+        return {
+            'status': 'error',
+            'error_message': (
+                'This batch has not been confirmed for calling yet. Ask the '
+                'human to confirm, then call confirm_calling.'
+            ),
+            'counts': _counts(batch),
+        }
+
+    def summary(lead):
+        return {
+            'lead_id': lead['lead_id'],
+            'name': lead['name'],
+            'phone': lead['phone'],
+            'policy': lead['policy'],
+            'pitch_notes': lead['pitch_notes'],
+            'reasoning': lead['reasoning'],
+            'profile': lead['profile'],
+            'attempts': lead['attempts'],
+            'attempts_remaining': min(
+                config.MAX_CALL_ATTEMPTS - lead['attempts'],
+                config.MAX_CALL_ATTEMPTS - lead['retry_rounds'],
+            ),
+        }
+
+    first_calls, retries, exhausted, in_flight = [], [], [], []
+    for lead in batch['leads'].values():
+        if lead['stage'] == ANALYSED and lead['attempts'] == 0:
+            first_calls.append(summary(lead))
+        elif lead['stage'] == IN_PROGRESS:
+            # Dialled and still live. Not ready, not retryable — handing this
+            # lead back out is how somebody gets a second call while the first
+            # one is ringing.
+            in_flight.append({'lead_id': lead['lead_id'],
+                              'call_id': lead['call_id']})
+        elif lead['stage'] in (UNATTEMPTED, FAILED):
+            if (lead['attempts'] < config.MAX_CALL_ATTEMPTS
+                    and lead['retry_rounds'] < config.MAX_CALL_ATTEMPTS):
+                retries.append(summary(lead))
+            else:
+                exhausted.append(lead['lead_id'])
+
+    return {
+        'status': 'success',
+        'batch_id': batch['batch_id'],
+        'first_calls': first_calls,
+        'retries': retries,
+        'retry_limit': config.MAX_CALL_ATTEMPTS,
+        'exhausted': exhausted,
+        'awaiting_result': in_flight,
+        'counts': _counts(batch),
+    }
+
+
+def confirm_calling(tool_context: ToolContext) -> dict:
+    """Unlock outbound calling for this batch, after the human has said yes.
+
+    Only call this once a human has actually answered the confirmation
+    question. It is not a formality — nothing recalls a voice call.
+    """
+    batch = _batch(tool_context)
+    if batch is None:
+        return _no_batch()
+    if batch['confirmed']:
+        return {'status': 'success', 'already_confirmed': True,
+                'counts': _counts(batch)}
+    batch['confirmed'] = True
+    batch['confirmed_at'] = _now()
+    _save(tool_context, batch)
+    logger.info('%s confirmed for calling', batch['batch_id'])
+    return {'status': 'success', 'counts': _counts(batch)}
+
+
+def record_outreach_results(results: list[dict],
+                            tool_context: ToolContext) -> dict:
+    """Record what the Outreach Agent reported back for each call.
+
+    Args:
+        results: One dict per lead the specialist attempted. Each needs a
+            `lead_id` and an `outcome` of 'contacted', 'unattempted',
+            'failed' or 'in_progress'. `attempts` — how many times it actually
+            dialled for this result — is optional but should be given whenever
+            the specialist retried internally, or the retry cap will not bind.
+            `detail` and `call_id` are optional.
+
+    Returns:
+        The counts after recording, and which leads are now owed a retry.
+    """
+    batch = _batch(tool_context)
+    if batch is None:
+        return _no_batch()
+
+    recorded, unknown, unclear = [], [], []
+    for result in results or []:
+        if not isinstance(result, dict):
+            unclear.append({'result': result, 'reason': 'not a record'})
+            continue
+        lead_id = str(result.get('lead_id') or '')
+        lead = batch['leads'].get(lead_id)
+        if lead is None:
+            unknown.append(lead_id or '(missing lead_id)')
+            continue
+
+        outcome = (result.get('outcome') or '').strip().lower()
+        detail = (result.get('detail') or '').strip()
+        if result.get('call_id'):
+            lead['call_id'] = str(result['call_id'])
+        # Sticky: once any result for this lead was simulated, the lead's
+        # history is a simulation and the report has to say so.
+        if result.get('mock'):
+            lead['mock'] = True
+
+        # How many times the specialist actually dialled for this result. It
+        # runs its own retry loop inside one invocation, so a single record can
+        # stand for three calls — counting it as one is how the cap stops
+        # binding and a lead gets dialled three times, handed back, and dialled
+        # three times again.
+        #
+        # Taken verbatim when it is given, including zero: a poll that resolves
+        # a call already placed reports zero, and charging it an attempt would
+        # spend the budget on looking. Absent, it is the one call it reported.
+        try:
+            spent = max(0, int(result['attempts'])) if 'attempts' in result else 1
+        except (TypeError, ValueError):
+            spent = 1
+
+        if outcome in ('contacted', 'answered', 'connected', 'success'):
+            lead['stage'] = CALLED
+            lead['attempts'] += spent
+        elif outcome in ('in_progress', 'dispatched', 'queued', 'ringing',
+                         'dialing'):
+            # Live. Parked until someone polls it; not retryable meanwhile.
+            lead['stage'] = IN_PROGRESS
+            lead['attempts'] += spent
+        elif outcome == 'unattempted':
+            lead['stage'] = UNATTEMPTED
+            lead['attempts'] += spent
+            lead['retry_rounds'] += 1
+        elif outcome in ('failed', 'no_answer', 'busy', 'voicemail'):
+            lead['stage'] = FAILED
+            lead['attempts'] += spent
+            lead['retry_rounds'] += 1
+        else:
+            # An outcome nobody here recognises. Guessing it is what turns an
+            # unreached lead into a reported contact — but leaving the lead
+            # where it was is worse than it looks: at `analysed` with no
+            # attempt spent it goes back out as a *first* call, and if the
+            # specialist did dial it, the lead gets phoned twice. We do not
+            # know what happened to this call, so nobody dials it again until
+            # a human has looked.
+            lead['stage'] = FLAGGED
+            lead['last_status'] = outcome
+            lead['note'] = (
+                f'outreach reported an outcome we cannot read ({outcome!r}); '
+                'unknown whether the call was placed'
+            )
+            unclear.append({'lead_id': lead_id, 'outcome': outcome})
+            continue
+
+        lead['last_status'] = outcome
+        if detail:
+            lead['note'] = detail
+
+        # Two ceilings, because a specialist reporting zero attempts every
+        # round — a platform that is down, say — would never reach the first
+        # one, and the batch would circle until the conversation was abandoned.
+        # `retry_rounds` bounds the loop by how many times we have come back to
+        # this lead, whatever it says it spent.
+        if lead['stage'] in (UNATTEMPTED, FAILED) and (
+            lead['attempts'] >= config.MAX_CALL_ATTEMPTS
+            or lead['retry_rounds'] >= config.MAX_CALL_ATTEMPTS
+        ):
+            lead['stage'] = FLAGGED
+            lead['note'] = (
+                f'{lead["attempts"]} attempts over {lead["retry_rounds"]} '
+                f'rounds, last outcome {outcome}. Needs a human.'
+            )
+        recorded.append(lead_id)
+
+    _save(tool_context, batch)
+    counts = _counts(batch)
+    return {
+        'status': 'success',
+        'recorded': len(recorded),
+        'unknown_lead_ids': unknown,
+        'unclear_outcomes': unclear,
+        'counts': counts,
+        'pending_retry': counts['pending_retry'],
+    }
+
+
+def flag_for_human_review(lead_id: str, reason: str,
+                          tool_context: ToolContext) -> dict:
+    """Take one lead out of the pipeline and leave it for a human.
+
+    Use this when a sub-agent keeps erroring on a lead, when the data is
+    unusable, or when retries are exhausted.
+    """
+    batch = _batch(tool_context)
+    if batch is None:
+        return _no_batch()
+    lead = batch['leads'].get(str(lead_id))
+    if lead is None:
+        return {
+            'status': 'error',
+            'error_message': f'No lead {lead_id!r} in this batch.',
+        }
+    lead['stage'] = FLAGGED
+    lead['note'] = reason
+    _save(tool_context, batch)
+    return {'status': 'success', 'lead_id': lead_id, 'counts': _counts(batch)}
+
+
+def batch_status(tool_context: ToolContext) -> dict:
+    """The state of the batch: counts, and every lead's stage.
+
+    This is the only source for a figure you report to a human.
+    """
+    batch = _batch(tool_context)
+    if batch is None:
+        return _no_batch()
+    return {
+        'status': 'success',
+        'batch_id': batch['batch_id'],
+        'source': batch['source'],
+        'opened_at': batch['opened_at'],
+        'confirmed_for_calling': batch['confirmed'],
+        'calls_are_simulated': config.mock_calls(),
+        'counts': _counts(batch),
+        'leads': [
+            {
+                'lead_id': lead['lead_id'],
+                'name': lead['name'],
+                'stage': lead['stage'],
+                'policy': lead['policy'],
+                'pitch_notes': lead['pitch_notes'],
+                'attempts': lead['attempts'],
+                'call_id': lead['call_id'],
+                'simulated': lead['mock'],
+                'last_status': lead['last_status'],
+                'note': lead['note'],
+            }
+            for lead in batch['leads'].values()
+        ],
+    }
