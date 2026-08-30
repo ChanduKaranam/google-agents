@@ -81,6 +81,11 @@ policy_analysis_agent = Agent(
     instruction=POLICY_ANALYSIS_INSTRUCTION,
     generate_content_config=GENERATE_CONFIG,
     tools=[],  # no tools: it reasons over the rows it is handed
+    # The answer lands in session state, where `record_analysis` reads it
+    # directly. The JSON never travels through a function-call argument —
+    # a payload that size is exactly what Gemini emits as a
+    # MALFORMED_FUNCTION_CALL, losing the chunk.
+    output_key='analysis_result',
 )
 
 
@@ -141,4 +146,7 @@ outreach_agent = Agent(
     instruction=OUTREACH_INSTRUCTION,
     generate_content_config=GENERATE_CONFIG,
     tools=[trigger_hello_ai_call, check_call_results],
+    # Same as the analysis agent: the report is read from session state by
+    # `record_outreach_results`, never passed as a function-call argument.
+    output_key='outreach_result',
 )

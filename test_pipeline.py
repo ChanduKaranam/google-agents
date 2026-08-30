@@ -69,11 +69,28 @@ def main() -> None:
     assert sum('no answer' in d for d in details) == 2, details
     assert sum('WhatsApp' in d for d in details) == 5, details
 
+    # The scripted outcomes must survive a model that drops the name field:
+    # resolution is by lead_id against the ledger.
+    stripped = [{'lead_id': l['lead_id'], 'phone': l['phone']} for l in targets]
+    names = {l['lead_id']: l['name'] for l in targets}
+    redone = hello_ai._mock_batch(stripped, names)
+    assert sum('interested —' in r['detail'] and 'not interested' not in
+               r['detail'] for r in redone['results']) == 4, redone
+
     # The two no-answers stay pending for a scheduled retry, nine are done.
-    recorded = tools.record_outreach_results(answer['results'], ctx)
+    # The report reaches the ledger via session state, as in production.
+    import json
+    ctx.state['outreach_result'] = json.dumps(answer['results'])
+    recorded = tools.record_outreach_results(ctx)
     assert recorded['status'] == 'success', recorded
     assert recorded['counts']['contacted'] == 9, recorded['counts']
     assert recorded['counts']['pending_retry'] == 2, recorded['counts']
+
+    # The report the advisor is read: 11 called · 4/3/2/2, one meeting.
+    report = tools.batch_status(ctx)['campaign_report']
+    assert report == {'called': 11, 'interested': 4,
+                      'asked_to_call_later': 3, 'not_interested': 2,
+                      'no_answer': 2, 'meetings_booked': 1}, report
 
     print('test_pipeline: all assertions passed')
 

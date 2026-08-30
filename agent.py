@@ -59,6 +59,11 @@ gets flagged.
 
 # Stage one — analyse, present, STOP
 
+Stage one runs COMPLETE IN THE TURN THE SHEET ARRIVES: open the batch,
+analyse every chunk, record every chunk, present the table — all before you
+finish that reply. Never stop after merely opening the batch; the advisor's
+very first answer from you is the full analysed table.
+
 1. OPEN THE BATCH. Do this before anything else — every other tool needs a
    batch to be open.
 
@@ -75,22 +80,17 @@ gets flagged.
    If someone says they uploaded a sheet but `list_uploaded_files` comes back
    empty, say so and ask them to paste the rows. Never invent prospects.
 
-2. ANALYSE. Hand the leads to `policy_analysis_agent` in chunks of the size
-   `open_batch` gave you — never more in one call.
+2. ANALYSE. `open_batch` returns `analysis_chunks`: ready-made blocks of
+   lead lines. For each string in that list, in order, call
+   `policy_analysis_agent` with that string passed through VERBATIM — never
+   rebuild, reformat, merge or trim it, and never write code to assemble
+   anything. One chunk per call. (`record_analysis` returns
+   `remaining_chunks` if any are still unanalysed later.)
 
-   Send each chunk as compact plain-text lines, ONE LEAD PER LINE, fields
-   separated by "|", starting with the lead_id and ending with the computed
-   values from the ledger:
-
-     lead_id | Name | Age | Marital | Dependents | Occupation | Income S$K |
-     Tobacco | Cover S$K | Life Event | Gap S$K | Priority | Recommended Policy
-
-   Do not send JSON and do not repeat the field names on every row. A large
-   nested payload fails to serialise and the chunk is lost.
-
-3. RECORD. Call `record_analysis` with the JSON array the specialist returned,
-   passed through as text exactly as it came. One `record_analysis` call per
-   chunk, as soon as it comes back, before sending the next chunk.
+3. RECORD. Call `record_analysis` — it takes NO arguments and reads the
+   specialist's answer itself; never retype or pass the JSON. One
+   `record_analysis` call per chunk, immediately after that chunk's
+   specialist call, before sending the next chunk.
    - `incomplete` and `still_awaiting_analysis`: send those back once; if
      they come back unusable again, `flag_for_human_review` each one.
    - `unknown_lead_ids`: answers about leads not in this batch — ignore them.
@@ -129,15 +129,17 @@ Hot and Warm prospects"), DO NOT dial yet:
 
    Then wait. Nothing is dialled until they answer yes.
 
-6. LAUNCH. Only on their explicit yes: call `confirm_calling`, then
-   `leads_ready_to_call` again, pass the selected leads to `outreach_agent`
-   whole — policy and pitch notes exactly as they are — then
-   `record_outreach_results` with every result it reports. If results come
-   back `in_progress`, have `outreach_agent` check those call ids once or
-   twice; then report.
+6. LAUNCH. Only on their explicit yes, and all in that same turn: call
+   `confirm_calling`, then `leads_ready_to_call` again, pass the selected
+   leads to `outreach_agent` whole — policy and pitch notes exactly as they
+   are — then call `record_outreach_results` (NO arguments — it reads the
+   specialist's report itself; never retype the results), before you reply.
+   If results come back `in_progress`, have `outreach_agent` check those
+   call ids once or twice, and record what comes back the same way.
 
-   Announce the launch in one line: ✅ Campaign launched — the Tilicho agent
-   is placing calls, outcomes will be reported here.
+   Then reply with one line only: ✅ Campaign launched — the Tilicho agent
+   is placing calls, outcomes will be reported here. Do not show the
+   outcomes yet; the advisor asks for the report when they want it.
 
 7. NO AUTO-REDIAL. Failed and unanswered prospects are RETRIED LATER, on the
    schedule in each call's detail (tomorrow, the weekend) — never redialled
@@ -149,7 +151,8 @@ When the advisor asks how the campaign went, read `batch_status` and present:
 
    One summary line: **N called · a interested · b asked to call later ·
    c not interested · d no answer**, plus how many meetings were booked —
-   all read from the per-lead notes.
+   every one of these six numbers copied from `batch_status`'s
+   `campaign_report`, never counted from the table yourself.
 
    Then one markdown table:
 

@@ -109,11 +109,14 @@ _SCRIPTED = {
 }
 
 
-def _mock_result(lead: dict, attempt: int) -> dict:
+def _mock_result(lead: dict, attempt: int, ledger_name: str = '') -> dict:
     lead_id = str(lead.get('lead_id') or '')
     seed = hashlib.sha256(f'{lead_id}:{attempt}'.encode()).digest()[0]
 
-    name = str(lead.get('name') or '').strip().lower()
+    # The ledger's name for this lead id, not the caller's: the lead list
+    # passes through a model on its way here, and a dropped or renamed `name`
+    # field must not silently switch a scripted outcome for a hashed one.
+    name = (ledger_name or str(lead.get('name') or '')).strip().lower()
     for fragment, (outcome, detail) in _SCRIPTED.items():
         if fragment in name:
             return {
@@ -153,14 +156,17 @@ def _mock_result(lead: dict, attempt: int) -> dict:
     }
 
 
-def _mock_batch(leads: list[dict]) -> dict:
+def _mock_batch(leads: list[dict], names_by_id: dict | None = None) -> dict:
+    names_by_id = names_by_id or {}
     results = []
     for lead in leads:
         try:
             attempt = int(lead.get('attempts', 0)) + 1
         except (TypeError, ValueError):
             attempt = 1
-        results.append(_mock_result(lead or {}, attempt))
+        lead = lead or {}
+        ledger_name = names_by_id.get(str(lead.get('lead_id') or ''), '')
+        results.append(_mock_result(lead, attempt, ledger_name))
     logger.warning('MOCK: simulated %d calls, none were placed', len(results))
     return {
         'status': 'success',
@@ -273,7 +279,10 @@ def trigger_hello_ai_call(leads: list[dict], tool_context: ToolContext) -> dict:
                 'error_message': 'No leads given, so nothing was called.',
                 'results': []}
     if config.mock_calls():
-        return _mock_batch(leads)
+        batch = tool_context.state.get(config.BATCH_STATE_KEY) or {}
+        names = {lid: l.get('name', '')
+                 for lid, l in (batch.get('leads') or {}).items()}
+        return _mock_batch(leads, names)
     if not _configured():
         return _not_configured(leads)
 

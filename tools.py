@@ -307,6 +307,17 @@ def _counts(batch: dict) -> dict:
     }
 
 
+def _chunks(batch: dict) -> list[str]:
+    """The unanalysed leads, as ready-to-send chunk texts.
+
+    Each string is one chunk: pass it to the analysis specialist verbatim.
+    """
+    lines = [lead['analysis_line'] for lead in batch['leads'].values()
+             if lead['stage'] == RECEIVED and lead.get('analysis_line')]
+    size = config.ANALYSIS_CHUNK_SIZE
+    return ['\n'.join(lines[i:i + size]) for i in range(0, len(lines), size)]
+
+
 _UNREADABLE = (
     'No leads could be read from that. Expected a header row naming the '
     'columns and one row per lead, separated by commas, pipes or tabs.'
@@ -339,9 +350,24 @@ def _open_from_rows(leads: list[dict], source: str,
             _field(row, 'lead_id', 'id') or f'L{index:03d}'
         )
         assessment = _assess(row)
+        name = str(_field(row, 'name', 'full_name', 'lead_name') or '')
+        # The exact line the analysis specialist is sent for this lead,
+        # composed here so the orchestrator never has to reassemble fields —
+        # a model asked to merge thirteen columns starts writing code instead
+        # of a function call, and the turn is lost.
+        analysis_line = ' | '.join(str(v) for v in (
+            lead_id, name, assessment['age'],
+            _row_value(row, 'marital') or 'Unknown',
+            assessment['dependents'],
+            _row_value(row, 'occupation', 'job') or 'Unknown',
+            assessment['income_k'], 'Y' if assessment['smoker'] else 'N',
+            assessment['cover_k'], assessment['life_event'] or '—',
+            assessment['gap_k'], assessment['priority'], assessment['policy'],
+        ))
         batch['leads'][lead_id] = {
             'lead_id': lead_id,
-            'name': str(_field(row, 'name', 'full_name', 'lead_name') or ''),
+            'name': name,
+            'analysis_line': analysis_line,
             'phone': str(_field(
                 row, 'phone', 'phone_number', 'mobile', 'contact',
                 'contact_number', 'mobile_number',
@@ -373,7 +399,9 @@ def _open_from_rows(leads: list[dict], source: str,
         'source': source,
         'counts': _counts(batch),
         'confirmation_required': config.CONFIRM_BEFORE_CALLS,
-        'chunk_size': config.ANALYSIS_CHUNK_SIZE,
+        # Ready-made: send each string to the analysis specialist verbatim,
+        # one call per string, recording after each.
+        'analysis_chunks': _chunks(batch),
         # Said here rather than discovered at dialling time. A whole file with
         # no phone column is the likeliest version of this, and it is worth
         # knowing before the analysis runs.
@@ -511,18 +539,50 @@ async def open_batch_from_file(filename: str,
     return _open_from_rows(leads, name, tool_context)
 
 
-def record_analysis(profiles_json: str, tool_context: ToolContext) -> dict:
-    """Record what the Policy Analysis Agent returned.
+def _stashed_json(tool_context: ToolContext, key: str):
+    """The JSON a specialist left in session state under its output_key.
+
+    Read from state rather than taken as an argument: a JSON payload of this
+    size passed through a function-call argument is exactly what Gemini emits
+    as a code block — MALFORMED_FUNCTION_CALL — and the whole chunk is lost.
+    Returns (parsed, error_message).
+    """
+    raw = tool_context.state.get(key)
+    if raw is None:
+        return None, (
+            f'Nothing to record: no specialist answer found. Call the '
+            f'specialist first, then this tool.'
+        )
+    if isinstance(raw, str):
+        text = raw.strip()
+        fenced = re.match(r'^```[a-zA-Z]*\s*\n(.*?)\n?```$', text, re.S)
+        if fenced:
+            text = fenced.group(1).strip()
+        # The answer may carry prose around the array; take the array.
+        start, end = text.find('['), text.rfind(']')
+        if start != -1 and end > start:
+            text = text[start:end + 1]
+        try:
+            raw = json.loads(text) if text else []
+        except json.JSONDecodeError as exc:
+            return None, (
+                f'The specialist\'s answer was not readable JSON ({exc.msg} '
+                f'at line {exc.lineno}). Ask it again. Nothing was recorded.'
+            )
+    if isinstance(raw, dict):
+        raw = [raw]
+    if not isinstance(raw, list):
+        return None, 'Expected a JSON array from the specialist.'
+    return raw, None
+
+
+def record_analysis(tool_context: ToolContext) -> dict:
+    """Record the Policy Analysis Agent's latest answer. Takes no arguments —
+    it reads the specialist's own output directly, so call it right after the
+    specialist returns, once per chunk, before the next chunk is sent.
 
     Anything missing a lead id or a recommended policy is flagged rather than
     recorded, and comes back in `incomplete` — those leads are not called.
-
-    Args:
-        profiles_json: The JSON array the analysis specialist returned, passed
-            through as text exactly as it came. One object per lead, each with
-            a `lead_id` and a `recommended_policy`; `reasoning`,
-            `pitch_notes`, `extracted_profile` and `lead_name` are carried
-            through to the caller if present.
 
     Returns:
         The counts after recording, plus any profiles that could not be used.
@@ -531,33 +591,9 @@ def record_analysis(profiles_json: str, tool_context: ToolContext) -> dict:
     if batch is None:
         return _no_batch()
 
-    # Taken as text rather than as a list of dicts for the same reason
-    # `open_batch` takes the sheet as text: a nested argument this size makes
-    # Gemini emit the call as a code block, and the chunk is lost.
-    profiles = profiles_json
-    if isinstance(profiles, str):
-        raw = profiles.strip()
-        fenced = re.match(r'^```[a-zA-Z]*\s*\n(.*?)\n?```$', raw, re.S)
-        if fenced:
-            raw = fenced.group(1).strip()
-        try:
-            profiles = json.loads(raw) if raw else []
-        except json.JSONDecodeError as exc:
-            return {
-                'status': 'error',
-                'error_message': (
-                    f'That analysis was not readable JSON ({exc.msg} at line '
-                    f'{exc.lineno}). Send the array exactly as the analysis '
-                    f'specialist returned it. Nothing was recorded.'
-                ),
-            }
-    if isinstance(profiles, dict):
-        profiles = [profiles]
-    if not isinstance(profiles, list):
-        return {
-            'status': 'error',
-            'error_message': 'Expected a JSON array of profiles.',
-        }
+    profiles, error = _stashed_json(tool_context, 'analysis_result')
+    if error:
+        return {'status': 'error', 'error_message': error}
 
     recorded, incomplete, unknown = [], [], []
     for profile in profiles or []:
@@ -619,6 +655,8 @@ def record_analysis(profiles_json: str, tool_context: ToolContext) -> dict:
         'incomplete': incomplete,
         'unknown_lead_ids': unknown,
         'still_awaiting_analysis': missing,
+        # Anything still unanalysed, ready to send — empty when done.
+        'remaining_chunks': _chunks(batch),
         'counts': _counts(batch),
     }
 
@@ -709,17 +747,14 @@ def confirm_calling(tool_context: ToolContext) -> dict:
     return {'status': 'success', 'counts': _counts(batch)}
 
 
-def record_outreach_results(results: list[dict],
-                            tool_context: ToolContext) -> dict:
-    """Record what the Outreach Agent reported back for each call.
+def record_outreach_results(tool_context: ToolContext) -> dict:
+    """Record the Outbound Campaign Agent's latest call report. Takes no
+    arguments — it reads the specialist's own output directly, so call it
+    right after the specialist returns, before replying to the advisor.
 
-    Args:
-        results: One dict per lead the specialist attempted. Each needs a
-            `lead_id` and an `outcome` of 'contacted', 'unattempted',
-            'failed' or 'in_progress'. `attempts` — how many times it actually
-            dialled for this result — is optional but should be given whenever
-            the specialist retried internally, or the retry cap will not bind.
-            `detail` and `call_id` are optional.
+    Each record needs a `lead_id` and an `outcome` of 'contacted',
+    'unattempted', 'failed' or 'in_progress'; `attempts`, `detail` and
+    `call_id` are carried through when present.
 
     Returns:
         The counts after recording, and which leads are now owed a retry.
@@ -727,6 +762,10 @@ def record_outreach_results(results: list[dict],
     batch = _batch(tool_context)
     if batch is None:
         return _no_batch()
+
+    results, error = _stashed_json(tool_context, 'outreach_result')
+    if error:
+        return {'status': 'error', 'error_message': error}
 
     recorded, unknown, unclear = [], [], []
     for result in results or []:
@@ -849,6 +888,41 @@ def flag_for_human_review(lead_id: str, reason: str,
     return {'status': 'success', 'lead_id': lead_id, 'counts': _counts(batch)}
 
 
+def _campaign_report(batch: dict) -> dict:
+    """The outcome tally, computed here so no model ever counts rows.
+
+    Buckets are read from each called lead's note text. ponytail: keyword
+    matching against the mock's own phrasing; revisit when real Tilicho
+    outcome codes exist.
+    """
+    interested = call_later = not_interested = no_answer = meetings = 0
+    called = 0
+    for lead in batch['leads'].values():
+        if lead['attempts'] <= 0:
+            continue
+        called += 1
+        note = (lead['note'] or '').lower()
+        if 'meeting' in note:
+            meetings += 1
+        if lead['stage'] == CALLED:
+            if 'not interested' in note:
+                not_interested += 1
+            elif 'call later' in note or 'call back' in note:
+                call_later += 1
+            else:
+                interested += 1
+        elif lead['stage'] in (FAILED, UNATTEMPTED, FLAGGED):
+            no_answer += 1
+    return {
+        'called': called,
+        'interested': interested,
+        'asked_to_call_later': call_later,
+        'not_interested': not_interested,
+        'no_answer': no_answer,
+        'meetings_booked': meetings,
+    }
+
+
 def batch_status(tool_context: ToolContext) -> dict:
     """The state of the batch: counts, and every lead's stage.
 
@@ -858,6 +932,7 @@ def batch_status(tool_context: ToolContext) -> dict:
     if batch is None:
         return _no_batch()
     return {
+        'campaign_report': _campaign_report(batch),
         'status': 'success',
         'batch_id': batch['batch_id'],
         'source': batch['source'],

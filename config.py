@@ -40,13 +40,12 @@ MAX_CALL_ATTEMPTS = int(os.environ.get('LODESTAR_MAX_CALL_ATTEMPTS', '3'))
 # spreadsheets; a hundred rows in a single prompt is where recommendations start
 # being dropped silently rather than returned.
 #
-# Small, and deliberately so. The binding limit is not the analysis — it is
-# `record_analysis` on the way back, which carries the full profile, reasoning
-# and pitch notes for every lead in the chunk as a single function call. Eight
-# leads was already enough to make Gemini emit a MALFORMED_FUNCTION_CALL, so
-# the chunk that produced them has to stay well under that. Raise it only with
-# a batch in front of you to prove it still records.
-ANALYSIS_CHUNK_SIZE = int(os.environ.get('LODESTAR_ANALYSIS_CHUNK_SIZE', '3'))
+# The binding limit is `record_analysis` on the way back — one function call
+# carrying the whole chunk's JSON. That payload is now small (a one-line Why
+# and three bullets per lead; the profiles and arithmetic live in the ledger),
+# so five keeps the whole 15-row showcase to three round trips per turn.
+# Raise it further only with a batch in front of you to prove it still records.
+ANALYSIS_CHUNK_SIZE = int(os.environ.get('LODESTAR_ANALYSIS_CHUNK_SIZE', '5'))
 
 # Output-token ceiling for every agent in the package.
 #
