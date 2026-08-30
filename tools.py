@@ -96,6 +96,33 @@ def _parse_rows(text: str) -> list[dict]:
     return cleaned
 
 
+def _artifact_text(part) -> str | None:
+    """The text of an attached file, or None if it is not text at all.
+
+    An attachment arrives as a `types.Part`: usually `inline_data` holding raw
+    bytes, occasionally already decoded into `text`. A CSV saved out of Excel
+    is frequently cp1252 rather than UTF-8, and is often carrying a BOM, so
+    both are tried before giving up.
+    """
+    text = getattr(part, 'text', None)
+    if text:
+        return text
+
+    inline = getattr(part, 'inline_data', None)
+    data = getattr(inline, 'data', None)
+    if not data:
+        return None
+    if isinstance(data, str):
+        return data
+
+    for encoding in ('utf-8-sig', 'utf-8', 'cp1252', 'latin-1'):
+        try:
+            return bytes(data).decode(encoding)
+        except (UnicodeDecodeError, ValueError):
+            continue
+    return None
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec='seconds')
 
@@ -144,33 +171,19 @@ def _counts(batch: dict) -> dict:
     }
 
 
-def open_batch(leads_csv: str, source: str,
-               tool_context: ToolContext) -> dict:
-    """Register a new batch of raw leads and start its ledger.
+_UNREADABLE = (
+    'No leads could be read from that. Expected a header row naming the '
+    'columns and one row per lead, separated by commas, pipes or tabs.'
+)
 
-    Call this the moment a batch arrives, before any analysis. It records the
-    leads as received; it does not analyse them.
 
-    Args:
-        leads_csv: The lead sheet as delimited text, exactly as it arrived —
-            a header row naming the columns, then one row per lead. Comma,
-            pipe, tab and semicolon all work. Pass the file through as text;
-            do not parse it into a list first.
-        source: Where the batch came from, e.g. the file name.
+def _open_from_rows(leads: list[dict], source: str,
+                    tool_context: ToolContext) -> dict:
+    """Start a ledger for rows that have already been parsed.
 
-    Returns:
-        The batch id and the opening counts.
+    Shared by both ways in — a sheet pasted into the conversation and a file
+    the user attached — so the two cannot drift apart.
     """
-    leads = _parse_rows(leads_csv)
-    if not leads:
-        return {
-            'status': 'error',
-            'error_message': (
-                'No leads could be read from that. Expected a header row '
-                'naming the columns and one row per lead, separated by '
-                'commas, pipes or tabs.'
-            ),
-        }
 
     batch = {
         'batch_id': f'batch-{uuid.uuid4().hex[:8]}',
@@ -227,6 +240,127 @@ def open_batch(leads_csv: str, source: str,
         'leads_without_a_phone_number': no_phone,
         'calls_are_simulated': config.mock_calls(),
     }
+
+
+def open_batch(leads_csv: str, source: str,
+               tool_context: ToolContext) -> dict:
+    """Register a batch of raw leads pasted into the conversation as text.
+
+    Use this when the lead rows are in the message itself. When the user
+    attached a file instead, use `open_batch_from_file` — it reads the file
+    directly and does not need the rows repeated.
+
+    Args:
+        leads_csv: The lead sheet as delimited text, exactly as it arrived —
+            a header row naming the columns, then one row per lead. Comma,
+            pipe, tab and semicolon all work.
+        source: Where the batch came from, e.g. the file name.
+
+    Returns:
+        The batch id and the opening counts.
+    """
+    leads = _parse_rows(leads_csv)
+    if not leads:
+        return {'status': 'error', 'error_message': _UNREADABLE}
+    return _open_from_rows(leads, source, tool_context)
+
+
+async def list_uploaded_files(tool_context: ToolContext) -> dict:
+    """List the files the user has attached to this conversation.
+
+    Call this first when someone says they have uploaded a lead sheet. It
+    returns the filenames; pass the one you want to `open_batch_from_file`.
+
+    Returns:
+        The filenames attached to this session, newest last.
+    """
+    try:
+        names = await tool_context.list_artifacts()
+    except ValueError:
+        # No artifact service wired up on this deployment.
+        return {
+            'status': 'error',
+            'error_message': (
+                'This deployment cannot see attached files. Ask the user to '
+                'paste the lead rows into the message instead.'
+            ),
+        }
+    except Exception as exc:  # noqa: BLE001 - surfaced to the model, not raised
+        logger.exception('listing artifacts failed')
+        return {'status': 'error', 'error_message': f'Could not list the attached files: {exc}'}
+
+    return {
+        'status': 'success',
+        'files': names,
+        'count': len(names),
+    }
+
+
+async def open_batch_from_file(filename: str,
+                               tool_context: ToolContext) -> dict:
+    """Register a batch of raw leads from a file the user attached.
+
+    Reads the file itself. The lead rows never pass back through the
+    conversation, which is the point: a sheet of any size opens the same way,
+    and nothing is retyped or summarised on the way in.
+
+    Args:
+        filename: The attached file to read, as `list_uploaded_files` gave it.
+            If there is exactly one attached file, "" reads that one.
+
+    Returns:
+        The batch id and the opening counts.
+    """
+    try:
+        name = (filename or '').strip()
+        if not name:
+            names = await tool_context.list_artifacts()
+            if len(names) != 1:
+                return {
+                    'status': 'error',
+                    'error_message': (
+                        'Say which file to read. Attached: '
+                        + (', '.join(names) if names else 'none')
+                    ),
+                }
+            name = names[0]
+
+        part = await tool_context.load_artifact(name)
+    except ValueError:
+        return {
+            'status': 'error',
+            'error_message': (
+                'This deployment cannot see attached files. Ask the user to '
+                'paste the lead rows into the message instead.'
+            ),
+        }
+    except Exception as exc:  # noqa: BLE001 - surfaced to the model, not raised
+        logger.exception('loading artifact %r failed', filename)
+        return {'status': 'error', 'error_message': f'Could not read {filename!r}: {exc}'}
+
+    if part is None:
+        return {
+            'status': 'error',
+            'error_message': f'There is no attached file called {name!r}.',
+        }
+
+    text = _artifact_text(part)
+    if text is None:
+        mime = getattr(getattr(part, 'inline_data', None), 'mime_type', '') or 'unknown'
+        return {
+            'status': 'error',
+            'error_message': (
+                f'{name!r} is not something I can read as a lead sheet '
+                f'(it looks like {mime}). A CSV or other delimited text file '
+                f'is what this expects — an .xlsx has to be exported to CSV '
+                f'first.'
+            ),
+        }
+
+    leads = _parse_rows(text)
+    if not leads:
+        return {'status': 'error', 'error_message': _UNREADABLE}
+    return _open_from_rows(leads, name, tool_context)
 
 
 def record_analysis(profiles_json: str, tool_context: ToolContext) -> dict:

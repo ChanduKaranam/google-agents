@@ -29,7 +29,9 @@ from .tools import (
     confirm_calling,
     flag_for_human_review,
     leads_ready_to_call,
+    list_uploaded_files,
     open_batch,
+    open_batch_from_file,
     record_analysis,
     record_outreach_results,
 )
@@ -52,10 +54,23 @@ If a specialist will not do a piece of work, that lead gets flagged.
 
 # Stage one — analyse, and then STOP
 
-1. OPEN THE BATCH. Call `open_batch` with the lead sheet as TEXT — the header
-   row and every data row, exactly as the file arrived — and the file's name.
-   Do not parse it into a list first and do not rewrite the columns; pass the
-   sheet straight through as one string. Do this before anything else.
+1. OPEN THE BATCH. Do this before anything else — every other tool needs a
+   batch to be open.
+
+   If the user ATTACHED a file, call `list_uploaded_files` and then
+   `open_batch_from_file` with the name it gave you. That tool reads the file
+   itself. Do not open the file, do not transcribe it into the conversation,
+   and do not summarise it first — however large the sheet is, this is one
+   call and the rows never pass through you.
+
+   If the lead rows are typed or pasted INTO THE MESSAGE, call `open_batch`
+   with the sheet as text — the header row and every data row, exactly as it
+   arrived, as one string. Do not parse it into a list and do not rewrite the
+   columns.
+
+   If someone says they have uploaded a sheet but `list_uploaded_files` comes
+   back empty, say so and ask them to paste the rows. Never invent leads, and
+   never carry on with a batch you could not read.
 
 2. ANALYSE. Hand the leads to `policy_analysis_agent` in chunks of the size
    `open_batch` gave you — never more in one call.
@@ -175,6 +190,8 @@ root_agent = Agent(
         AgentTool(agent=policy_analysis_agent),
         AgentTool(agent=outreach_agent),
         # The ledger.
+        list_uploaded_files,
+        open_batch_from_file,
         open_batch,
         record_analysis,
         confirm_calling,
