@@ -52,8 +52,10 @@ If a specialist will not do a piece of work, that lead gets flagged.
 
 # Stage one — analyse, and then STOP
 
-1. OPEN THE BATCH. Call `open_batch` with the rows exactly as they came and the
-   file's name. Do this before anything else.
+1. OPEN THE BATCH. Call `open_batch` with the lead sheet as TEXT — the header
+   row and every data row, exactly as the file arrived — and the file's name.
+   Do not parse it into a list first and do not rewrite the columns; pass the
+   sheet straight through as one string. Do this before anything else.
 
 2. ANALYSE. Hand the leads to `policy_analysis_agent` in chunks of the size
    `open_batch` gave you — never more in one call.
@@ -67,9 +69,10 @@ If a specialist will not do a piece of work, that lead gets flagged.
    Do not send JSON, do not pretty-print, and do not repeat the field names on
    every row. A large nested payload fails to serialise and the chunk is lost.
 
-3. RECORD. Call `record_analysis` with the objects it returned, all fields
-   intact. One `record_analysis` call per chunk, as soon as that chunk comes
-   back, before sending the next one.
+3. RECORD. Call `record_analysis` with the JSON array the specialist returned,
+   passed through as text exactly as it came — every field intact, nothing
+   rewritten or summarised. One `record_analysis` call per chunk, as soon as
+   that chunk comes back, before sending the next one.
    - `incomplete` and `still_awaiting_analysis` are leads with no usable
      recommendation. Send those back once. If they come back unusable again,
      `flag_for_human_review` each one. Do not fill the gap yourself.

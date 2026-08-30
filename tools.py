@@ -11,7 +11,11 @@ did not get from `batch_status`.
 Every tool returns a plain dict with a `status` of 'success' or 'error'.
 """
 
+import csv
+import io
+import json
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -47,6 +51,49 @@ def _field(row: dict, *names: str):
         if value not in (None, ''):
             return value
     return None
+
+
+def _parse_rows(text: str) -> list[dict]:
+    """Rows out of whatever delimited text the model passed through.
+
+    The lead sheet reaches this tool as the text of the uploaded file rather
+    than as a parsed list of dicts, and deliberately so: a list-of-dicts
+    argument makes Gemini emit its function call as a code block, which arrives
+    as MALFORMED_FUNCTION_CALL and loses the entire batch. One string argument
+    it can always serialise.
+
+    Comma, pipe, tab and semicolon are all accepted, because a file pasted into
+    a chat window has usually stopped being a CSV by the time it arrives.
+    """
+    text = (text or '').strip()
+    if not text:
+        return []
+    # A fenced block, if the model wrapped it in one.
+    fenced = re.match(r'^```[a-zA-Z]*\s*\n(.*?)\n?```$', text, re.S)
+    if fenced:
+        text = fenced.group(1).strip()
+
+    lines = [line for line in text.splitlines() if line.strip()]
+    if not lines:
+        return []
+
+    header = lines[0]
+    delimiter = max(',|\t;', key=header.count)
+    if header.count(delimiter) == 0:
+        return []
+
+    rows = list(csv.DictReader(io.StringIO('\n'.join(lines)), delimiter=delimiter))
+    cleaned = []
+    for row in rows:
+        # DictReader gives None keys for surplus columns and None values for
+        # short rows; neither should reach the ledger.
+        item = {
+            str(k).strip(): ('' if v is None else str(v).strip())
+            for k, v in row.items() if k is not None
+        }
+        if any(item.values()):
+            cleaned.append(item)
+    return cleaned
 
 
 def _now() -> str:
@@ -97,7 +144,7 @@ def _counts(batch: dict) -> dict:
     }
 
 
-def open_batch(leads: list[dict], source: str,
+def open_batch(leads_csv: str, source: str,
                tool_context: ToolContext) -> dict:
     """Register a new batch of raw leads and start its ledger.
 
@@ -105,17 +152,24 @@ def open_batch(leads: list[dict], source: str,
     leads as received; it does not analyse them.
 
     Args:
-        leads: The raw lead rows exactly as they were parsed, one dict per
-            lead. Whatever columns the file had are kept as-is.
+        leads_csv: The lead sheet as delimited text, exactly as it arrived —
+            a header row naming the columns, then one row per lead. Comma,
+            pipe, tab and semicolon all work. Pass the file through as text;
+            do not parse it into a list first.
         source: Where the batch came from, e.g. the file name.
 
     Returns:
         The batch id and the opening counts.
     """
+    leads = _parse_rows(leads_csv)
     if not leads:
         return {
             'status': 'error',
-            'error_message': 'That batch has no leads in it. Nothing to open.',
+            'error_message': (
+                'No leads could be read from that. Expected a header row '
+                'naming the columns and one row per lead, separated by '
+                'commas, pipes or tabs.'
+            ),
         }
 
     batch = {
@@ -175,18 +229,18 @@ def open_batch(leads: list[dict], source: str,
     }
 
 
-def record_analysis(profiles: list[dict], tool_context: ToolContext) -> dict:
+def record_analysis(profiles_json: str, tool_context: ToolContext) -> dict:
     """Record what the Policy Analysis Agent returned.
 
     Anything missing a lead id or a recommended policy is flagged rather than
     recorded, and comes back in `incomplete` — those leads are not called.
 
     Args:
-        profiles: One dict per lead from the analysis specialist, in the JSON
-            shape it returns. Each needs a `lead_id` and a
-            `recommended_policy`; `reasoning`, `pitch_notes`,
-            `extracted_profile` and `lead_name` are carried through to the
-            caller if present.
+        profiles_json: The JSON array the analysis specialist returned, passed
+            through as text exactly as it came. One object per lead, each with
+            a `lead_id` and a `recommended_policy`; `reasoning`,
+            `pitch_notes`, `extracted_profile` and `lead_name` are carried
+            through to the caller if present.
 
     Returns:
         The counts after recording, plus any profiles that could not be used.
@@ -194,6 +248,34 @@ def record_analysis(profiles: list[dict], tool_context: ToolContext) -> dict:
     batch = _batch(tool_context)
     if batch is None:
         return _no_batch()
+
+    # Taken as text rather than as a list of dicts for the same reason
+    # `open_batch` takes the sheet as text: a nested argument this size makes
+    # Gemini emit the call as a code block, and the chunk is lost.
+    profiles = profiles_json
+    if isinstance(profiles, str):
+        raw = profiles.strip()
+        fenced = re.match(r'^```[a-zA-Z]*\s*\n(.*?)\n?```$', raw, re.S)
+        if fenced:
+            raw = fenced.group(1).strip()
+        try:
+            profiles = json.loads(raw) if raw else []
+        except json.JSONDecodeError as exc:
+            return {
+                'status': 'error',
+                'error_message': (
+                    f'That analysis was not readable JSON ({exc.msg} at line '
+                    f'{exc.lineno}). Send the array exactly as the analysis '
+                    f'specialist returned it. Nothing was recorded.'
+                ),
+            }
+    if isinstance(profiles, dict):
+        profiles = [profiles]
+    if not isinstance(profiles, list):
+        return {
+            'status': 'error',
+            'error_message': 'Expected a JSON array of profiles.',
+        }
 
     recorded, incomplete, unknown = [], [], []
     for profile in profiles or []:
