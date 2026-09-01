@@ -1,0 +1,25 @@
+# Placement Assistant Agent — Dependencies
+# Install with: pip install -r requirements.txt
+
+# Google ADK (Agent Development Kit)
+google-adk>=1.0.0
+
+# Resume parsing
+pdfplumber>=0.11.0        # PDF text extraction
+python-docx>=1.1.0        # DOCX text extraction
+
+# Google Cloud / Vertex AI (required by .env config)
+google-cloud-aiplatform>=1.60.0
+
+# --- A2A transport (placement_agent/a2a_app.py only) -------------------------
+# Needed ONLY to serve the agent over A2A for Gemini Enterprise A2UI. The
+# Agent Engine deployment does not import a2a_app.py and does not need these.
+#
+# Version note: a2a-sdk 1.x builds a protobuf AgentCard that advertises its
+# endpoint under `supportedInterfaces`, and leaves the legacy top-level `url`
+# unset. 0.3.x emits the older `url` + `preferredTransport` shape. GE's A2UI
+# registration is Preview; if it rejects the 1.x card, pin `a2a-sdk<1` here --
+# nothing in our own code reads either field.
+a2a-sdk>=0.3.4,<2
+sse-starlette>=2.1.0
+uvicorn>=0.30.0

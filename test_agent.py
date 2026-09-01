@@ -4,12 +4,33 @@ No network, no LLM calls. Run with: .venv/bin/python -m pytest test_agent.py
 or just: .venv/bin/python test_agent.py
 """
 
+import asyncio
+import io
+import json
+import os
+import tempfile
+
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.function_tool import FunctionTool
+from google.genai import types
 
-from placement_agent.agent import SPECIALISTS, root_agent
-from placement_agent.tools import list_applications, track_application
+from Job_Helper_agent.agent import SPECIALISTS, root_agent
+from Job_Helper_agent.tools import list_applications, track_application
+from placement_agent import a2a_app
+from placement_agent.a2ui import A2UI_CLOSE, A2UI_OPEN
+from placement_agent.a2ui.probe import show_a2ui_probe_card
+from placement_agent.agent import root_agent as placement_root_agent
+from placement_agent.interview_prep.agent import interview_prep_agent
+from placement_agent.interview_prep.progress_tracker import (
+    get_progress_summary,
+    init_progress,
+    log_mock_interview,
+    log_question_attempt,
+    mark_topic_complete,
+    suggest_next_step,
+)
+from placement_agent.resume_parser import parse_resume
 
 # Built-in Gemini tools, which cannot share an agent with function tools.
 BUILT_IN_NAMES = {"google_search", "url_context", "code_execution", "computer_use"}
@@ -135,6 +156,472 @@ def test_track_application_rejects_unknown_status():
     result = track_application("Google", "SWE", "Ghosted", "", ctx)
     assert "error" in result
     assert ctx.state.get("applications") in (None, [])
+
+
+# ---------------------------------------------------------------------------
+# placement_agent -- reading the file the user uploaded in Gemini Enterprise
+#
+# GE never gives a custom agent a file path. It announces the upload as a text
+# marker ("<start_of_user_uploaded_file: resume.pdf>", empty between markers)
+# and puts the bytes in the artifact service. Measured against a live deployed
+# agent 2026-07-22; see .claude/skills/gemini-enterprise-agents. A parser that
+# only stats the filesystem can never succeed in the deployed container, and
+# the model then invents the resume contents instead of erroring.
+# ---------------------------------------------------------------------------
+
+DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+class _FakeUploadContext:
+    """Stand-in for ToolContext: only the artifact methods are touched."""
+
+    def __init__(self, artifacts=None, has_artifact_service=True):
+        self._artifacts = dict(artifacts or {})
+        self._has_service = has_artifact_service
+        self.state = {}
+
+    async def list_artifacts(self):
+        if not self._has_service:
+            raise ValueError("Artifact service is not initialized.")
+        return list(self._artifacts)
+
+    async def load_artifact(self, filename, version=None):
+        if not self._has_service:
+            raise ValueError("Artifact service is not initialized.")
+        return self._artifacts.get(filename)
+
+
+def _docx_bytes(paragraphs) -> bytes:
+    from docx import Document
+
+    doc = Document()
+    for line in paragraphs:
+        doc.add_paragraph(line)
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def _upload(data: bytes, mime_type: str):
+    return types.Part.from_bytes(data=data, mime_type=mime_type)
+
+
+def _pdf_bytes(line: str) -> bytes:
+    """A minimal one-page PDF with a real text layer -- no extra dependency."""
+    stream = f"BT /F1 12 Tf 72 720 Td ({line}) Tj ET".encode()
+    objects = [
+        b"<</Type/Catalog/Pages 2 0 R>>",
+        b"<</Type/Pages/Kids[3 0 R]/Count 1>>",
+        b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]"
+        b"/Resources<</Font<</F1 5 0 R>>>>/Contents 4 0 R>>",
+        b"<</Length " + str(len(stream)).encode() + b">>\nstream\n" + stream + b"\nendstream\n",
+        b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+    ]
+    buf, offsets = io.BytesIO(), []
+    buf.write(b"%PDF-1.4\n")
+    for i, obj in enumerate(objects, 1):
+        offsets.append(buf.tell())
+        buf.write(str(i).encode() + b" 0 obj\n" + obj + b"\nendobj\n")
+    xref = buf.tell()
+    buf.write(b"xref\n0 " + str(len(objects) + 1).encode() + b"\n0000000000 65535 f \n")
+    for off in offsets:
+        buf.write(b"%010d 00000 n \n" % off)
+    buf.write(
+        b"trailer<</Size " + str(len(objects) + 1).encode() + b"/Root 1 0 R>>\nstartxref\n"
+        + str(xref).encode() + b"\n%%EOF\n"
+    )
+    return buf.getvalue()
+
+
+def test_parse_resume_reads_an_uploaded_pdf_artifact():
+    """PDF is the format users actually upload; extraction runs off bytes."""
+    ctx = _FakeUploadContext(
+        {"resume.pdf": _upload(_pdf_bytes("Priya Raman Backend Intern Python"), "application/pdf")}
+    )
+    out = asyncio.run(parse_resume(ctx, "resume.pdf"))
+
+    assert out["success"], out
+    assert "Priya Raman" in out["text"]
+    assert out["source"] == "uploaded_file"
+
+
+def test_parse_resume_reads_an_uploaded_docx_artifact():
+    """The deployed path: bytes come from the artifact service, not from disk."""
+    ctx = _FakeUploadContext(
+        {"resume.docx": _upload(_docx_bytes(["Priya Raman", "Backend Intern"]), DOCX_MIME)}
+    )
+    out = asyncio.run(parse_resume(ctx, "resume.docx"))
+
+    assert out["success"], out
+    assert "Priya Raman" in out["text"]
+    assert out["source"] == "uploaded_file"
+    assert out["word_count"] > 0
+
+
+def test_parse_resume_reads_docx_table_cells():
+    """Resumes are routinely laid out in tables -- paragraphs alone drop them."""
+    from docx import Document
+
+    doc = Document()
+    doc.add_paragraph("Priya Raman")
+    table = doc.add_table(rows=1, cols=2)
+    table.cell(0, 0).text = "Skills"
+    table.cell(0, 1).text = "Python, Kubernetes"
+    buf = io.BytesIO()
+    doc.save(buf)
+
+    ctx = _FakeUploadContext({"resume.docx": _upload(buf.getvalue(), DOCX_MIME)})
+    out = asyncio.run(parse_resume(ctx, "resume.docx"))
+
+    assert out["success"], out
+    assert "Kubernetes" in out["text"], "table cell content was silently dropped"
+
+
+def test_parse_resume_accepts_the_ge_upload_marker_verbatim():
+    """The model sees the marker, not a bare name -- both must resolve."""
+    ctx = _FakeUploadContext({"resume.txt": _upload(b"Priya Raman\nBackend Intern", "text/plain")})
+    out = asyncio.run(parse_resume(ctx, "<start_of_user_uploaded_file: resume.txt>"))
+
+    assert out["success"], out
+    assert "Priya Raman" in out["text"]
+
+
+def test_parse_resume_finds_the_only_upload_without_being_told_its_name():
+    ctx = _FakeUploadContext({"my cv.txt": _upload(b"Priya Raman", "text/plain")})
+    out = asyncio.run(parse_resume(ctx))
+
+    assert out["success"], out
+    assert out["file_name"] == "my cv.txt"
+
+
+def test_parse_resume_reports_what_is_attached_when_the_name_is_wrong():
+    ctx = _FakeUploadContext({"resume.txt": _upload(b"Priya Raman", "text/plain")})
+    out = asyncio.run(parse_resume(ctx, "not-the-file.pdf"))
+
+    assert out["success"] is False
+    assert out["available_files"] == ["resume.txt"]
+
+
+def test_parse_resume_says_nothing_was_uploaded_rather_than_returning_blank():
+    """A blank success would let the model hallucinate a resume."""
+    ctx = _FakeUploadContext({})
+    out = asyncio.run(parse_resume(ctx))
+
+    assert out["success"] is False
+    assert out["text"] == ""
+    assert "upload" in out["error"].lower()
+
+
+def test_parse_resume_still_reads_a_local_path_for_adk_web():
+    """Local `adk web` runs have no artifact service; a path must still work."""
+    fd, path = tempfile.mkstemp(suffix=".txt")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write("Priya Raman\nBackend Intern")
+    try:
+        out = asyncio.run(parse_resume(_FakeUploadContext(has_artifact_service=False), path))
+    finally:
+        os.unlink(path)
+
+    assert out["success"], out
+    assert out["source"] == "local_path"
+    assert "Priya Raman" in out["text"]
+
+
+def test_parse_resume_flags_a_pdf_with_no_text_layer():
+    """A scanned resume must be reported, not returned as an empty success."""
+    empty_pdf = (
+        b"%PDF-1.4\n"
+        b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+        b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+        b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\n"
+        b"trailer<</Root 1 0 R>>\n%%EOF\n"
+    )
+    ctx = _FakeUploadContext({"scan.pdf": _upload(empty_pdf, "application/pdf")})
+    out = asyncio.run(parse_resume(ctx, "scan.pdf"))
+
+    assert out["success"] is False
+    assert out["text"] == ""
+
+
+def test_placement_root_is_told_the_upload_marker_protocol():
+    """Guardrail: lose the marker instruction and the model invents resumes."""
+    instruction = placement_root_agent.instruction
+    assert "<start_of_user_uploaded_file:" in instruction
+    assert "parse_resume" in instruction
+
+
+def test_placement_agents_do_not_mix_builtin_and_function_tools():
+    agents = [placement_root_agent, *(placement_root_agent.sub_agents or [])]
+    for agent in agents:
+        tools = list(agent.tools or [])
+        built_ins = [t for t in tools if _is_built_in(t)]
+        if built_ins:
+            assert len(tools) == 1, (
+                f"{agent.name} holds built-in {_tool_name(built_ins[0])!r} alongside"
+                " function tools. Gemini rejects this at request time."
+            )
+
+
+# ---------------------------------------------------------------------------
+# interview_prep -- whose progress is this, and where does it live
+#
+# Two defects shipped together here. The store was a module-global dict, which
+# on Agent Runtime is per-container memory: it dies on restart and diverges
+# across instances. Worse, `user_id` was a model-supplied argument and the
+# prompt told the model to pass the literal 'default_user' -- so every end user
+# of the deployed agent read and wrote one shared record. Identity must come
+# from the session, never from the model.
+# ---------------------------------------------------------------------------
+
+PROGRESS_TOOLS = [
+    init_progress,
+    mark_topic_complete,
+    log_question_attempt,
+    log_mock_interview,
+    get_progress_summary,
+    suggest_next_step,
+]
+
+
+class _FakeSession:
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.id = "session-1"
+
+
+class _FakeProgressContext:
+    """Stand-in for ToolContext: .state plus the session that names the user."""
+
+    def __init__(self, user_id="student@example.com", state=None):
+        self.session = _FakeSession(user_id)
+        self.state = {} if state is None else state
+
+
+def test_progress_tools_never_take_a_user_id_from_the_model():
+    """The declaration is the contract. If `user_id` is in it, the model fills
+    it in -- and one hallucinated constant merges every student's record."""
+    for fn in PROGRESS_TOOLS:
+        schema = FunctionTool(fn)._get_declaration().parameters_json_schema or {}
+        assert "user_id" not in (schema.get("properties") or {}), (
+            f"{fn.__name__} still asks the model for user_id; identity must come"
+            " from tool_context.session"
+        )
+
+
+def test_progress_identity_comes_from_the_session():
+    ctx = _FakeProgressContext("priya@college.edu")
+    out = init_progress(ctx, "software engineer")
+    assert out["user_id"] == "priya@college.edu"
+
+
+def test_two_users_do_not_share_one_progress_record():
+    """The live bug: with 'default_user' hardcoded, B saw A's completed topics."""
+    a = _FakeProgressContext("a@college.edu")
+    b = _FakeProgressContext("b@college.edu")
+
+    init_progress(a, "software engineer")
+    mark_topic_complete(a, "data_structures")
+
+    assert get_progress_summary(b)["status"] == "no_session", (
+        "user B can see user A's progress"
+    )
+
+
+def test_progress_persists_in_session_state_across_tool_calls():
+    """Survives because it is in ADK session state, not a module global."""
+    state = {}
+    init_progress(_FakeProgressContext(state=state), "data analyst")
+    for topic in ("data_structures", "algorithms", "sql_databases"):
+        mark_topic_complete(_FakeProgressContext(state=state), topic)
+
+    summary = get_progress_summary(_FakeProgressContext(state=state))
+    assert summary["completed_topics"] == [
+        "data_structures",
+        "algorithms",
+        "sql_databases",
+    ]
+    # Three completions is the auto-level-up threshold.
+    assert summary["current_difficulty"] == "medium"
+    assert summary["role"] == "data analyst"
+
+
+def test_progress_writes_through_state_so_adk_records_the_delta():
+    """Mutating a dict already in state is not a recorded delta in ADK; the
+    record has to be assigned back or the write is lost on the real service."""
+    ctx = _FakeProgressContext()
+    init_progress(ctx, "software engineer")
+    assert "interview_progress" in ctx.state
+
+
+def test_interview_prompt_does_not_hardcode_a_shared_user():
+    instruction = interview_prep_agent.instruction
+    assert "default_user" not in instruction, (
+        "the prompt still names one shared record"
+    )
+    assert "user_id" not in instruction, (
+        "the prompt still tells the model to pass a user_id that no tool accepts"
+    )
+
+
+# ---------------------------------------------------------------------------
+# A2UI -- the payload the renderer will actually accept
+#
+# Every assertion below is taken from ADK's own bundled A2UI renderer
+# (google/adk/cli/browser/chunk-2SRK2U7X.js), not from prose docs. That client
+# throws `Invalid data; expected <Type>` and renders nothing when a component
+# fails its shape check, and it fails silently when a referenced component id
+# was never declared -- which is the single most common way an A2UI surface
+# comes back blank.
+# ---------------------------------------------------------------------------
+
+
+def _a2ui_messages(block: str) -> list[dict]:
+    """Parse a block the way the renderer's extractA2uiJsonFromText does."""
+    assert block.startswith(A2UI_OPEN), block[:40]
+    assert block.endswith(A2UI_CLOSE), block[-40:]
+    payload = json.loads(block[len(A2UI_OPEN): -len(A2UI_CLOSE)].strip())
+    assert isinstance(payload, list), "renderer expects an array of messages"
+    return payload
+
+
+def _probe_block() -> str:
+    return show_a2ui_probe_card()["a2ui_block"]
+
+
+def test_a2ui_block_uses_the_marker_the_renderer_scans_for():
+    """The renderer finds A2UI by string search for these exact tags."""
+    messages = _a2ui_messages(_probe_block())
+    kinds = [k for m in messages for k in m]
+    assert "surfaceUpdate" in kinds
+    assert "beginRendering" in kinds
+    # beginRendering names the root; without it the tree is never built.
+    assert kinds.index("surfaceUpdate") < kinds.index("beginRendering"), (
+        "components must be declared before the root that references them"
+    )
+
+
+def test_a2ui_every_referenced_component_id_is_declared():
+    """A dangling id makes buildNodeRecursive return null -- a blank surface,
+    with no error anywhere. Nothing else in the stack catches this."""
+    messages = _a2ui_messages(_probe_block())
+    declared, referenced = set(), set()
+
+    for message in messages:
+        for component in message.get("surfaceUpdate", {}).get("components", []):
+            declared.add(component["id"])
+            (props,) = component["component"].values()
+            for value in props.values():
+                if isinstance(value, str):
+                    referenced.add(value)
+                elif isinstance(value, dict) and "explicitList" in value:
+                    referenced.update(value["explicitList"])
+        if "beginRendering" in message:
+            referenced.add(message["beginRendering"]["root"])
+
+    assert referenced <= declared, f"undeclared component ids: {referenced - declared}"
+
+
+def test_a2ui_components_carry_a_single_typed_body():
+    """buildNodeRecursive switches on Object.keys(component)[0]; a second key
+    is silently ignored and a zero-key component throws."""
+    for message in _a2ui_messages(_probe_block()):
+        for component in message.get("surfaceUpdate", {}).get("components", []):
+            assert set(component) <= {"id", "component", "weight"}, component
+            assert len(component["component"]) == 1, (
+                f"{component['id']} declares {list(component['component'])}"
+            )
+
+
+def test_a2ui_text_is_never_a_bare_string():
+    """isResolvedText requires {path|literal|literalString}; a bare string
+    fails the check and the whole surface throws."""
+    for message in _a2ui_messages(_probe_block()):
+        for component in message.get("surfaceUpdate", {}).get("components", []):
+            body = component["component"].get("Text")
+            if body is None:
+                continue
+            assert isinstance(body["text"], dict), body
+            assert {"path", "literal", "literalString"} & set(body["text"]), body
+
+
+def test_a2ui_button_action_can_be_routed_back_to_a_tool():
+    """The client posts back {userAction:{name, context}}; an unnamed action
+    gives the agent nothing to dispatch on."""
+    buttons = [
+        component["component"]["Button"]
+        for message in _a2ui_messages(_probe_block())
+        for component in message.get("surfaceUpdate", {}).get("components", [])
+        if "Button" in component["component"]
+    ]
+    assert buttons, "the probe card has no interactive element to validate"
+
+    for button in buttons:
+        assert button["action"]["name"], button
+        assert isinstance(button["child"], str), "Button needs a child component"
+        for entry in button["action"].get("context", []):
+            assert set(entry) == {"key", "value"}, entry
+            assert {"literalString", "literalNumber", "literalBoolean", "path"} & set(
+                entry["value"]
+            ), entry
+
+
+def test_a2ui_probe_card_is_wired_into_the_placement_root():
+    names = [_tool_name(t) for t in (placement_root_agent.tools or [])]
+    assert "show_a2ui_probe_card" in names
+
+
+def test_placement_root_is_told_to_emit_the_a2ui_block_verbatim():
+    """The block only renders if it survives the model unedited."""
+    instruction = placement_root_agent.instruction
+    assert "a2ui_block" in instruction
+    assert "verbatim" in instruction.lower()
+
+
+# ---------------------------------------------------------------------------
+# A2A transport -- the wrapper Gemini Enterprise needs to see A2UI at all
+#
+# GE renders A2UI only for agents registered as A2A agents. `to_a2a()` wraps
+# the existing root_agent without touching it, but its convenience defaults are
+# wrong for production in two ways that fail silently, so both are pinned here.
+# ---------------------------------------------------------------------------
+
+
+def test_a2a_app_wraps_the_same_root_agent_that_is_deployed_today():
+    """A second agent definition would drift from the one in production."""
+    assert a2a_app.AGENT is placement_root_agent
+
+
+def test_a2a_runner_keeps_session_state_off_the_container():
+    """`to_a2a`'s default runner uses InMemorySessionService, which would put
+    interview progress back in per-container memory -- undoing M0 without a
+    single test failing anywhere else."""
+    runner = a2a_app.build_runner(
+        project="supadha-dev", location="us-central1", agent_engine_id="123",
+        artifact_bucket="some-bucket",
+    )
+    assert type(runner.session_service).__name__ == "VertexAiSessionService"
+    assert type(runner.artifact_service).__name__ == "GcsArtifactService"
+
+
+def test_a2a_runner_falls_back_to_in_memory_when_unconfigured():
+    """`adk web` and tests must still work with no cloud config present."""
+    runner = a2a_app.build_runner(project="", location="", agent_engine_id="")
+    assert type(runner.session_service).__name__ == "InMemorySessionService"
+
+
+def test_a2a_card_url_carries_no_port_on_https():
+    """to_a2a builds `{protocol}://{host}:{port}/` unconditionally; an
+    advertised `:443` is a needless mismatch risk at registration time."""
+    url = a2a_app.rpc_url("https://placement-abc.a.run.app")
+    assert url == "https://placement-abc.a.run.app/a2a", url
+    assert ":443" not in url
+
+
+def test_a2a_card_advertises_streaming():
+    """Without streaming the client waits for the whole turn before showing
+    anything -- and A2UI surfaces arrive mid-turn."""
+    card = asyncio.run(a2a_app.build_agent_card("https://placement-abc.a.run.app"))
+    assert a2a_app.card_streaming_enabled(card) is True
 
 
 if __name__ == "__main__":

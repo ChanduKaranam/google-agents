@@ -208,6 +208,69 @@ true behaviour.
 
 ---
 
+## 6. Rich UI (A2UI) — a different registration, not a different agent
+
+**Agent Runtime cannot emit A2UI.** GE renders A2UI component trees only for agents
+registered as **A2A agents**, and a reasoning engine does not speak A2A — it serves the
+`reasoningEngines` API. No prompt or tool change closes that gap. The agent stays the
+same; the *transport* and the *registration* change.
+
+`to_a2a()` wraps an existing agent with no edits to it:
+
+```python
+from google.adk.a2a.utils.agent_to_a2a import to_a2a
+app = to_a2a(root_agent, agent_card=card, runner=runner)   # Starlette ASGI app
+```
+
+See `placement_agent/a2a_app.py` for the working shape. Three defaults will bite you:
+
+1. **`to_a2a` builds a runner with `InMemorySessionService` and `InMemoryArtifactService`**
+   (`agent_to_a2a.py:158-161`). That is not the Agent Engine behaviour you tested — session
+   state goes back to per-container memory and uploads become unreadable across instances.
+   Pass your own `runner=`. Point `VertexAiSessionService` at your existing
+   `AGENT_ENGINE_ID` and both front doors share one session store.
+2. **The advertised URL is `f"{protocol}://{host}:{port}/"`** (`agent_to_a2a.py:182`), so
+   behind Cloud Run it publishes the *container* port. Pass a pre-built `agent_card=`.
+3. **`AgentCardBuilder` leaves `streaming` off.** A2UI surfaces arrive mid-turn; without
+   streaming the client shows nothing until the turn ends.
+
+The card is served at `/.well-known/agent-card.json` — that path, not `/agent.json`.
+
+**Deployment target:** Cloud Run, not Agent Runtime. This is *additive* — the reasoning
+engine keeps serving the existing GE registration untouched, so a failed A2UI experiment
+costs you a `gcloud run services delete`, nothing more.
+
+```bash
+gcloud run deploy placement-assist-a2a \
+  --source . --region us-central1 --allow-unauthenticated \
+  --set-env-vars "A2A_BASE_URL=https://<assigned-url>,GOOGLE_CLOUD_PROJECT=<proj>,AGENT_ENGINE_ID=<id>,ARTIFACT_BUCKET=<bucket>" \
+  --command python --args -m,placement_agent.a2a_app
+```
+
+Chicken-and-egg: `A2A_BASE_URL` must be the URL Cloud Run assigns, so deploy once, read
+the URL, then redeploy with it set. Verify before touching GE:
+
+```bash
+curl -s https://<url>/.well-known/agent-card.json | jq '.supportedInterfaces, .capabilities'
+```
+
+**A2UI is Preview / Pre-GA and pinned to A2UI v0.8.** Treat every version number here as
+load-bearing. Note also that a2a-sdk 1.x advertises the endpoint under
+`supportedInterfaces` and leaves the legacy top-level `url` null; if GE's registration
+rejects that card, pin `a2a-sdk<1` (see `placement_agent/requirements.txt`).
+
+### Validating the component tree without deploying anything
+
+`adk web` ships a full A2UI renderer (`google/adk/cli/browser/chunk-2SRK2U7X.js`). It
+finds A2UI by scanning reply text for `<a2ui-json>…</a2ui-json>` holding an array of
+`surfaceUpdate` / `beginRendering` / `dataModelUpdate` messages. So the component tree can
+be built and *seen* locally before any Cloud Run or GE work happens. The shape rules that
+client enforces — and the ones that fail silently — are encoded in `placement_agent/a2ui/`
+and pinned by the `test_a2ui_*` tests. The worst one: **a component id that was never
+declared makes the whole surface render blank with no error anywhere.**
+
+---
+
 ## The ADK rules that WILL bite you
 
 These cost us real time. Read them before you build something non-trivial.
@@ -263,8 +326,33 @@ REST endpoint.
 ### 5. Uploaded files arrive as artifacts, not as text
 When a user attaches a file in Gemini Enterprise, your agent gets a marker like
 `<start_of_user_uploaded_file: resume.pdf>` with **no content between the markers** — the
-bytes are held aside. Give the root the `load_artifacts` tool and instruct it to call it,
-or it will see a filename it can't read and may invent the contents.
+bytes are held aside in the artifact service. An agent that only knows how to open a
+*file path* can never read the upload: there is no such path in the container. The failure
+is silent and nasty — the model sees a filename it can't open and **invents** the contents.
+
+Two ways to actually read it:
+
+- **`load_artifacts` tool** — hands the raw file to the model. Fine when the model itself
+  should read the document.
+- **Your own function tool** taking `tool_context: ToolContext`, calling
+  `await tool_context.load_artifact(name)` and extracting text from
+  `part.inline_data.data`. Prefer this when the bytes must feed *other* function tools —
+  it is deterministic, and nothing round-trips through the model.
+
+`placement_agent/resume_parser.py::parse_resume` is the second shape. Points that cost
+time: the model passes the whole marker as the filename (strip it), artifacts persist for
+the **whole session** so a later turn needs no re-upload, and a DOCX laid out in tables
+gives up nothing through `doc.paragraphs` — read `doc.tables` too.
+
+⚠️ **Set `--artifact_service_uri` when your agent reads uploads.** The deployed default is
+`InMemoryArtifactService` (`vertexai/agent_engines/templates/adk.py:1007`, verified on the
+installed SDK) — process-local memory, so an upload is only reliably there for the instance
+that received it. Back it with GCS:
+
+```bash
+adk deploy agent_engine --project=P --region=us-central1 --agent_engine_id=ID \
+  --display_name="X" --artifact_service_uri="gs://YOUR_BUCKET" my_agent
+```
 
 ### 6. Verify with CODE, not just instructions
 If your agent produces links or facts users act on, "the model promised not to make things
