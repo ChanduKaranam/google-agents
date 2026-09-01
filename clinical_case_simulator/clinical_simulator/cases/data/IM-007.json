@@ -1,0 +1,973 @@
+{
+  "case_id": "IM-007",
+  "title": "Thirst, weight loss and vomiting in a 19-year-old",
+  "specialty": "Internal Medicine",
+  "difficulty": 2,
+  "setting": "Emergency department",
+  "opening_brief": "You are a medical student in the emergency department.\n\nA 19-year-old college student has been brought in by a friend with two days of vomiting and abdominal pain. He looks unwell and is breathing heavily.\n\nAssess him, decide what you need at the bedside, and justify your reasoning.",
+  "patient": {
+    "name": "Arjun Pillai",
+    "age": 19,
+    "sex": "male",
+    "occupation": "engineering student",
+    "background": "Lives in a college hostel. Normally fit, plays football."
+  },
+  "persona": {
+    "speech_style": "Tired, speaks in short phrases because he is breathing deeply.",
+    "emotional_state": "Uncomfortable and frightened, but cooperative.",
+    "education_level": "Undergraduate student, no medical training.",
+    "knows_not": [
+      "what the doctors are testing his urine for",
+      "his blood sugar level",
+      "whether anyone in the family has a sugar problem, beyond a vague memory"
+    ],
+    "quirks": [
+      "Attributes everything to food poisoning from the hostel mess."
+    ]
+  },
+  "chief_complaint": "vomiting and abdominal pain for two days",
+  "history": {
+    "present_illness": {
+      "onset": "Vomiting started two days ago. But he has felt unwell for about three weeks.",
+      "site": "Pain all over the abdomen, no particular spot.",
+      "character": "A generalised cramping ache.",
+      "radiation": "Does not go anywhere.",
+      "duration": "Two days of vomiting; three weeks of feeling generally unwell.",
+      "severity": "Pain 5 out of 10. The tiredness is what bothers him most.",
+      "timing": "Continuous over the last two days.",
+      "aggravating": "Nothing he has identified.",
+      "relieving": "Nothing.",
+      "associated": [
+        "extremely thirsty for the last three weeks, finishing several bottles of water a day",
+        "passing urine very often, including getting up four or five times at night",
+        "lost weight — trousers are loose, thinks about 6 kg in a month",
+        "very tired, stopped going to football practice",
+        "blurred vision on and off"
+      ],
+      "progression": "The thirst and urination have been getting worse for three weeks; the vomiting and breathlessness started in the last two days."
+    },
+    "past_medical": [
+      "Never been in hospital",
+      "Had a bad throat infection about six weeks ago that settled on its own",
+      "Says nobody has ever told him he has a sugar problem, and he has no asthma"
+    ],
+    "medications": [
+      "None",
+      "Took an antacid and a paracetamol for the stomach pain"
+    ],
+    "allergies": [
+      "None known"
+    ],
+    "family": [
+      "An aunt on his mother's side takes injections every day, he thinks for her sugar",
+      "Mother has a thyroid problem"
+    ],
+    "social": [
+      "Non-smoker",
+      "Drinks alcohol very occasionally at parties, none in the last month",
+      "No drug use",
+      "Eats hostel food, has not been eating much for two days"
+    ],
+    "review_of_systems_positive": [
+      "mouth feels dry all the time",
+      "cramps in the legs"
+    ],
+    "review_of_systems_negative": [
+      "no diarrhoea",
+      "no blood in the vomit",
+      "no fever that he has measured",
+      "no cough",
+      "no burning when passing urine",
+      "no headache or neck stiffness",
+      "no chest pain",
+      "no skin infection or boils"
+    ]
+  },
+  "examination": [
+    {
+      "id": "vitals",
+      "label": "Vital signs",
+      "aliases": [
+        "vitals",
+        "vital signs",
+        "temperature",
+        "pulse",
+        "blood pressure",
+        "bp",
+        "respiratory rate",
+        "saturation",
+        "spo2",
+        "observations"
+      ],
+      "result": "Temperature 37.1 C. Pulse 124/min. BP 96/58 mmHg. Respiratory rate 30/min, deep and sighing. SpO2 99% on room air."
+    },
+    {
+      "id": "glucose",
+      "label": "Capillary blood glucose",
+      "aliases": [
+        "glucose",
+        "capillary glucose",
+        "blood sugar",
+        "rbs",
+        "glucometer",
+        "bedside glucose",
+        "sugar"
+      ],
+      "result": "HI on the glucometer (above the readable range of 500 mg/dL)."
+    },
+    {
+      "id": "ketones",
+      "label": "Capillary blood ketones",
+      "aliases": [
+        "ketones",
+        "blood ketones",
+        "capillary ketones",
+        "beta hydroxybutyrate",
+        "ketone meter"
+      ],
+      "result": "5.8 mmol/L."
+    },
+    {
+      "id": "general",
+      "label": "General examination",
+      "aliases": [
+        "general examination",
+        "hydration",
+        "dehydration",
+        "skin turgor",
+        "mucous membranes",
+        "pallor",
+        "breath",
+        "acetone",
+        "smell"
+      ],
+      "result": "Thin, unwell, visibly dehydrated with dry mucous membranes and reduced skin turgor. Sweet acetone smell on the breath. No pallor, no icterus, no rash, no lymphadenopathy."
+    },
+    {
+      "id": "breathing",
+      "label": "Pattern of breathing",
+      "aliases": [
+        "breathing pattern",
+        "kussmaul",
+        "respiratory pattern",
+        "deep breathing"
+      ],
+      "result": "Deep, laboured, regular sighing respiration — Kussmaul breathing. No use of accessory muscles for airway obstruction, no wheeze."
+    },
+    {
+      "id": "chest",
+      "label": "Respiratory examination",
+      "aliases": [
+        "chest",
+        "respiratory",
+        "lungs",
+        "auscultation",
+        "breath sounds",
+        "crackles"
+      ],
+      "result": "Chest clear, equal air entry, no crackles, no wheeze."
+    },
+    {
+      "id": "cvs",
+      "label": "Cardiovascular examination",
+      "aliases": [
+        "cardiovascular",
+        "cvs",
+        "heart sounds",
+        "murmur",
+        "jvp",
+        "capillary refill",
+        "peripheries"
+      ],
+      "result": "Sinus tachycardia. Heart sounds normal. JVP low. Capillary refill 3 seconds. Peripheries cool."
+    },
+    {
+      "id": "abdomen",
+      "label": "Abdominal examination",
+      "aliases": [
+        "abdomen",
+        "abdominal",
+        "per abdomen",
+        "tenderness",
+        "guarding",
+        "rigidity",
+        "bowel sounds"
+      ],
+      "result": "Mild generalised tenderness with no guarding or rigidity. Bowel sounds present. No organomegaly, no mass. No rebound."
+    },
+    {
+      "id": "cns",
+      "label": "Conscious level and neurological examination",
+      "aliases": [
+        "cns",
+        "conscious",
+        "gcs",
+        "neuro",
+        "neurological",
+        "orientation",
+        "neck stiffness"
+      ],
+      "result": "GCS 15, alert and fully oriented but tired. No focal deficit. No neck stiffness."
+    },
+    {
+      "id": "feet",
+      "label": "Foot and skin examination for a source of infection",
+      "aliases": [
+        "feet",
+        "foot",
+        "skin",
+        "infection",
+        "ulcer",
+        "boil",
+        "abscess",
+        "perineum"
+      ],
+      "result": "No ulcer, no cellulitis, no abscess, no dental infection. Skin intact."
+    }
+  ],
+  "investigations": [
+    {
+      "id": "abg",
+      "label": "Venous or arterial blood gas",
+      "aliases": [
+        "abg",
+        "vbg",
+        "blood gas",
+        "arterial blood gas",
+        "venous blood gas",
+        "ph",
+        "bicarbonate"
+      ],
+      "tier": "bedside",
+      "result": "pH 7.11, pCO2 18 mmHg, HCO3 7 mEq/L, base excess -21, lactate 1.4 mmol/L. Anion gap 26 mEq/L."
+    },
+    {
+      "id": "labglucose",
+      "label": "Laboratory plasma glucose",
+      "aliases": [
+        "plasma glucose",
+        "lab glucose",
+        "serum glucose",
+        "blood sugar lab"
+      ],
+      "tier": "first-line",
+      "result": "612 mg/dL (34 mmol/L)."
+    },
+    {
+      "id": "electrolytes",
+      "label": "Serum electrolytes and renal function",
+      "aliases": [
+        "electrolytes",
+        "sodium",
+        "potassium",
+        "urea",
+        "creatinine",
+        "rft",
+        "kft",
+        "renal function",
+        "bicarbonate"
+      ],
+      "tier": "first-line",
+      "result": "Sodium 129 mEq/L (corrected for glucose: 137). Potassium 5.4 mEq/L. Chloride 96. Bicarbonate 7 mEq/L. Urea 62 mg/dL. Creatinine 1.4 mg/dL. Anion gap 26."
+    },
+    {
+      "id": "urineketones",
+      "label": "Urine dipstick",
+      "aliases": [
+        "urine dipstick",
+        "urine ketones",
+        "urinalysis",
+        "urine routine",
+        "urine"
+      ],
+      "tier": "bedside",
+      "result": "Ketones 4+, glucose 4+, protein trace, no nitrites, no leucocytes, no blood."
+    },
+    {
+      "id": "cbc",
+      "label": "Complete blood count",
+      "aliases": [
+        "cbc",
+        "blood count",
+        "hemogram",
+        "haemogram",
+        "fbc",
+        "wbc"
+      ],
+      "tier": "first-line",
+      "result": "Hb 15.6 g/dL (haemoconcentrated). WBC 16,800/uL with neutrophilia — common in ketoacidosis without infection. Platelets 310,000/uL."
+    },
+    {
+      "id": "ecg",
+      "label": "12-lead ECG",
+      "aliases": [
+        "ecg",
+        "ekg",
+        "electrocardiogram"
+      ],
+      "tier": "bedside",
+      "result": "Sinus tachycardia at 122/min. Tall peaked T waves in the precordial leads consistent with hyperkalaemia. No ischaemic changes."
+    },
+    {
+      "id": "hba1c",
+      "label": "HbA1c",
+      "aliases": [
+        "hba1c",
+        "glycated haemoglobin",
+        "glycated hemoglobin",
+        "a1c"
+      ],
+      "tier": "first-line",
+      "result": "12.8% — confirming several months of hyperglycaemia rather than an acute stress response."
+    },
+    {
+      "id": "phosphate",
+      "label": "Serum phosphate and magnesium",
+      "aliases": [
+        "phosphate",
+        "magnesium",
+        "po4",
+        "mg"
+      ],
+      "tier": "second-line",
+      "result": "Phosphate 4.6 mg/dL (will fall with treatment). Magnesium 2.0 mg/dL."
+    },
+    {
+      "id": "cxr",
+      "label": "Chest X-ray",
+      "aliases": [
+        "chest x ray",
+        "cxr",
+        "chest xray",
+        "chest radiograph"
+      ],
+      "tier": "first-line",
+      "result": "Clear lung fields. No consolidation. Normal heart size."
+    },
+    {
+      "id": "cultures",
+      "label": "Blood and urine cultures",
+      "aliases": [
+        "blood culture",
+        "urine culture",
+        "cultures",
+        "septic screen"
+      ],
+      "tier": "first-line",
+      "result": "Sent. No growth at 48 hours."
+    },
+    {
+      "id": "antibodies",
+      "label": "Anti-GAD and islet autoantibodies, C-peptide",
+      "aliases": [
+        "anti gad",
+        "gad antibodies",
+        "islet antibodies",
+        "autoantibodies",
+        "c peptide",
+        "antibodies"
+      ],
+      "tier": "second-line",
+      "result": "Anti-GAD strongly positive. Anti-IA2 positive. C-peptide low at 0.2 ng/mL — confirming type 1 diabetes."
+    },
+    {
+      "id": "lipase",
+      "label": "Serum lipase",
+      "aliases": [
+        "lipase",
+        "amylase"
+      ],
+      "tier": "first-line",
+      "appropriate": false,
+      "result": "Mildly raised at 92 U/L (under three times the upper limit).",
+      "note": "Lipase is often mildly raised in ketoacidosis without pancreatitis. Ordering it is reasonable, but do not let a mild rise derail the diagnosis."
+    },
+    {
+      "id": "ctabdomen",
+      "label": "CT abdomen",
+      "aliases": [
+        "ct abdomen",
+        "ct scan",
+        "cect"
+      ],
+      "tier": "second-line",
+      "appropriate": false,
+      "result": "No acute intra-abdominal pathology.",
+      "note": "The abdominal pain of ketoacidosis resolves with treatment. Imaging before correcting the metabolic derangement wastes time and contrast in a dehydrated patient."
+    }
+  ],
+  "differentials": [
+    {
+      "dx": "Diabetic ketoacidosis",
+      "status": "correct",
+      "aliases": [
+        "dka",
+        "diabetic ketoacidosis",
+        "ketoacidosis",
+        "ketosis"
+      ],
+      "why": "The diagnostic triad is complete: glucose 612 mg/dL, ketones 5.8 mmol/L with 4+ on urine dipstick, and pH 7.11 with bicarbonate 7 and a raised anion gap."
+    },
+    {
+      "dx": "New-onset type 1 diabetes mellitus",
+      "status": "correct",
+      "aliases": [
+        "type 1 diabetes",
+        "t1dm",
+        "type 1 dm",
+        "insulin dependent diabetes",
+        "new onset diabetes"
+      ],
+      "why": "Three weeks of polyuria, polydipsia and 6 kg weight loss in a lean 19-year-old, HbA1c 12.8%, positive anti-GAD and low C-peptide. Naming the underlying disease, not just the acute complication, is required."
+    },
+    {
+      "dx": "Hyperosmolar hyperglycaemic state",
+      "status": "must-exclude",
+      "aliases": [
+        "hhs",
+        "hyperosmolar",
+        "honk",
+        "hyperglycaemic hyperosmolar"
+      ],
+      "why": "The other hyperglycaemic emergency, but it occurs in older type 2 patients with far higher glucose, minimal ketones and no acidosis. Distinguishing them matters because the fluid and insulin strategies differ.",
+      "excluded_by": [
+        "ketones",
+        "abg",
+        "labglucose"
+      ]
+    },
+    {
+      "dx": "Sepsis with lactic acidosis",
+      "status": "must-exclude",
+      "aliases": [
+        "sepsis",
+        "septic shock",
+        "lactic acidosis",
+        "infection"
+      ],
+      "why": "Tachycardia, hypotension, a raised white count and an acidosis all fit. Excluded by a lactate of 1.4, ketones of 5.8 and no source — but a precipitating infection must always be sought in ketoacidosis.",
+      "excluded_by": [
+        "abg",
+        "cultures",
+        "cxr",
+        "feet"
+      ]
+    },
+    {
+      "dx": "Surgical acute abdomen",
+      "status": "must-exclude",
+      "aliases": [
+        "acute abdomen",
+        "appendicitis",
+        "perforation",
+        "surgical abdomen",
+        "peritonitis"
+      ],
+      "why": "Ketoacidosis frequently presents with abdominal pain and a raised white count and is misdiagnosed as a surgical abdomen. Here there is no guarding, no rigidity and no rebound, and the pain settles with treatment.",
+      "excluded_by": [
+        "abdomen"
+      ]
+    },
+    {
+      "dx": "Salicylate or toxic alcohol poisoning",
+      "status": "plausible",
+      "aliases": [
+        "salicylate",
+        "aspirin",
+        "methanol",
+        "ethylene glycol",
+        "poisoning",
+        "toxic alcohol"
+      ],
+      "why": "Other causes of a raised anion gap metabolic acidosis with hyperventilation, worth considering when ketones are negative. Not the case here."
+    },
+    {
+      "dx": "Gastroenteritis",
+      "status": "incorrect",
+      "aliases": [
+        "gastroenteritis",
+        "food poisoning",
+        "stomach infection",
+        "gastritis"
+      ],
+      "why": "The patient's own explanation. It does not cause a glucose of 612, ketonuria, Kussmaul breathing or three weeks of polyuria and weight loss."
+    },
+    {
+      "dx": "Starvation ketosis",
+      "status": "incorrect",
+      "aliases": [
+        "starvation ketosis",
+        "fasting ketosis"
+      ],
+      "why": "Produces mild ketosis with normal or low glucose and rarely a pH below 7.3."
+    }
+  ],
+  "final_diagnosis": "Diabetic ketoacidosis (glucose 612 mg/dL, ketones 5.8 mmol/L, pH 7.11, bicarbonate 7, anion gap 26) as the first presentation of type 1 diabetes mellitus, with hypovolaemia, acute kidney injury and hyperkalaemia, no identified precipitating infection",
+  "diagnosis_reasoning": "Three weeks of osmotic symptoms — polyuria, polydipsia and 6 kg of weight loss in a lean adolescent — establish undiagnosed diabetes. The acute deterioration with vomiting, abdominal pain, Kussmaul breathing and ketotic breath is decompensation into ketoacidosis, confirmed by all three diagnostic criteria. HbA1c 12.8% shows this is not stress hyperglycaemia, and positive anti-GAD with a low C-peptide establishes type 1 rather than type 2. The abdominal pain and neutrophilia are consequences of the ketoacidosis, not evidence of a second illness; cultures and imaging found no precipitant, so the likely trigger is simply the natural progression of untreated beta-cell failure, possibly following the viral illness six weeks ago.",
+  "critical_clues": [
+    "polyuria",
+    "polydipsia",
+    "thirst",
+    "weight loss",
+    "kussmaul",
+    "deep breathing",
+    "ketone",
+    "acetone",
+    "anion gap",
+    "ph 7.11",
+    "glucose",
+    "dehydrat"
+  ],
+  "red_flags": [
+    "ph below 7.2",
+    "hypotension",
+    "hyperkalaemia",
+    "acute kidney injury",
+    "reduced conscious level risk"
+  ],
+  "rubric": {
+    "history": [
+      {
+        "id": "h_polyuria",
+        "label": "Polyuria, nocturia and thirst",
+        "keywords": [
+          "urine",
+          "urinat",
+          "passing water",
+          "thirst",
+          "thirsty",
+          "drink",
+          "night",
+          "nocturia",
+          "frequency",
+          "how often"
+        ],
+        "weight": 5,
+        "critical": true,
+        "teaching_note": "The osmotic symptoms are the history that makes this diagnosis. Anchoring on 'vomiting for two days' and never asking about the preceding weeks is the trap."
+      },
+      {
+        "id": "h_weightloss",
+        "label": "Weight loss",
+        "keywords": [
+          "weight",
+          "lost weight",
+          "losing",
+          "clothes",
+          "trousers",
+          "thinner"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Weight loss with polyuria in a young person is type 1 diabetes until proved otherwise."
+      },
+      {
+        "id": "h_duration",
+        "label": "Duration and time course of the whole illness",
+        "keywords": [
+          "how long",
+          "when did",
+          "started",
+          "since",
+          "weeks",
+          "before this",
+          "prior",
+          "unwell for"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Explicitly asking whether anything preceded the acute illness is what uncovers the three-week prodrome."
+      },
+      {
+        "id": "h_vomiting",
+        "label": "Vomiting and oral intake",
+        "keywords": [
+          "vomit",
+          "throwing up",
+          "nausea",
+          "eat",
+          "drink",
+          "keeping down",
+          "fluid"
+        ],
+        "weight": 3,
+        "teaching_note": "Determines the degree of fluid deficit and whether oral treatment is even possible."
+      },
+      {
+        "id": "h_precipitant",
+        "label": "Search for a precipitating illness",
+        "keywords": [
+          "fever",
+          "infection",
+          "cough",
+          "burning urine",
+          "sore throat",
+          "unwell",
+          "boil",
+          "abscess",
+          "diarrhoea",
+          "tooth"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Every episode of ketoacidosis needs a precipitant sought — infection, missed insulin, myocardial infarction or a new diagnosis."
+      },
+      {
+        "id": "h_famhx",
+        "label": "Family history of diabetes and autoimmune disease",
+        "keywords": [
+          "family",
+          "mother",
+          "father",
+          "aunt",
+          "relative",
+          "diabetes",
+          "sugar",
+          "thyroid",
+          "runs in"
+        ],
+        "weight": 3,
+        "teaching_note": "Type 1 diabetes clusters with other autoimmune disease, particularly thyroid and coeliac."
+      },
+      {
+        "id": "h_vision",
+        "label": "Visual blurring",
+        "keywords": [
+          "vision",
+          "blurred",
+          "eyes",
+          "sight",
+          "seeing"
+        ],
+        "weight": 2,
+        "teaching_note": "Osmotic lens changes are a common and reversible early symptom of hyperglycaemia."
+      },
+      {
+        "id": "h_drugs",
+        "label": "Drug and substance history",
+        "keywords": [
+          "medicine",
+          "medication",
+          "drug",
+          "tablet",
+          "steroid",
+          "alcohol",
+          "supplement"
+        ],
+        "weight": 3,
+        "teaching_note": "Steroids, alcohol and toxic ingestions all feature in the differential of an anion-gap acidosis."
+      },
+      {
+        "id": "h_abdopain",
+        "label": "Character of the abdominal pain",
+        "keywords": [
+          "pain",
+          "abdomen",
+          "stomach",
+          "where",
+          "how bad",
+          "constant",
+          "colicky"
+        ],
+        "weight": 2,
+        "teaching_note": "Diffuse pain without localisation or peritonism argues against a surgical cause."
+      },
+      {
+        "id": "h_pastdm",
+        "label": "Known diabetes and insulin use",
+        "keywords": [
+          "diabetes",
+          "sugar",
+          "insulin",
+          "diagnosed",
+          "known"
+        ],
+        "weight": 3,
+        "teaching_note": "In a known diabetic, missed insulin doses are the commonest precipitant."
+      }
+    ],
+    "examination": [
+      {
+        "id": "e_glucose",
+        "label": "Bedside capillary glucose",
+        "keywords": [
+          "glucose",
+          "sugar",
+          "rbs",
+          "glucometer",
+          "capillary",
+          "blood sugar"
+        ],
+        "weight": 5,
+        "critical": true,
+        "teaching_note": "Ten seconds, and it makes the diagnosis. There is no excuse for not doing it in any acutely unwell patient."
+      },
+      {
+        "id": "e_ketones",
+        "label": "Bedside capillary or urine ketones",
+        "keywords": [
+          "ketone",
+          "ketones",
+          "urine dipstick",
+          "dipstick"
+        ],
+        "weight": 5,
+        "critical": true,
+        "teaching_note": "Distinguishes ketoacidosis from a hyperosmolar state and from simple hyperglycaemia."
+      },
+      {
+        "id": "e_vitals",
+        "label": "Vital signs including respiratory rate",
+        "keywords": [
+          "vitals",
+          "vital signs",
+          "pulse",
+          "blood pressure",
+          "bp",
+          "respiratory rate",
+          "temperature",
+          "saturation"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "A respiratory rate of 30 in a patient with no chest signs should immediately raise metabolic acidosis."
+      },
+      {
+        "id": "e_hydration",
+        "label": "Assessment of hydration and perfusion",
+        "keywords": [
+          "hydration",
+          "dehydrat",
+          "turgor",
+          "mucous",
+          "capillary refill",
+          "peripheries",
+          "volume status",
+          "jvp"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "The fluid deficit in ketoacidosis is typically 5 to 8 litres and drives the first hour of management."
+      },
+      {
+        "id": "e_breathing",
+        "label": "Pattern of breathing and breath odour",
+        "keywords": [
+          "breathing pattern",
+          "kussmaul",
+          "deep breathing",
+          "smell",
+          "breath",
+          "acetone",
+          "odour",
+          "odor"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Kussmaul respiration and ketotic breath are classic bedside signs that students read about and then forget to look for."
+      },
+      {
+        "id": "e_abdomen",
+        "label": "Abdominal examination",
+        "keywords": [
+          "abdomen",
+          "abdominal",
+          "palpat",
+          "tender",
+          "guarding",
+          "rigidity",
+          "rebound"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Distinguishing the diffuse pain of ketoacidosis from true peritonism prevents an unnecessary laparotomy."
+      },
+      {
+        "id": "e_cns",
+        "label": "Conscious level",
+        "keywords": [
+          "gcs",
+          "conscious",
+          "alert",
+          "orientation",
+          "neuro",
+          "cns",
+          "mental"
+        ],
+        "weight": 3,
+        "teaching_note": "A falling conscious level in ketoacidosis signals severity and the risk of cerebral oedema, especially in the young."
+      },
+      {
+        "id": "e_source",
+        "label": "Examination for a source of infection",
+        "keywords": [
+          "chest",
+          "skin",
+          "feet",
+          "foot",
+          "throat",
+          "ulcer",
+          "abscess",
+          "boil",
+          "perineum",
+          "dental"
+        ],
+        "weight": 3,
+        "teaching_note": "The precipitant is often a small, easily overlooked infection."
+      }
+    ],
+    "investigations": [
+      {
+        "id": "i_abg",
+        "label": "Blood gas with pH and bicarbonate",
+        "keywords": [
+          "abg",
+          "vbg",
+          "blood gas",
+          "ph",
+          "bicarbonate",
+          "arterial",
+          "venous gas"
+        ],
+        "weight": 5,
+        "critical": true,
+        "teaching_note": "The third leg of the diagnostic triad and the marker of severity. A venous gas is sufficient — an arterial sample is rarely necessary."
+      },
+      {
+        "id": "i_ketones",
+        "label": "Blood or urine ketones",
+        "keywords": [
+          "ketone",
+          "beta hydroxybutyrate",
+          "urine dipstick",
+          "dipstick"
+        ],
+        "weight": 5,
+        "critical": true,
+        "teaching_note": "Blood beta-hydroxybutyrate is preferred: urine dipsticks measure acetoacetate and can look falsely reassuring early and falsely persistent late."
+      },
+      {
+        "id": "i_electrolytes",
+        "label": "Electrolytes, renal function and anion gap",
+        "keywords": [
+          "electrolyte",
+          "sodium",
+          "potassium",
+          "urea",
+          "creatinine",
+          "rft",
+          "kft",
+          "anion gap"
+        ],
+        "weight": 5,
+        "critical": true,
+        "teaching_note": "Potassium governs everything: total body potassium is depleted even when the serum level is high, and insulin will drive it down fast."
+      },
+      {
+        "id": "i_glucose",
+        "label": "Laboratory plasma glucose",
+        "keywords": [
+          "glucose",
+          "plasma glucose",
+          "lab glucose",
+          "sugar"
+        ],
+        "weight": 3,
+        "teaching_note": "Needed because the glucometer only reads 'HI' above its range."
+      },
+      {
+        "id": "i_ecg",
+        "label": "ECG",
+        "keywords": [
+          "ecg",
+          "ekg",
+          "electrocardiogram"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Shows hyperkalaemic changes and screens for a silent myocardial infarction as a precipitant."
+      },
+      {
+        "id": "i_cbc",
+        "label": "Complete blood count",
+        "keywords": [
+          "cbc",
+          "blood count",
+          "hemogram",
+          "haemogram",
+          "wbc"
+        ],
+        "weight": 2,
+        "teaching_note": "Interpret with care — a neutrophilia is expected in ketoacidosis and does not by itself indicate infection."
+      },
+      {
+        "id": "i_septicscreen",
+        "label": "Chest X-ray, blood and urine cultures",
+        "keywords": [
+          "chest x ray",
+          "cxr",
+          "blood culture",
+          "urine culture",
+          "septic screen",
+          "cultures"
+        ],
+        "weight": 3,
+        "teaching_note": "A precipitant should be actively looked for in every case."
+      },
+      {
+        "id": "i_hba1c",
+        "label": "HbA1c",
+        "keywords": [
+          "hba1c",
+          "glycated",
+          "a1c"
+        ],
+        "weight": 3,
+        "teaching_note": "Separates a new chronic diagnosis from acute stress hyperglycaemia."
+      },
+      {
+        "id": "i_antibodies",
+        "label": "Islet autoantibodies and C-peptide",
+        "keywords": [
+          "gad",
+          "antibodies",
+          "autoantibod",
+          "c peptide",
+          "islet"
+        ],
+        "weight": 3,
+        "teaching_note": "Confirms type 1 and commits the patient to lifelong insulin — an important conversation to get right at diagnosis."
+      }
+    ]
+  },
+  "hints": [
+    "The vomiting is two days old, but ask yourself what he told you about the previous three weeks.",
+    "He is breathing deeply with a clear chest and normal saturations. What is the body compensating for, and what would you measure at the bedside to find out?",
+    "Review the metabolic emergencies that produce a raised anion gap acidosis with a very high blood sugar, and how the two hyperglycaemic emergencies differ from each other."
+  ],
+  "teaching_points": [
+    "Check a capillary glucose in every acutely unwell patient. It takes seconds and here it is the whole diagnosis.",
+    "Diabetic ketoacidosis is defined by all three of: hyperglycaemia (or known diabetes), ketonaemia, and metabolic acidosis. Any one alone is not enough.",
+    "Deep sighing breathing with a clear chest and normal saturations means metabolic acidosis, not a respiratory problem.",
+    "Abdominal pain and a neutrophilia are common features of ketoacidosis itself. Do not rush to a surgical diagnosis before the metabolic state is corrected.",
+    "Serum potassium is usually high on arrival while total body potassium is profoundly depleted. Insulin without potassium replacement can be fatal.",
+    "Fluid first, then insulin. Always look for a precipitant.",
+    "Do not measure a glucose and stop there — the underlying question is what type of diabetes this is."
+  ],
+  "revision_topics": [
+    "Diagnosis and management of diabetic ketoacidosis, including fluid and potassium protocols",
+    "Diabetic ketoacidosis versus hyperosmolar hyperglycaemic state",
+    "Causes of a raised anion gap metabolic acidosis",
+    "Classification of diabetes mellitus and the investigation of new-onset diabetes in the young"
+  ],
+  "provenance": {
+    "author": "Simulator seed content",
+    "reviewed_by": "",
+    "review_date": "",
+    "status": "draft",
+    "references": [
+      "Joint British Diabetes Societies guideline: the management of diabetic ketoacidosis in adults",
+      "ADA Standards of Care: classification and diagnosis of diabetes"
+    ]
+  }
+}

@@ -1,0 +1,895 @@
+{
+  "case_id": "IM-002",
+  "title": "Central chest discomfort in a 54-year-old man",
+  "specialty": "Internal Medicine",
+  "difficulty": 2,
+  "setting": "Emergency department",
+  "opening_brief": "You are a medical student working in the emergency department.\n\nA 54-year-old male has presented with chest discomfort.\n\nYour objective is to assess the patient, gather relevant information, identify possible diagnoses, and explain your clinical reasoning.",
+  "patient": {
+    "name": "Rajesh Menon",
+    "age": 54,
+    "sex": "male",
+    "occupation": "bank manager",
+    "background": "Sedentary desk job. Came in with his wife, who insisted."
+  },
+  "persona": {
+    "speech_style": "Understates things. Calls it 'discomfort', not pain.",
+    "emotional_state": "Playing it down, but visibly uneasy and sweaty.",
+    "education_level": "Graduate, no medical training.",
+    "knows_not": [
+      "his cholesterol level",
+      "the name of his blood pressure tablet, only that it is 'a small white one'",
+      "whether his ECG has ever been done before"
+    ],
+    "quirks": [
+      "Says 'it's probably just gas' if the student pauses too long."
+    ]
+  },
+  "chief_complaint": "chest discomfort since this morning",
+  "history": {
+    "present_illness": {
+      "onset": "Started around 7 this morning while walking to the bus stop.",
+      "site": "Middle of the chest, behind the breastbone.",
+      "character": "A heaviness, like something pressing down. Not sharp.",
+      "radiation": "Sometimes goes into the left arm, and up into the jaw.",
+      "duration": "Comes and goes; the current episode has lasted about 40 minutes.",
+      "severity": "About 6 out of 10 at its worst.",
+      "timing": "Worse in the morning and on any exertion.",
+      "aggravating": "Walking, especially uphill or in a hurry. Also came on after a heavy meal once last week.",
+      "relieving": "Stopping and standing still eases it within a few minutes.",
+      "associated": [
+        "sweating heavily during the episodes",
+        "feeling sick in the stomach",
+        "short of breath during the worst episode"
+      ],
+      "progression": "Similar but milder episodes for about three weeks; today is the worst and the first one that did not settle quickly."
+    },
+    "past_medical": [
+      "High blood pressure, diagnosed about six years ago",
+      "Told his blood sugar was 'borderline' at a health check two years ago; no follow-up",
+      "No previous heart attack or stroke"
+    ],
+    "medications": [
+      "One small white blood pressure tablet every morning, takes it most days",
+      "An antacid he bought himself, which did not help today"
+    ],
+    "allergies": [
+      "None known"
+    ],
+    "family": [
+      "Father had a heart attack at 52 and died at 60",
+      "Elder brother had a stent put in at 55"
+    ],
+    "social": [
+      "Smokes 15 cigarettes a day for about 30 years",
+      "Drinks alcohol two or three times a week",
+      "No exercise at all",
+      "Works long hours, eats out often"
+    ],
+    "review_of_systems_positive": [
+      "occasional heartburn after spicy food, but different from this",
+      "gained about 6 kg in two years"
+    ],
+    "review_of_systems_negative": [
+      "no fever",
+      "no cough",
+      "no leg swelling or calf pain",
+      "no recent travel or long journeys",
+      "no vomiting blood or black stools",
+      "no pain on pressing the chest wall",
+      "no palpitations that he has noticed",
+      "no blackouts"
+    ]
+  },
+  "examination": [
+    {
+      "id": "vitals",
+      "label": "Vital signs",
+      "aliases": [
+        "vitals",
+        "vital signs",
+        "temperature",
+        "pulse",
+        "blood pressure",
+        "bp",
+        "respiratory rate",
+        "saturation",
+        "spo2",
+        "observations"
+      ],
+      "result": "Pulse 96/min regular. BP 156/94 mmHg in the right arm, 152/92 in the left. Respiratory rate 18/min. SpO2 97% on room air. Temperature 36.9 C."
+    },
+    {
+      "id": "general",
+      "label": "General examination",
+      "aliases": [
+        "general examination",
+        "general exam",
+        "pallor",
+        "sweating",
+        "clubbing",
+        "cyanosis",
+        "xanthelasma",
+        "bmi"
+      ],
+      "result": "Centrally obese, clammy and sweaty. Xanthelasma over both eyelids. No pallor, no cyanosis, no clubbing."
+    },
+    {
+      "id": "cvs",
+      "label": "Cardiovascular examination",
+      "aliases": [
+        "cardiovascular",
+        "cvs",
+        "heart sounds",
+        "heart examination",
+        "apex beat",
+        "murmur",
+        "precordium"
+      ],
+      "result": "Apex beat in the fifth space, mid-clavicular line, not heaving. Heart sounds S1 and S2 normal, a soft S4 audible. No murmur, no rub, no gallop."
+    },
+    {
+      "id": "jvp",
+      "label": "Jugular venous pressure",
+      "aliases": [
+        "jvp",
+        "jugular venous pressure",
+        "neck veins"
+      ],
+      "result": "Not elevated."
+    },
+    {
+      "id": "peripheral_pulses",
+      "label": "Peripheral pulses and BP in both arms",
+      "aliases": [
+        "peripheral pulses",
+        "radial",
+        "femoral",
+        "pulses",
+        "both arms",
+        "radiofemoral delay"
+      ],
+      "result": "All peripheral pulses present and symmetrical. No radio-femoral delay. No inter-arm BP difference beyond 4 mmHg."
+    },
+    {
+      "id": "chest",
+      "label": "Respiratory examination",
+      "aliases": [
+        "chest",
+        "respiratory",
+        "auscultation",
+        "lungs",
+        "breath sounds",
+        "crepitations"
+      ],
+      "result": "Chest clear, equal air entry, no crackles, no wheeze."
+    },
+    {
+      "id": "chestwall",
+      "label": "Chest wall palpation",
+      "aliases": [
+        "chest wall",
+        "palpation",
+        "tenderness",
+        "press on the chest",
+        "costochondral"
+      ],
+      "result": "No tenderness on palpation. The discomfort is not reproduced by pressing."
+    },
+    {
+      "id": "abdomen",
+      "label": "Abdominal examination",
+      "aliases": [
+        "abdomen",
+        "abdominal examination",
+        "epigastric",
+        "per abdomen"
+      ],
+      "result": "Soft, mild epigastric fullness, no tenderness, no organomegaly."
+    },
+    {
+      "id": "legs",
+      "label": "Lower limb examination",
+      "aliases": [
+        "legs",
+        "calf",
+        "pedal oedema",
+        "leg swelling",
+        "dvt",
+        "homans"
+      ],
+      "result": "No calf tenderness, no swelling, no oedema."
+    }
+  ],
+  "investigations": [
+    {
+      "id": "ecg",
+      "label": "12-lead ECG",
+      "aliases": [
+        "ecg",
+        "ekg",
+        "electrocardiogram",
+        "12 lead"
+      ],
+      "tier": "bedside",
+      "result": "Sinus rhythm at 96/min. Horizontal ST depression of 1.5 mm in leads V4 to V6, with T-wave inversion in II, III and aVF. No ST elevation. No pathological Q waves."
+    },
+    {
+      "id": "troponin",
+      "label": "High-sensitivity troponin",
+      "aliases": [
+        "troponin",
+        "trop",
+        "cardiac enzymes",
+        "hs troponin",
+        "cardiac markers",
+        "ck mb"
+      ],
+      "tier": "first-line",
+      "result": "Troponin I at presentation 214 ng/L (upper reference limit 34). Repeat at 3 hours: 890 ng/L."
+    },
+    {
+      "id": "cxr",
+      "label": "Chest X-ray",
+      "aliases": [
+        "chest x ray",
+        "chest xray",
+        "cxr",
+        "chest radiograph"
+      ],
+      "tier": "first-line",
+      "result": "Normal cardiac size. Clear lung fields. Mediastinum not widened."
+    },
+    {
+      "id": "cbc",
+      "label": "Complete blood count",
+      "aliases": [
+        "cbc",
+        "blood count",
+        "fbc",
+        "hemogram",
+        "haemogram"
+      ],
+      "tier": "first-line",
+      "result": "Hb 14.8 g/dL. WBC 9,200/uL. Platelets 240,000/uL."
+    },
+    {
+      "id": "glucose",
+      "label": "Blood glucose and HbA1c",
+      "aliases": [
+        "glucose",
+        "sugar",
+        "rbs",
+        "blood sugar",
+        "hba1c",
+        "glycated"
+      ],
+      "tier": "first-line",
+      "result": "Random glucose 178 mg/dL. HbA1c 7.4%."
+    },
+    {
+      "id": "lipids",
+      "label": "Fasting lipid profile",
+      "aliases": [
+        "lipid",
+        "lipids",
+        "cholesterol",
+        "ldl",
+        "triglyceride",
+        "lipid profile"
+      ],
+      "tier": "first-line",
+      "result": "Total cholesterol 248 mg/dL, LDL 172 mg/dL, HDL 33 mg/dL, triglycerides 214 mg/dL."
+    },
+    {
+      "id": "rft",
+      "label": "Renal function and electrolytes",
+      "aliases": [
+        "rft",
+        "renal",
+        "urea",
+        "creatinine",
+        "electrolytes",
+        "kft",
+        "potassium"
+      ],
+      "tier": "first-line",
+      "result": "Urea 30 mg/dL, creatinine 1.1 mg/dL, Na 139, K 4.3 mEq/L."
+    },
+    {
+      "id": "echo",
+      "label": "Transthoracic echocardiogram",
+      "aliases": [
+        "echo",
+        "echocardiogram",
+        "2d echo",
+        "cardiac echo"
+      ],
+      "tier": "second-line",
+      "result": "Hypokinesia of the mid and apical anterolateral wall. Left ventricular ejection fraction 46%. No pericardial effusion. No aortic dissection flap seen."
+    },
+    {
+      "id": "ddimer",
+      "label": "D-dimer",
+      "aliases": [
+        "d dimer",
+        "ddimer"
+      ],
+      "tier": "first-line",
+      "appropriate": false,
+      "result": "480 ng/mL (reference <500).",
+      "note": "Low pre-test probability for pulmonary embolism here; a positive result would only have generated a needless CT."
+    },
+    {
+      "id": "ctpa",
+      "label": "CT pulmonary angiogram",
+      "aliases": [
+        "ctpa",
+        "ct pulmonary angiogram",
+        "ct angio",
+        "ct angiography",
+        "ct chest"
+      ],
+      "tier": "second-line",
+      "appropriate": false,
+      "result": "No pulmonary embolus. No aortic dissection. Incidental hepatic steatosis.",
+      "note": "Not indicated with a low Wells score and an ischaemic ECG; delays reperfusion decisions."
+    },
+    {
+      "id": "ugi",
+      "label": "Upper GI endoscopy",
+      "aliases": [
+        "endoscopy",
+        "ugi scopy",
+        "gastroscopy",
+        "opd scopy"
+      ],
+      "tier": "specialist",
+      "appropriate": false,
+      "result": "Mild antral gastritis. No ulcer.",
+      "note": "Never the first move in undifferentiated chest pain with cardiac risk factors."
+    }
+  ],
+  "differentials": [
+    {
+      "dx": "Acute coronary syndrome (NSTEMI)",
+      "status": "correct",
+      "aliases": [
+        "acs",
+        "nstemi",
+        "non st elevation myocardial infarction",
+        "myocardial infarction",
+        "unstable angina",
+        "heart attack",
+        "ischemic heart disease",
+        "ischaemic heart disease",
+        "coronary"
+      ],
+      "why": "Exertional retrosternal heaviness radiating to arm and jaw with diaphoresis, on a background of multiple risk factors, with ischaemic ST depression and a rising troponin."
+    },
+    {
+      "dx": "Aortic dissection",
+      "status": "must-exclude",
+      "aliases": [
+        "dissection",
+        "aortic dissection"
+      ],
+      "why": "Catastrophic if missed and the treatment is opposite to that of ACS. Argued against by the absence of tearing pain, inter-arm BP difference, pulse deficit or a widened mediastinum.",
+      "excluded_by": [
+        "peripheral_pulses",
+        "cxr",
+        "vitals"
+      ]
+    },
+    {
+      "dx": "Pulmonary embolism",
+      "status": "must-exclude",
+      "aliases": [
+        "pe",
+        "pulmonary embolism",
+        "embolus"
+      ],
+      "why": "Another life-threatening cause of chest pain with breathlessness. Low Wells score, no risk factors, normal saturations and no right-heart strain make it unlikely.",
+      "excluded_by": [
+        "legs",
+        "ddimer",
+        "ctpa"
+      ]
+    },
+    {
+      "dx": "Stable angina",
+      "status": "plausible",
+      "aliases": [
+        "angina",
+        "stable angina",
+        "exertional angina"
+      ],
+      "why": "The three-week pattern was stable angina; the failure of today's episode to settle and the troponin rise mark the change to an acute coronary syndrome."
+    },
+    {
+      "dx": "Gastro-oesophageal reflux disease",
+      "status": "plausible",
+      "aliases": [
+        "gerd",
+        "reflux",
+        "acidity",
+        "gastritis",
+        "oesophageal spasm",
+        "esophageal spasm"
+      ],
+      "why": "The patient's own explanation, and postprandial episodes fit — but reflux is not relieved by rest and does not raise troponin."
+    },
+    {
+      "dx": "Pericarditis",
+      "status": "plausible",
+      "aliases": [
+        "pericarditis"
+      ],
+      "why": "No pleuritic or positional pain, no rub, no saddle ST elevation with PR depression."
+    },
+    {
+      "dx": "Musculoskeletal chest pain",
+      "status": "incorrect",
+      "aliases": [
+        "costochondritis",
+        "musculoskeletal",
+        "muscle pain"
+      ],
+      "why": "The pain is not reproducible on palpation and is exertional."
+    }
+  ],
+  "final_diagnosis": "Non-ST-elevation myocardial infarction (NSTEMI) on a background of crescendo angina, in a patient with hypertension, undiagnosed type 2 diabetes, dyslipidaemia, smoking and a strong family history",
+  "diagnosis_reasoning": "Exertional retrosternal heaviness radiating to the left arm and jaw, relieved by rest, with diaphoresis and nausea, is textbook ischaemic cardiac pain. The three-week crescendo pattern culminating in a prolonged episode at rest defines an acute coronary syndrome. Ischaemic ST depression without ST elevation, plus a troponin that rises from 214 to 890 ng/L, makes it an NSTEMI rather than unstable angina. Regional hypokinesia on echo in a matching territory confirms it.",
+  "critical_clues": [
+    "radiat",
+    "left arm",
+    "jaw",
+    "exertion",
+    "relieved by rest",
+    "sweat",
+    "diaphoresis",
+    "st depression",
+    "troponin",
+    "family history",
+    "smok"
+  ],
+  "red_flags": [
+    "prolonged pain at rest",
+    "diaphoresis",
+    "dynamic ecg changes",
+    "rising troponin"
+  ],
+  "rubric": {
+    "history": [
+      {
+        "id": "h_site",
+        "label": "Site of the pain",
+        "keywords": [
+          "where",
+          "which part",
+          "point to",
+          "site",
+          "location",
+          "exactly is the pain"
+        ],
+        "weight": 2,
+        "teaching_note": "Central retrosternal location is one half of the classic description."
+      },
+      {
+        "id": "h_character",
+        "label": "Character of the pain",
+        "keywords": [
+          "what kind",
+          "what does it feel",
+          "describe the pain",
+          "sharp",
+          "heavy",
+          "heaviness",
+          "pressing",
+          "burning",
+          "type of pain"
+        ],
+        "weight": 2,
+        "critical": true,
+        "teaching_note": "Heaviness or pressure points to ischaemia; sharp and stabbing points elsewhere."
+      },
+      {
+        "id": "h_radiation",
+        "label": "Radiation of the pain",
+        "keywords": [
+          "radiate",
+          "spread",
+          "move anywhere",
+          "go anywhere",
+          "travel",
+          "arm",
+          "jaw",
+          "shoulder",
+          "back"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Radiation to the left arm and jaw roughly doubles the likelihood of an acute coronary syndrome. Radiation to the back would raise dissection instead."
+      },
+      {
+        "id": "h_onset",
+        "label": "Onset and timing",
+        "keywords": [
+          "when did",
+          "how long",
+          "start",
+          "began",
+          "onset",
+          "since",
+          "how many"
+        ],
+        "weight": 2,
+        "teaching_note": "Duration decides whether this is stable angina or an acute coronary syndrome."
+      },
+      {
+        "id": "h_aggravating",
+        "label": "Aggravating factors, especially exertion",
+        "keywords": [
+          "worse",
+          "aggravat",
+          "bring it on",
+          "when you walk",
+          "exertion",
+          "exercise",
+          "activity",
+          "climbing"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Reproducible exertional onset is the single most useful discriminator between cardiac and non-cardiac chest pain."
+      },
+      {
+        "id": "h_relieving",
+        "label": "Relieving factors",
+        "keywords": [
+          "better",
+          "reliev",
+          "ease",
+          "rest",
+          "stopping",
+          "antacid",
+          "sit down"
+        ],
+        "weight": 2,
+        "teaching_note": "Relief within minutes of rest is characteristic of angina."
+      },
+      {
+        "id": "h_associated",
+        "label": "Associated autonomic and cardiorespiratory symptoms",
+        "keywords": [
+          "sweat",
+          "diaphoresis",
+          "nausea",
+          "vomit",
+          "short of breath",
+          "breathless",
+          "dizzy",
+          "faint",
+          "palpitation",
+          "anything else"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Diaphoresis, nausea and dyspnoea with chest pain markedly raise the probability of infarction. This is the classic omission in a student history."
+      },
+      {
+        "id": "h_previous",
+        "label": "Previous similar episodes",
+        "keywords": [
+          "happened before",
+          "similar",
+          "previous",
+          "first time",
+          "episodes",
+          "ever had"
+        ],
+        "weight": 2,
+        "teaching_note": "A crescendo pattern over weeks is the natural history of an evolving acute coronary syndrome."
+      },
+      {
+        "id": "h_riskfactors",
+        "label": "Cardiac risk factors: hypertension, diabetes, lipids",
+        "keywords": [
+          "blood pressure",
+          "hypertension",
+          "diabetes",
+          "sugar",
+          "cholesterol",
+          "lipid",
+          "medical problem",
+          "past medical",
+          "any illness"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Pre-test probability is built from risk factors; without them the ECG and troponin cannot be interpreted properly."
+      },
+      {
+        "id": "h_smoking",
+        "label": "Smoking history",
+        "keywords": [
+          "smoke",
+          "smoking",
+          "cigarette",
+          "tobacco",
+          "bidi"
+        ],
+        "weight": 2,
+        "critical": true,
+        "teaching_note": "The strongest modifiable risk factor in this age group."
+      },
+      {
+        "id": "h_family",
+        "label": "Family history of premature coronary disease",
+        "keywords": [
+          "family",
+          "father",
+          "mother",
+          "brother",
+          "sister",
+          "parents",
+          "relatives",
+          "runs in"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "A first-degree relative with coronary disease before 55 is an independent risk factor and is present here."
+      },
+      {
+        "id": "h_meds",
+        "label": "Current medication and compliance",
+        "keywords": [
+          "medicine",
+          "medication",
+          "tablet",
+          "drug",
+          "taking anything",
+          "compliance"
+        ],
+        "weight": 1,
+        "teaching_note": "Poor compliance with antihypertensives explains the uncontrolled BP."
+      },
+      {
+        "id": "h_dvt",
+        "label": "Risk factors for venous thromboembolism",
+        "keywords": [
+          "travel",
+          "flight",
+          "journey",
+          "immobil",
+          "surgery",
+          "leg swelling",
+          "calf",
+          "bed rest"
+        ],
+        "weight": 2,
+        "teaching_note": "Consciously excluding pulmonary embolism is part of a safe chest-pain history."
+      },
+      {
+        "id": "h_gi",
+        "label": "Reflux, indigestion and relation to meals",
+        "keywords": [
+          "heartburn",
+          "acidity",
+          "reflux",
+          "food",
+          "meal",
+          "eating",
+          "indigestion",
+          "stomach"
+        ],
+        "weight": 1,
+        "teaching_note": "Worth asking, but never enough on its own to discharge a patient with cardiac risk factors."
+      }
+    ],
+    "examination": [
+      {
+        "id": "e_vitals",
+        "label": "Vital signs, including BP in both arms",
+        "keywords": [
+          "vitals",
+          "vital signs",
+          "pulse",
+          "blood pressure",
+          "bp",
+          "saturation",
+          "spo2",
+          "both arms",
+          "respiratory rate",
+          "temperature"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "An inter-arm difference is the bedside screen for dissection before anticoagulation is given."
+      },
+      {
+        "id": "e_cvs",
+        "label": "Cardiovascular examination",
+        "keywords": [
+          "cardiovascular",
+          "cvs",
+          "heart",
+          "apex",
+          "murmur",
+          "heart sounds",
+          "precordium"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "A new murmur would suggest a mechanical complication; a rub would suggest pericarditis."
+      },
+      {
+        "id": "e_jvp",
+        "label": "Jugular venous pressure",
+        "keywords": [
+          "jvp",
+          "jugular",
+          "neck vein"
+        ],
+        "weight": 2,
+        "teaching_note": "A raised JVP with clear lungs points to right ventricular infarction or pulmonary embolism."
+      },
+      {
+        "id": "e_chest",
+        "label": "Respiratory examination",
+        "keywords": [
+          "chest",
+          "lung",
+          "respiratory",
+          "auscultat",
+          "breath sounds",
+          "crackles"
+        ],
+        "weight": 2,
+        "teaching_note": "Basal crackles would signal Killip class II and change the prognosis."
+      },
+      {
+        "id": "e_legs",
+        "label": "Legs for DVT and oedema",
+        "keywords": [
+          "leg",
+          "calf",
+          "oedema",
+          "edema",
+          "dvt",
+          "ankle"
+        ],
+        "weight": 1,
+        "teaching_note": "Part of consciously excluding pulmonary embolism."
+      },
+      {
+        "id": "e_chestwall",
+        "label": "Chest wall palpation",
+        "keywords": [
+          "chest wall",
+          "palpat",
+          "tender",
+          "press"
+        ],
+        "weight": 1,
+        "teaching_note": "Reproducible tenderness argues for a musculoskeletal cause, though it never excludes ischaemia."
+      }
+    ],
+    "investigations": [
+      {
+        "id": "i_ecg",
+        "label": "12-lead ECG",
+        "keywords": [
+          "ecg",
+          "ekg",
+          "electrocardiogram"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Must be obtained within 10 minutes of arrival for any adult with chest pain. It is the decision point between STEMI and non-STEMI pathways."
+      },
+      {
+        "id": "i_troponin",
+        "label": "Serial troponin",
+        "keywords": [
+          "troponin",
+          "cardiac enzyme",
+          "cardiac marker",
+          "trop"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "A single troponin is not enough; the rise and fall over 3 hours is what distinguishes infarction from a chronically elevated baseline."
+      },
+      {
+        "id": "i_cxr",
+        "label": "Chest X-ray",
+        "keywords": [
+          "chest x ray",
+          "chest xray",
+          "cxr",
+          "chest radiograph"
+        ],
+        "weight": 2,
+        "teaching_note": "Screens for a widened mediastinum, pneumothorax and pulmonary oedema."
+      },
+      {
+        "id": "i_glucose",
+        "label": "Blood glucose and HbA1c",
+        "keywords": [
+          "glucose",
+          "sugar",
+          "hba1c",
+          "rbs"
+        ],
+        "weight": 2,
+        "teaching_note": "Uncovers the undiagnosed diabetes driving his risk."
+      },
+      {
+        "id": "i_lipids",
+        "label": "Lipid profile",
+        "keywords": [
+          "lipid",
+          "cholesterol",
+          "ldl",
+          "triglyceride"
+        ],
+        "weight": 2,
+        "teaching_note": "Needed for secondary prevention, and best taken early in the admission."
+      },
+      {
+        "id": "i_rft",
+        "label": "Renal function and electrolytes",
+        "keywords": [
+          "renal",
+          "urea",
+          "creatinine",
+          "electrolyte",
+          "potassium",
+          "rft",
+          "kft"
+        ],
+        "weight": 2,
+        "teaching_note": "Determines contrast safety before angiography and guides drug dosing."
+      },
+      {
+        "id": "i_echo",
+        "label": "Echocardiogram",
+        "keywords": [
+          "echo",
+          "echocardiogram"
+        ],
+        "weight": 2,
+        "teaching_note": "Regional wall-motion abnormality localises the infarct and quantifies ventricular function."
+      }
+    ]
+  },
+  "hints": [
+    "Go back to what the patient told you about when the discomfort comes on and what makes it stop.",
+    "Think about conditions in which symptoms appear on exertion and settle with rest, and what that pattern implies about supply and demand.",
+    "Review the structured approach to acute chest pain: the three diagnoses that must be excluded before anything else, and how the ECG and troponin separate them."
+  ],
+  "teaching_points": [
+    "Exertional retrosternal heaviness with radiation to the arm or jaw, relieved by rest and accompanied by diaphoresis, is ischaemic until proven otherwise, whatever the patient calls it.",
+    "Every adult with chest pain needs an ECG within 10 minutes, and troponin measured serially rather than once.",
+    "Aortic dissection must be excluded before anticoagulating: ask about tearing pain radiating to the back, check both arms, look at the mediastinum.",
+    "A normal initial troponin never excludes an acute coronary syndrome; a normal ECG never excludes one either.",
+    "The absence of chest-wall tenderness does not confirm cardiac pain, but its presence does not exclude it."
+  ],
+  "revision_topics": [
+    "Structured approach to acute chest pain and its red-flag features",
+    "ECG localisation of ischaemia and infarction",
+    "NSTEMI versus unstable angina versus STEMI: definitions and initial management",
+    "Cardiovascular risk factor assessment"
+  ],
+  "provenance": {
+    "author": "Simulator seed content",
+    "reviewed_by": "",
+    "review_date": "",
+    "status": "draft",
+    "references": [
+      "Fourth Universal Definition of Myocardial Infarction",
+      "ESC guidelines on acute coronary syndromes without persistent ST elevation"
+    ]
+  }
+}

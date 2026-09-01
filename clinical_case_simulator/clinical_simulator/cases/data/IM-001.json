@@ -1,0 +1,845 @@
+{
+  "case_id": "IM-001",
+  "title": "Fever and cough in a 42-year-old man",
+  "specialty": "Internal Medicine",
+  "difficulty": 1,
+  "setting": "Outpatient medicine clinic",
+  "opening_brief": "You are a medical student in the general medicine outpatient clinic.\n\nA 42-year-old man has come in with fever and cough for the last three days.\n\nYour objective is to take a history, examine him, select appropriate investigations, build a differential diagnosis and explain your reasoning.",
+  "patient": {
+    "name": "Suresh Nair",
+    "age": 42,
+    "sex": "male",
+    "occupation": "auto-rickshaw driver",
+    "background": "Lives with his wife and two children. Has not seen a doctor in years."
+  },
+  "persona": {
+    "speech_style": "Plain, slightly breathless, gives short answers.",
+    "emotional_state": "Uncomfortable and tired, wants to feel better quickly.",
+    "education_level": "Finished school; no medical knowledge.",
+    "knows_not": [
+      "his exact temperature readings",
+      "the names of any medicines beyond 'a fever tablet'",
+      "what his blood pressure usually is"
+    ],
+    "quirks": [
+      "Coughs mid-sentence when talking for too long."
+    ]
+  },
+  "chief_complaint": "fever with cough for three days",
+  "history": {
+    "present_illness": {
+      "onset": "Started three days ago, quite suddenly, with a shaking chill.",
+      "site": "Chest pain on the right side, low down, near the ribs.",
+      "character": "The chest pain is sharp, like a catch.",
+      "radiation": "Does not go anywhere else.",
+      "duration": "Three days, continuous.",
+      "severity": "Fever feels high; pain 6 out of 10 when it comes.",
+      "timing": "Fever is worse in the evening. Cough is all day.",
+      "aggravating": "Deep breathing and coughing make the chest pain much worse.",
+      "relieving": "Lying still on the painful side helps a little. A fever tablet helped briefly.",
+      "associated": [
+        "cough bringing up thick rusty-brown phlegm",
+        "feeling short of breath when walking to the toilet",
+        "sweating at night",
+        "no appetite"
+      ],
+      "progression": "Getting worse each day, especially the breathlessness."
+    },
+    "past_medical": [
+      "No diabetes or blood pressure that he knows of",
+      "Had jaundice as a teenager, recovered fully",
+      "Never admitted to hospital"
+    ],
+    "medications": [
+      "Only a paracetamol tablet bought from the pharmacy"
+    ],
+    "allergies": [
+      "None known"
+    ],
+    "family": [
+      "Father died of a heart attack at 60",
+      "No family history of TB"
+    ],
+    "social": [
+      "Smokes about 10 bidis a day for 20 years",
+      "Drinks alcohol occasionally, on weekends",
+      "No recent travel",
+      "No known contact with anyone coughing for a long time"
+    ],
+    "review_of_systems_positive": [
+      "chest hurts when breathing in deeply",
+      "feels weak and tired"
+    ],
+    "review_of_systems_negative": [
+      "no blood in the phlegm",
+      "no weight loss",
+      "no leg swelling",
+      "no vomiting",
+      "no burning when passing urine",
+      "no rash",
+      "no joint pain"
+    ]
+  },
+  "examination": [
+    {
+      "id": "vitals",
+      "label": "Vital signs",
+      "aliases": [
+        "vitals",
+        "vital signs",
+        "temperature",
+        "pulse",
+        "blood pressure",
+        "bp",
+        "respiratory rate",
+        "saturation",
+        "spo2",
+        "observations"
+      ],
+      "result": "Temperature 39.1 C. Pulse 108/min regular. BP 118/74 mmHg. Respiratory rate 26/min. SpO2 92% on room air."
+    },
+    {
+      "id": "general",
+      "label": "General examination",
+      "aliases": [
+        "general examination",
+        "general exam",
+        "pallor",
+        "cyanosis",
+        "clubbing",
+        "icterus",
+        "lymph nodes",
+        "hydration"
+      ],
+      "result": "Unwell, flushed, breathing shallowly. No pallor, no cyanosis, no clubbing, no icterus. No palpable lymph nodes. Mildly dehydrated."
+    },
+    {
+      "id": "respiratory",
+      "label": "Full respiratory examination",
+      "aliases": [
+        "respiratory system",
+        "respiratory examination",
+        "respiratory exam",
+        "examine the respiratory system",
+        "chest examination",
+        "examine the chest",
+        "full respiratory examination",
+        "respiratory",
+        "examine his chest",
+        "chest exam"
+      ],
+      "result": "Inspection: reduced movement of the right lower chest, no scars or deformity. Percussion: dull over the right lower zone posteriorly, resonant elsewhere. Auscultation: bronchial breath sounds with coarse end-inspiratory crackles over the right lower zone, with increased vocal resonance in the same area. Left lung clear."
+    },
+    {
+      "id": "resp_inspection",
+      "label": "Respiratory inspection and expansion",
+      "aliases": [
+        "inspection",
+        "chest movement",
+        "chest expansion",
+        "expansion"
+      ],
+      "result": "Reduced movement of the right lower chest. No scars or deformity."
+    },
+    {
+      "id": "percussion",
+      "label": "Chest percussion",
+      "aliases": [
+        "percussion",
+        "percuss"
+      ],
+      "result": "Dull to percussion over the right lower zone posteriorly. Resonant elsewhere."
+    },
+    {
+      "id": "auscultation",
+      "label": "Chest auscultation",
+      "aliases": [
+        "auscultation",
+        "auscultate",
+        "breath sounds",
+        "listen to the chest",
+        "crepitations",
+        "crackles"
+      ],
+      "result": "Bronchial breath sounds with coarse end-inspiratory crackles over the right lower zone. Increased vocal resonance in the same area. Left lung clear."
+    },
+    {
+      "id": "cvs",
+      "label": "Cardiovascular examination",
+      "aliases": [
+        "cardiovascular",
+        "cvs",
+        "heart sounds",
+        "heart examination",
+        "jvp",
+        "murmur"
+      ],
+      "result": "Heart sounds normal, no murmur. JVP not raised. No pedal oedema."
+    },
+    {
+      "id": "abdomen",
+      "label": "Abdominal examination",
+      "aliases": [
+        "abdomen",
+        "abdominal examination",
+        "per abdomen",
+        "liver",
+        "spleen"
+      ],
+      "result": "Soft, non-tender. Liver and spleen not enlarged."
+    },
+    {
+      "id": "legs",
+      "label": "Lower limb examination",
+      "aliases": [
+        "legs",
+        "leg",
+        "calf",
+        "calves",
+        "calf tenderness",
+        "leg swelling",
+        "pedal oedema",
+        "pedal edema",
+        "ankle",
+        "dvt",
+        "lower limb",
+        "homans",
+        "oedema",
+        "edema",
+        "both legs"
+      ],
+      "result": "Both calves equal in circumference, non-tender. No pedal oedema, no erythema, no palpable cord."
+    },
+    {
+      "id": "chestwall",
+      "label": "Chest wall palpation",
+      "aliases": [
+        "chest wall",
+        "palpation",
+        "palpate",
+        "tenderness",
+        "press on the chest",
+        "costochondral",
+        "reproducible",
+        "rib tenderness"
+      ],
+      "result": "No tenderness on palpation of the chest wall or costochondral junctions. The pain is not reproduced by pressing; it is reproduced by deep inspiration."
+    }
+  ],
+  "investigations": [
+    {
+      "id": "cxr",
+      "label": "Chest X-ray (PA)",
+      "aliases": [
+        "chest x ray",
+        "chest xray",
+        "cxr",
+        "chest radiograph",
+        "x ray chest"
+      ],
+      "tier": "first-line",
+      "result": "Homogeneous opacity involving the right lower lobe with air bronchograms. No pleural effusion. Heart size normal."
+    },
+    {
+      "id": "cbc",
+      "label": "Complete blood count",
+      "aliases": [
+        "cbc",
+        "complete blood count",
+        "full blood count",
+        "fbc",
+        "hemogram",
+        "haemogram",
+        "wbc",
+        "blood counts"
+      ],
+      "tier": "first-line",
+      "result": "Hb 13.4 g/dL. Total WBC 18,600/uL with 86% neutrophils. Platelets 265,000/uL."
+    },
+    {
+      "id": "crp",
+      "label": "C-reactive protein",
+      "aliases": [
+        "crp",
+        "c reactive protein",
+        "inflammatory markers",
+        "esr"
+      ],
+      "tier": "first-line",
+      "result": "CRP 214 mg/L. ESR 68 mm/hr."
+    },
+    {
+      "id": "sputum",
+      "label": "Sputum Gram stain and culture",
+      "aliases": [
+        "sputum",
+        "sputum culture",
+        "sputum gram stain",
+        "gram stain"
+      ],
+      "tier": "first-line",
+      "result": "Gram stain: numerous polymorphs with Gram-positive diplococci. Culture pending at 48 hours."
+    },
+    {
+      "id": "afb",
+      "label": "Sputum for AFB / GeneXpert",
+      "aliases": [
+        "afb",
+        "acid fast bacilli",
+        "genexpert",
+        "cbnaat",
+        "tb test",
+        "sputum afb",
+        "zn stain"
+      ],
+      "tier": "first-line",
+      "result": "No acid-fast bacilli seen on two samples. GeneXpert: MTB not detected."
+    },
+    {
+      "id": "rft",
+      "label": "Renal function and electrolytes",
+      "aliases": [
+        "rft",
+        "renal function",
+        "urea",
+        "creatinine",
+        "electrolytes",
+        "kft"
+      ],
+      "tier": "first-line",
+      "result": "Urea 38 mg/dL. Creatinine 1.0 mg/dL. Na 134 mEq/L. K 4.1 mEq/L."
+    },
+    {
+      "id": "abg",
+      "label": "Arterial blood gas",
+      "aliases": [
+        "abg",
+        "arterial blood gas",
+        "blood gas"
+      ],
+      "tier": "second-line",
+      "result": "pH 7.46, PaO2 62 mmHg, PaCO2 32 mmHg, HCO3 23 on room air."
+    },
+    {
+      "id": "bloodculture",
+      "label": "Blood culture",
+      "aliases": [
+        "blood culture",
+        "blood cultures"
+      ],
+      "tier": "first-line",
+      "result": "Sent before antibiotics. No growth at 24 hours; final result pending."
+    },
+    {
+      "id": "ctchest",
+      "label": "CT chest",
+      "aliases": [
+        "ct chest",
+        "ct scan",
+        "hrct",
+        "computed tomography"
+      ],
+      "tier": "second-line",
+      "appropriate": false,
+      "result": "Right lower lobe consolidation with air bronchograms. No mass, no cavitation, no effusion.",
+      "note": "Adds nothing over the chest X-ray in a straightforward community-acquired pneumonia."
+    },
+    {
+      "id": "dengue",
+      "label": "Dengue NS1 and serology",
+      "aliases": [
+        "dengue",
+        "ns1",
+        "dengue serology"
+      ],
+      "tier": "first-line",
+      "appropriate": false,
+      "result": "NS1 negative, IgM negative.",
+      "note": "Reasonable in an undifferentiated fever, low yield once focal chest signs are present."
+    },
+    {
+      "id": "ddimer",
+      "label": "D-dimer",
+      "aliases": [
+        "d dimer",
+        "ddimer",
+        "d-dimer"
+      ],
+      "tier": "first-line",
+      "appropriate": false,
+      "result": "D-dimer 1,240 ng/mL (reference <500).",
+      "note": "Raised, and uninterpretable here. D-dimer rises in any inflammatory or infective state, so a positive result in established pneumonia does not raise the probability of pulmonary embolism — it only generates a CT. Use clinical probability first."
+    }
+  ],
+  "differentials": [
+    {
+      "dx": "Community-acquired pneumonia",
+      "status": "correct",
+      "aliases": [
+        "cap",
+        "lobar pneumonia",
+        "pneumonia",
+        "right lower lobe pneumonia",
+        "bacterial pneumonia",
+        "pneumococcal pneumonia"
+      ],
+      "why": "Abrupt fever with rigor, rusty sputum, focal consolidation signs, neutrophilic leucocytosis and lobar opacity on X-ray."
+    },
+    {
+      "dx": "Pulmonary tuberculosis",
+      "status": "must-exclude",
+      "aliases": [
+        "tb",
+        "tuberculosis",
+        "koch's",
+        "pulmonary tb"
+      ],
+      "why": "Endemic and must be excluded in any Indian patient with fever and cough, but the three-day onset, rigor and lobar consolidation argue against it. Excluded here on AFB and GeneXpert.",
+      "excluded_by": [
+        "afb",
+        "cxr"
+      ]
+    },
+    {
+      "dx": "Pulmonary embolism",
+      "status": "must-exclude",
+      "aliases": [
+        "pe",
+        "pulmonary embolism",
+        "embolus"
+      ],
+      "why": "Pleuritic pain with hypoxia and tachycardia can be embolic; the fever, purulent sputum and consolidation make it unlikely, but it should be consciously considered.",
+      "excluded_by": [
+        "legs",
+        "abg",
+        "ddimer"
+      ]
+    },
+    {
+      "dx": "Acute bronchitis",
+      "status": "plausible",
+      "aliases": [
+        "bronchitis",
+        "acute bronchitis"
+      ],
+      "why": "Common cause of fever and cough, but does not produce focal dullness, bronchial breathing or lobar opacity."
+    },
+    {
+      "dx": "Lung abscess",
+      "status": "plausible",
+      "aliases": [
+        "abscess",
+        "lung abscess"
+      ],
+      "why": "Can follow pneumonia; no cavitation or foul sputum at this stage."
+    },
+    {
+      "dx": "COVID-19 or influenza pneumonitis",
+      "status": "plausible",
+      "aliases": [
+        "covid",
+        "influenza",
+        "viral pneumonia",
+        "sars cov 2"
+      ],
+      "why": "Viral pneumonitis is usually bilateral and interstitial rather than lobar with rusty sputum."
+    },
+    {
+      "dx": "Congestive cardiac failure",
+      "status": "incorrect",
+      "aliases": [
+        "heart failure",
+        "ccf",
+        "pulmonary oedema"
+      ],
+      "why": "No orthopnoea, raised JVP, oedema or cardiomegaly."
+    }
+  ],
+  "final_diagnosis": "Community-acquired pneumonia of the right lower lobe, most likely pneumococcal, with hypoxia (CURB-65 = 1, but SpO2 92% warrants admission)",
+  "diagnosis_reasoning": "Abrupt onset fever with a rigor, pleuritic right-sided chest pain, rusty sputum, focal dullness with bronchial breathing and increased vocal resonance, neutrophilic leucocytosis and a lobar opacity with air bronchograms together make lobar pneumonia the only diagnosis that explains every finding. Gram-positive diplococci on sputum support Streptococcus pneumoniae.",
+  "critical_clues": [
+    "rigor",
+    "rusty sputum",
+    "pleuritic",
+    "bronchial breath",
+    "dull to percussion",
+    "air bronchogram",
+    "neutrophil"
+  ],
+  "red_flags": [
+    "SpO2 92%",
+    "respiratory rate 26",
+    "tachycardia"
+  ],
+  "rubric": {
+    "history": [
+      {
+        "id": "h_onset",
+        "label": "Onset and duration of the fever",
+        "keywords": [
+          "when did",
+          "how long",
+          "start",
+          "began",
+          "onset",
+          "duration",
+          "since when"
+        ],
+        "weight": 2,
+        "teaching_note": "Abrupt onset with a rigor separates bacterial pneumonia from the indolent onset of tuberculosis."
+      },
+      {
+        "id": "h_sputum",
+        "label": "Character of the sputum",
+        "keywords": [
+          "sputum",
+          "phlegm",
+          "cough up",
+          "coughing up",
+          "colour of",
+          "color of",
+          "expectoration",
+          "bring up"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Rusty sputum is close to pathognomonic for pneumococcal pneumonia. Missing it means missing the single most specific clue in the history."
+      },
+      {
+        "id": "h_hemoptysis",
+        "label": "Blood in the sputum",
+        "keywords": [
+          "blood",
+          "haemoptysis",
+          "hemoptysis",
+          "streak"
+        ],
+        "weight": 1,
+        "teaching_note": "Separates pneumonia from TB, bronchiectasis and malignancy."
+      },
+      {
+        "id": "h_pleuritic",
+        "label": "Chest pain and its relation to breathing",
+        "keywords": [
+          "chest pain",
+          "pain in your chest",
+          "hurt when you breathe",
+          "breathing",
+          "deep breath",
+          "worse when"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Pleuritic pain localises the pathology to the pleura and narrows the differential immediately."
+      },
+      {
+        "id": "h_dyspnoea",
+        "label": "Breathlessness and exercise tolerance",
+        "keywords": [
+          "short of breath",
+          "breathless",
+          "breathing",
+          "walk",
+          "exertion",
+          "climbing"
+        ],
+        "weight": 2,
+        "teaching_note": "Quantifying breathlessness drives the severity assessment and the decision to admit."
+      },
+      {
+        "id": "h_weightloss",
+        "label": "Weight loss and night sweats",
+        "keywords": [
+          "weight",
+          "lost weight",
+          "night sweat",
+          "sweating at night",
+          "appetite"
+        ],
+        "weight": 2,
+        "teaching_note": "Constitutional symptoms are the screening question for tuberculosis, which is the must-exclude diagnosis here."
+      },
+      {
+        "id": "h_tbcontact",
+        "label": "Contact with a person with tuberculosis",
+        "keywords": [
+          "contact",
+          "anyone at home",
+          "tb",
+          "tuberculosis",
+          "coughing for",
+          "family member"
+        ],
+        "weight": 2,
+        "critical": true,
+        "teaching_note": "In a TB-endemic setting, contact history is not optional."
+      },
+      {
+        "id": "h_smoking",
+        "label": "Smoking history",
+        "keywords": [
+          "smoke",
+          "smoking",
+          "cigarette",
+          "bidi",
+          "tobacco"
+        ],
+        "weight": 2,
+        "teaching_note": "Smoking predisposes to pneumococcal disease and to malignancy, and changes the differential for a persistent opacity."
+      },
+      {
+        "id": "h_alcohol",
+        "label": "Alcohol use",
+        "keywords": [
+          "alcohol",
+          "drink",
+          "drinking"
+        ],
+        "weight": 1,
+        "teaching_note": "Alcohol excess predisposes to aspiration and to Klebsiella pneumonia."
+      },
+      {
+        "id": "h_comorbid",
+        "label": "Diabetes, HIV or other comorbidity",
+        "keywords": [
+          "diabetes",
+          "sugar",
+          "blood pressure",
+          "hiv",
+          "medical problem",
+          "past medical",
+          "illness before",
+          "any other illness"
+        ],
+        "weight": 2,
+        "teaching_note": "Immunosuppression changes both the likely organism and the disposition."
+      },
+      {
+        "id": "h_travel",
+        "label": "Recent travel or exposure",
+        "keywords": [
+          "travel",
+          "travelled",
+          "outside",
+          "trip"
+        ],
+        "weight": 1,
+        "teaching_note": "Relevant to atypical organisms and to endemic infections."
+      },
+      {
+        "id": "h_meds",
+        "label": "Medication already taken",
+        "keywords": [
+          "medicine",
+          "medication",
+          "tablet",
+          "taken anything",
+          "drug"
+        ],
+        "weight": 1,
+        "teaching_note": "Prior antibiotics change culture yield and the fever pattern."
+      }
+    ],
+    "examination": [
+      {
+        "id": "e_vitals",
+        "label": "Vital signs including oxygen saturation",
+        "keywords": [
+          "vitals",
+          "vital signs",
+          "temperature",
+          "pulse",
+          "blood pressure",
+          "bp",
+          "respiratory rate",
+          "saturation",
+          "spo2"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "SpO2 92% and a respiratory rate of 26 are what move this patient from outpatient to inpatient care."
+      },
+      {
+        "id": "e_resp",
+        "label": "Full respiratory examination",
+        "keywords": [
+          "chest",
+          "respiratory",
+          "auscultat",
+          "breath sounds",
+          "listen",
+          "percussion",
+          "expansion"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Dullness with bronchial breathing and increased vocal resonance is the classic triad of consolidation."
+      },
+      {
+        "id": "e_cvs",
+        "label": "Cardiovascular examination",
+        "keywords": [
+          "cardiovascular",
+          "cvs",
+          "heart",
+          "jvp",
+          "murmur"
+        ],
+        "weight": 1,
+        "teaching_note": "Excludes heart failure as a cause of the breathlessness."
+      },
+      {
+        "id": "e_general",
+        "label": "General examination",
+        "keywords": [
+          "general",
+          "pallor",
+          "clubbing",
+          "cyanosis",
+          "lymph node",
+          "hydration",
+          "icterus"
+        ],
+        "weight": 1,
+        "teaching_note": "Clubbing and lymphadenopathy would point away from simple pneumonia."
+      },
+      {
+        "id": "e_legs",
+        "label": "Lower limbs for DVT",
+        "keywords": [
+          "leg",
+          "legs",
+          "calf",
+          "calves",
+          "oedema",
+          "edema",
+          "dvt",
+          "lower limb",
+          "ankle"
+        ],
+        "weight": 2,
+        "critical": false,
+        "teaching_note": "Pleuritic pain with hypoxia can be embolic. Examining the calves is how you consciously address pulmonary embolism rather than assuming pneumonia because there is a fever."
+      },
+      {
+        "id": "e_chestwall",
+        "label": "Chest wall palpation",
+        "keywords": [
+          "chest wall",
+          "palpat",
+          "tender",
+          "press",
+          "costochondral",
+          "reproducible"
+        ],
+        "weight": 1,
+        "critical": false,
+        "teaching_note": "Distinguishes pleuritic pain from a musculoskeletal cause. Pain reproduced by pressing points away from the pleura."
+      }
+    ],
+    "investigations": [
+      {
+        "id": "i_cxr",
+        "label": "Chest X-ray",
+        "keywords": [
+          "chest x ray",
+          "chest xray",
+          "cxr",
+          "chest radiograph",
+          "x ray"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "The single test that confirms consolidation and defines its extent."
+      },
+      {
+        "id": "i_cbc",
+        "label": "Complete blood count",
+        "keywords": [
+          "cbc",
+          "blood count",
+          "fbc",
+          "hemogram",
+          "haemogram",
+          "wbc"
+        ],
+        "weight": 2,
+        "teaching_note": "Neutrophilic leucocytosis supports a bacterial cause."
+      },
+      {
+        "id": "i_afb",
+        "label": "Sputum for AFB / GeneXpert",
+        "keywords": [
+          "afb",
+          "genexpert",
+          "cbnaat",
+          "acid fast",
+          "tb"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "In India, TB must be actively excluded before labelling a chest opacity as pneumonia."
+      },
+      {
+        "id": "i_sputum",
+        "label": "Sputum Gram stain and culture",
+        "keywords": [
+          "sputum culture",
+          "gram stain",
+          "sputum"
+        ],
+        "weight": 2,
+        "teaching_note": "Guides narrowing of antibiotics."
+      },
+      {
+        "id": "i_rft",
+        "label": "Renal function and electrolytes",
+        "keywords": [
+          "urea",
+          "creatinine",
+          "renal",
+          "rft",
+          "electrolytes",
+          "kft"
+        ],
+        "weight": 2,
+        "teaching_note": "Urea is a component of CURB-65 and drives the admission decision."
+      },
+      {
+        "id": "i_bloodculture",
+        "label": "Blood culture",
+        "keywords": [
+          "blood culture"
+        ],
+        "weight": 1,
+        "teaching_note": "Low yield but changes management when positive; must be taken before antibiotics."
+      }
+    ]
+  },
+  "hints": [
+    "Look again at the vital signs and at where in the chest the abnormal findings are.",
+    "The examination findings are all confined to one lobe. What single process produces dullness, bronchial breathing and increased vocal resonance together?",
+    "Review the causes of an acute febrile illness with focal signs confined to one part of the chest, and how you would separate them from tuberculosis."
+  ],
+  "teaching_points": [
+    "Dullness + bronchial breath sounds + increased vocal resonance = consolidation, and consolidation with acute fever means pneumonia until proven otherwise.",
+    "Use CURB-65 (confusion, urea >42 mg/dL, respiratory rate >=30, BP <90/60, age >=65) to decide disposition, but treat hypoxia as an independent reason to admit.",
+    "In a TB-endemic setting, always send sputum for AFB/GeneXpert even when the clinical picture looks bacterial.",
+    "Rusty sputum, a preceding rigor and lobar consolidation together point to Streptococcus pneumoniae."
+  ],
+  "revision_topics": [
+    "Signs of consolidation and how they differ from collapse, effusion and fibrosis",
+    "CURB-65 and severity assessment in community-acquired pneumonia",
+    "Differentiating community-acquired pneumonia from pulmonary tuberculosis"
+  ],
+  "provenance": {
+    "author": "Simulator seed content",
+    "reviewed_by": "",
+    "review_date": "",
+    "status": "draft",
+    "references": [
+      "Standard Treatment Guidelines, community-acquired pneumonia",
+      "National TB Elimination Programme diagnostic algorithm"
+    ]
+  }
+}

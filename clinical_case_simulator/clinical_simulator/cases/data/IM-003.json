@@ -1,0 +1,870 @@
+{
+  "case_id": "IM-003",
+  "title": "Severe upper abdominal pain in a 38-year-old man",
+  "specialty": "Internal Medicine",
+  "difficulty": 2,
+  "setting": "Emergency department",
+  "opening_brief": "You are a medical student in the emergency department.\n\nA 38-year-old man has come in with severe upper abdominal pain that began last night.\n\nAssess him, decide what you need to know, choose your investigations, and be ready to justify your differential.",
+  "patient": {
+    "name": "Vikram Sethi",
+    "age": 38,
+    "sex": "male",
+    "occupation": "sales executive",
+    "background": "Unmarried, lives alone. Frequent work dinners."
+  },
+  "persona": {
+    "speech_style": "In pain, speaks in short bursts, leans forward while sitting.",
+    "emotional_state": "Distressed, keeps shifting position.",
+    "education_level": "Graduate.",
+    "knows_not": [
+      "how much alcohol counts as 'a lot'",
+      "his liver test results",
+      "whether he has gallstones"
+    ],
+    "quirks": [
+      "Downplays his drinking at first; gives a fuller answer only if asked directly and non-judgementally."
+    ]
+  },
+  "chief_complaint": "severe pain in the upper abdomen since last night",
+  "history": {
+    "present_illness": {
+      "onset": "Came on over about an hour last night, a few hours after a party.",
+      "site": "Upper part of the stomach, in the middle and slightly to the left.",
+      "character": "Constant, boring, deep pain. Not colicky.",
+      "radiation": "Goes straight through to the back.",
+      "duration": "About 14 hours now, has not let up at all.",
+      "severity": "9 out of 10, the worst pain he has had.",
+      "timing": "Constant since it started.",
+      "aggravating": "Lying flat makes it much worse. Any attempt to eat or drink makes it worse.",
+      "relieving": "Sitting up and leaning forward helps a little.",
+      "associated": [
+        "vomited six or seven times, mostly bile, no relief after vomiting",
+        "has not passed stool since yesterday",
+        "abdomen feels bloated",
+        "feels feverish"
+      ],
+      "progression": "Unchanged in severity, but the bloating is increasing."
+    },
+    "past_medical": [
+      "Two similar but much milder episodes in the last two years, each settled in a day",
+      "High triglycerides mentioned at a company health check, never treated",
+      "No diabetes, no known gallstones"
+    ],
+    "medications": [
+      "Occasional antacid",
+      "No regular medication"
+    ],
+    "allergies": [
+      "None known"
+    ],
+    "family": [
+      "Mother has gallstones",
+      "No family history of pancreatic disease"
+    ],
+    "social": [
+      "Drinks nearly every day; about a quarter bottle of whisky on weekdays and more at weekends, for the last ten years",
+      "Drank heavily at a party the night this started",
+      "Smokes 5 cigarettes a day",
+      "No recent travel"
+    ],
+    "review_of_systems_positive": [
+      "feels dizzy on standing",
+      "passing less urine than usual"
+    ],
+    "review_of_systems_negative": [
+      "no chest pain",
+      "no blood in the vomit",
+      "no black stools",
+      "no jaundice noticed",
+      "no burning urine",
+      "no diarrhoea",
+      "no recent injury to the abdomen"
+    ]
+  },
+  "examination": [
+    {
+      "id": "vitals",
+      "label": "Vital signs",
+      "aliases": [
+        "vitals",
+        "vital signs",
+        "temperature",
+        "pulse",
+        "blood pressure",
+        "bp",
+        "respiratory rate",
+        "saturation",
+        "spo2"
+      ],
+      "result": "Temperature 38.2 C. Pulse 118/min. BP 98/62 mmHg lying, 84/56 on sitting up. Respiratory rate 24/min. SpO2 95% on room air."
+    },
+    {
+      "id": "general",
+      "label": "General examination",
+      "aliases": [
+        "general examination",
+        "pallor",
+        "icterus",
+        "jaundice",
+        "hydration",
+        "clubbing"
+      ],
+      "result": "Ill-looking, dry mucous membranes, sitting forward. Mild scleral icterus. No pallor, no clubbing, no asterixis."
+    },
+    {
+      "id": "abdomen",
+      "label": "Abdominal examination",
+      "aliases": [
+        "abdomen",
+        "abdominal examination",
+        "per abdomen",
+        "palpation",
+        "tenderness",
+        "guarding",
+        "rigidity"
+      ],
+      "result": "Distended, tender in the epigastrium with voluntary guarding. No board-like rigidity. Bowel sounds sluggish. No mass palpable. Liver and spleen not enlarged. No shifting dullness."
+    },
+    {
+      "id": "cullen",
+      "label": "Flank and periumbilical discoloration",
+      "aliases": [
+        "cullen",
+        "grey turner",
+        "flank discoloration",
+        "bruising",
+        "ecchymosis"
+      ],
+      "result": "No periumbilical or flank discoloration."
+    },
+    {
+      "id": "murphy",
+      "label": "Murphy's sign",
+      "aliases": [
+        "murphy",
+        "murphys sign",
+        "gallbladder",
+        "right hypochondrium"
+      ],
+      "result": "Negative. Right hypochondrial tenderness is much less than epigastric tenderness."
+    },
+    {
+      "id": "chest",
+      "label": "Respiratory examination",
+      "aliases": [
+        "chest",
+        "respiratory",
+        "lungs",
+        "auscultation",
+        "breath sounds"
+      ],
+      "result": "Reduced air entry at the left base with dullness. Right lung clear."
+    },
+    {
+      "id": "cvs",
+      "label": "Cardiovascular examination",
+      "aliases": [
+        "cardiovascular",
+        "cvs",
+        "heart sounds",
+        "jvp"
+      ],
+      "result": "Tachycardic, heart sounds normal, no murmur. JVP low."
+    },
+    {
+      "id": "hernial",
+      "label": "Hernial orifices and per-rectal examination",
+      "aliases": [
+        "hernia",
+        "hernial orifices",
+        "per rectal",
+        "pr examination",
+        "rectal"
+      ],
+      "result": "Hernial orifices free. Rectum empty, no melaena, no mass."
+    }
+  ],
+  "investigations": [
+    {
+      "id": "lipase",
+      "label": "Serum lipase",
+      "aliases": [
+        "lipase",
+        "serum lipase"
+      ],
+      "tier": "first-line",
+      "result": "Serum lipase 1,840 U/L (upper reference limit 60)."
+    },
+    {
+      "id": "amylase",
+      "label": "Serum amylase",
+      "aliases": [
+        "amylase",
+        "serum amylase"
+      ],
+      "tier": "first-line",
+      "result": "Serum amylase 1,120 U/L (upper reference limit 100)."
+    },
+    {
+      "id": "lft",
+      "label": "Liver function tests",
+      "aliases": [
+        "lft",
+        "liver function",
+        "bilirubin",
+        "alt",
+        "ast",
+        "sgpt",
+        "sgot",
+        "alkaline phosphatase"
+      ],
+      "tier": "first-line",
+      "result": "Total bilirubin 2.4 mg/dL, direct 1.3. ALT 78 U/L, AST 96 U/L, ALP 156 U/L, GGT 288 U/L. Albumin 3.2 g/dL."
+    },
+    {
+      "id": "cbc",
+      "label": "Complete blood count",
+      "aliases": [
+        "cbc",
+        "blood count",
+        "hemogram",
+        "haemogram",
+        "fbc",
+        "wbc",
+        "hematocrit"
+      ],
+      "tier": "first-line",
+      "result": "Hb 15.9 g/dL, haematocrit 49%. WBC 17,400/uL. Platelets 198,000/uL."
+    },
+    {
+      "id": "rft",
+      "label": "Renal function and electrolytes",
+      "aliases": [
+        "rft",
+        "renal",
+        "urea",
+        "creatinine",
+        "electrolytes",
+        "kft",
+        "calcium",
+        "sodium",
+        "potassium"
+      ],
+      "tier": "first-line",
+      "result": "Urea 58 mg/dL, creatinine 1.6 mg/dL. Na 132, K 3.9 mEq/L. Corrected calcium 7.6 mg/dL."
+    },
+    {
+      "id": "glucose",
+      "label": "Blood glucose",
+      "aliases": [
+        "glucose",
+        "sugar",
+        "rbs",
+        "blood sugar"
+      ],
+      "tier": "bedside",
+      "result": "Random glucose 214 mg/dL."
+    },
+    {
+      "id": "triglycerides",
+      "label": "Serum triglycerides",
+      "aliases": [
+        "triglyceride",
+        "triglycerides",
+        "lipid profile",
+        "lipids"
+      ],
+      "tier": "first-line",
+      "result": "Triglycerides 340 mg/dL (not in the range that causes pancreatitis on its own)."
+    },
+    {
+      "id": "crp",
+      "label": "C-reactive protein",
+      "aliases": [
+        "crp",
+        "c reactive protein",
+        "inflammatory markers"
+      ],
+      "tier": "first-line",
+      "result": "CRP 186 mg/L at 24 hours from onset."
+    },
+    {
+      "id": "usg",
+      "label": "Ultrasound abdomen",
+      "aliases": [
+        "ultrasound",
+        "usg",
+        "sonography",
+        "abdominal ultrasound",
+        "us abdomen"
+      ],
+      "tier": "first-line",
+      "result": "Bulky, hypoechoic pancreas with peripancreatic fluid. Gallbladder contains no calculi; wall not thickened. Common bile duct 4 mm, not dilated. Small left pleural effusion."
+    },
+    {
+      "id": "erectcxr",
+      "label": "Erect chest X-ray",
+      "aliases": [
+        "erect chest x ray",
+        "chest x ray",
+        "cxr",
+        "chest xray",
+        "air under diaphragm"
+      ],
+      "tier": "first-line",
+      "result": "No free gas under the diaphragm. Small left pleural effusion. Lung fields otherwise clear."
+    },
+    {
+      "id": "ecg",
+      "label": "12-lead ECG",
+      "aliases": [
+        "ecg",
+        "ekg",
+        "electrocardiogram"
+      ],
+      "tier": "bedside",
+      "result": "Sinus tachycardia at 116/min. No ST-segment or T-wave changes."
+    },
+    {
+      "id": "cect",
+      "label": "Contrast-enhanced CT abdomen",
+      "aliases": [
+        "ct abdomen",
+        "cect",
+        "ct scan",
+        "contrast ct",
+        "ct"
+      ],
+      "tier": "second-line",
+      "appropriate": false,
+      "result": "Diffusely enlarged oedematous pancreas with peripancreatic fat stranding and fluid. No necrosis identified at this stage.",
+      "note": "CT within the first 72 hours understates necrosis and is not needed when the diagnosis is already established biochemically. Reserve it for deterioration or diagnostic doubt."
+    },
+    {
+      "id": "ugi",
+      "label": "Upper GI endoscopy",
+      "aliases": [
+        "endoscopy",
+        "gastroscopy",
+        "ugi scopy"
+      ],
+      "tier": "specialist",
+      "appropriate": false,
+      "result": "Not performed in the acute phase.",
+      "note": "Contraindicated as a first step in an acute abdomen."
+    }
+  ],
+  "differentials": [
+    {
+      "dx": "Acute pancreatitis",
+      "status": "correct",
+      "aliases": [
+        "pancreatitis",
+        "acute pancreatitis",
+        "alcoholic pancreatitis",
+        "alcohol induced pancreatitis"
+      ],
+      "why": "Constant boring epigastric pain radiating to the back, relieved by leaning forward, after a heavy alcohol binge, with lipase more than three times the upper limit and a bulky pancreas on ultrasound."
+    },
+    {
+      "dx": "Perforated peptic ulcer",
+      "status": "must-exclude",
+      "aliases": [
+        "perforation",
+        "perforated ulcer",
+        "peptic ulcer perforation",
+        "hollow viscus perforation"
+      ],
+      "why": "The other cause of sudden severe epigastric pain with an unwell patient. Excluded by the absence of board-like rigidity and of free gas under the diaphragm — but it requires a surgical referral if suspected.",
+      "excluded_by": [
+        "erectcxr",
+        "abdomen"
+      ]
+    },
+    {
+      "dx": "Inferior wall myocardial infarction",
+      "status": "must-exclude",
+      "aliases": [
+        "myocardial infarction",
+        "mi",
+        "inferior mi",
+        "acs",
+        "heart attack"
+      ],
+      "why": "Inferior infarction classically presents as epigastric pain with vomiting. Excluded here by a normal ECG, but the ECG must actually be done.",
+      "excluded_by": [
+        "ecg"
+      ]
+    },
+    {
+      "dx": "Acute cholecystitis or biliary colic",
+      "status": "plausible",
+      "aliases": [
+        "cholecystitis",
+        "biliary colic",
+        "gallstone",
+        "gall bladder"
+      ],
+      "why": "Mother has gallstones and the bilirubin is mildly raised, but the pain is epigastric rather than right hypochondrial, Murphy's sign is negative and there are no calculi on ultrasound."
+    },
+    {
+      "dx": "Mesenteric ischaemia",
+      "status": "plausible",
+      "aliases": [
+        "mesenteric ischemia",
+        "mesenteric ischaemia",
+        "bowel ischemia"
+      ],
+      "why": "Pain out of proportion to signs fits, but the age, the absence of vascular risk factors and the biochemical picture make it unlikely."
+    },
+    {
+      "dx": "Acute gastritis",
+      "status": "incorrect",
+      "aliases": [
+        "gastritis",
+        "acidity",
+        "dyspepsia"
+      ],
+      "why": "Does not cause shock, a lipase of 1,840 or peripancreatic fluid."
+    }
+  ],
+  "final_diagnosis": "Acute alcohol-induced pancreatitis with early organ dysfunction (hypotension, acute kidney injury, hypocalcaemia) and a left pleural effusion — a severe attack requiring aggressive fluid resuscitation and high-dependency monitoring",
+  "diagnosis_reasoning": "Two of the three diagnostic criteria are met and the third is supportive: characteristic epigastric pain radiating to the back and relieved by leaning forward, lipase more than three times the upper limit of normal, and a bulky oedematous pancreas with peripancreatic fluid on ultrasound. The precipitant is a heavy alcohol binge on ten years of daily drinking, with a raised GGT and no gallstones. Postural hypotension, haematocrit 49%, creatinine 1.6 and corrected calcium 7.6 mark this as severe rather than mild.",
+  "critical_clues": [
+    "radiat",
+    "back",
+    "leaning forward",
+    "alcohol",
+    "lipase",
+    "haematocrit",
+    "hematocrit",
+    "calcium",
+    "no gallstone",
+    "postural"
+  ],
+  "red_flags": [
+    "postural hypotension",
+    "tachycardia 118",
+    "acute kidney injury",
+    "hypocalcaemia",
+    "haemoconcentration"
+  ],
+  "rubric": {
+    "history": [
+      {
+        "id": "h_site",
+        "label": "Site of the pain",
+        "keywords": [
+          "where",
+          "which part",
+          "point to",
+          "site",
+          "location"
+        ],
+        "weight": 2,
+        "teaching_note": "Epigastric localisation immediately narrows the differential."
+      },
+      {
+        "id": "h_radiation",
+        "label": "Radiation to the back",
+        "keywords": [
+          "radiate",
+          "spread",
+          "go anywhere",
+          "move",
+          "back",
+          "through to"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Radiation straight through to the back is characteristic of retroperitoneal structures — pancreas and aorta."
+      },
+      {
+        "id": "h_posture",
+        "label": "Effect of posture on the pain",
+        "keywords": [
+          "lying",
+          "lie down",
+          "sitting",
+          "leaning forward",
+          "position",
+          "posture",
+          "better",
+          "worse",
+          "reliev"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Relief on leaning forward is close to specific for pancreatic pain and is almost always missed by students."
+      },
+      {
+        "id": "h_alcohol",
+        "label": "Alcohol history, quantified",
+        "keywords": [
+          "alcohol",
+          "drink",
+          "drinking",
+          "whisky",
+          "how much",
+          "how often",
+          "binge",
+          "party"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Alcohol and gallstones cause 80% of acute pancreatitis. Asking 'do you drink?' is not enough — quantity, frequency and duration all matter."
+      },
+      {
+        "id": "h_vomiting",
+        "label": "Vomiting and its character",
+        "keywords": [
+          "vomit",
+          "throwing up",
+          "nausea",
+          "sick"
+        ],
+        "weight": 2,
+        "teaching_note": "Vomiting without relief of pain distinguishes pancreatitis from obstruction."
+      },
+      {
+        "id": "h_previous",
+        "label": "Previous similar episodes",
+        "keywords": [
+          "before",
+          "similar",
+          "previous",
+          "first time",
+          "episodes",
+          "happened again"
+        ],
+        "weight": 2,
+        "teaching_note": "Recurrent milder attacks suggest ongoing insult and possible chronic pancreatitis."
+      },
+      {
+        "id": "h_gallstones",
+        "label": "Gallstones and fatty-food intolerance",
+        "keywords": [
+          "gallstone",
+          "gall bladder",
+          "stone",
+          "fatty food",
+          "oily food"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Gallstone pancreatitis needs a completely different pathway — early ERCP if there is cholangitis or obstruction."
+      },
+      {
+        "id": "h_lipids",
+        "label": "Triglycerides and metabolic history",
+        "keywords": [
+          "triglyceride",
+          "cholesterol",
+          "lipid",
+          "sugar",
+          "diabetes",
+          "health check"
+        ],
+        "weight": 2,
+        "teaching_note": "Hypertriglyceridaemia is the third commonest cause and is treatable."
+      },
+      {
+        "id": "h_drugs",
+        "label": "Drug history including recent new medication",
+        "keywords": [
+          "medicine",
+          "medication",
+          "tablet",
+          "drug",
+          "taking anything",
+          "steroid"
+        ],
+        "weight": 2,
+        "teaching_note": "Azathioprine, valproate, thiazides and others cause drug-induced pancreatitis."
+      },
+      {
+        "id": "h_bowel",
+        "label": "Bowel habit and passage of flatus",
+        "keywords": [
+          "stool",
+          "motion",
+          "bowel",
+          "constipat",
+          "flatus",
+          "gas",
+          "diarrhoea",
+          "diarrhea"
+        ],
+        "weight": 2,
+        "teaching_note": "Absolute constipation with distension would point towards obstruction or ileus."
+      },
+      {
+        "id": "h_jaundice",
+        "label": "Jaundice, urine and stool colour",
+        "keywords": [
+          "jaundice",
+          "yellow",
+          "eyes",
+          "urine colour",
+          "urine color",
+          "dark urine",
+          "pale stool"
+        ],
+        "weight": 2,
+        "teaching_note": "Biliary obstruction changes management urgently."
+      },
+      {
+        "id": "h_urine",
+        "label": "Urine output",
+        "keywords": [
+          "urine",
+          "passing water",
+          "urinat",
+          "output"
+        ],
+        "weight": 2,
+        "teaching_note": "Oliguria is an early marker of severity and of inadequate resuscitation."
+      }
+    ],
+    "examination": [
+      {
+        "id": "e_vitals",
+        "label": "Vital signs including postural blood pressure",
+        "keywords": [
+          "vitals",
+          "vital signs",
+          "pulse",
+          "blood pressure",
+          "bp",
+          "temperature",
+          "postural",
+          "respiratory rate",
+          "saturation"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Postural hypotension here signals substantial third-space fluid loss and drives resuscitation."
+      },
+      {
+        "id": "e_abdomen",
+        "label": "Abdominal examination",
+        "keywords": [
+          "abdomen",
+          "abdominal",
+          "palpat",
+          "tender",
+          "guarding",
+          "rigidity",
+          "bowel sounds",
+          "per abdomen"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Guarding without board-like rigidity separates pancreatitis from perforation at the bedside."
+      },
+      {
+        "id": "e_hydration",
+        "label": "Hydration and general examination",
+        "keywords": [
+          "general",
+          "hydration",
+          "dry",
+          "mucous",
+          "pallor",
+          "icterus",
+          "jaundice"
+        ],
+        "weight": 2,
+        "teaching_note": "Clinical dehydration corroborates the haematocrit of 49%."
+      },
+      {
+        "id": "e_chest",
+        "label": "Respiratory examination",
+        "keywords": [
+          "chest",
+          "lung",
+          "respiratory",
+          "auscultat",
+          "breath sounds",
+          "effusion"
+        ],
+        "weight": 2,
+        "teaching_note": "A left pleural effusion is a recognised early sign of severe pancreatitis."
+      },
+      {
+        "id": "e_flank",
+        "label": "Flank and periumbilical discoloration",
+        "keywords": [
+          "cullen",
+          "grey turner",
+          "flank",
+          "bruis",
+          "discolor",
+          "discolour"
+        ],
+        "weight": 1,
+        "teaching_note": "Rare and late, but worth knowing and looking for."
+      }
+    ],
+    "investigations": [
+      {
+        "id": "i_lipase",
+        "label": "Serum lipase or amylase",
+        "keywords": [
+          "lipase",
+          "amylase"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Lipase is more sensitive and stays elevated longer; a value over three times the upper limit is diagnostic in the right clinical context."
+      },
+      {
+        "id": "i_usg",
+        "label": "Ultrasound abdomen",
+        "keywords": [
+          "ultrasound",
+          "usg",
+          "sonography",
+          "us abdomen"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "The point of the ultrasound is to look for gallstones and duct dilatation, because that changes management, not to confirm the pancreatitis."
+      },
+      {
+        "id": "i_rft",
+        "label": "Renal function, electrolytes and calcium",
+        "keywords": [
+          "renal",
+          "urea",
+          "creatinine",
+          "electrolyte",
+          "calcium",
+          "rft",
+          "kft",
+          "sodium"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Creatinine and calcium are severity markers and feed directly into scoring systems."
+      },
+      {
+        "id": "i_cbc",
+        "label": "Complete blood count with haematocrit",
+        "keywords": [
+          "cbc",
+          "blood count",
+          "hemogram",
+          "haemogram",
+          "hematocrit",
+          "haematocrit",
+          "wbc"
+        ],
+        "weight": 3,
+        "teaching_note": "A haematocrit above 44% that fails to fall with fluids predicts necrosis."
+      },
+      {
+        "id": "i_lft",
+        "label": "Liver function tests",
+        "keywords": [
+          "lft",
+          "liver function",
+          "bilirubin",
+          "alt",
+          "sgpt",
+          "ggt",
+          "alkaline"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "An ALT above 150 U/L makes a gallstone aetiology far more likely; GGT points to alcohol."
+      },
+      {
+        "id": "i_erectcxr",
+        "label": "Erect chest X-ray",
+        "keywords": [
+          "erect chest",
+          "chest x ray",
+          "cxr",
+          "chest xray",
+          "free gas",
+          "air under"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "The bedside test that excludes perforation, which is the surgical mimic."
+      },
+      {
+        "id": "i_ecg",
+        "label": "ECG",
+        "keywords": [
+          "ecg",
+          "ekg",
+          "electrocardiogram"
+        ],
+        "weight": 2,
+        "critical": true,
+        "teaching_note": "Epigastric pain with vomiting can be an inferior myocardial infarction. Missing this is a classic and dangerous error."
+      },
+      {
+        "id": "i_glucose",
+        "label": "Blood glucose",
+        "keywords": [
+          "glucose",
+          "sugar",
+          "rbs"
+        ],
+        "weight": 2,
+        "teaching_note": "Hyperglycaemia is a severity marker in most scoring systems."
+      },
+      {
+        "id": "i_crp",
+        "label": "C-reactive protein",
+        "keywords": [
+          "crp",
+          "c reactive protein"
+        ],
+        "weight": 2,
+        "teaching_note": "CRP above 150 mg/L at 48 hours predicts severe disease."
+      },
+      {
+        "id": "i_triglycerides",
+        "label": "Serum triglycerides",
+        "keywords": [
+          "triglyceride",
+          "lipid profile"
+        ],
+        "weight": 2,
+        "teaching_note": "Needed to identify or exclude hypertriglyceridaemic pancreatitis."
+      }
+    ]
+  },
+  "hints": [
+    "Ask yourself what the patient's posture is telling you, and re-read what he said about lying flat.",
+    "Retroperitoneal structures produce pain that bores through to the back. Which one sits in the epigastrium, and what would have provoked it the night before?",
+    "Review the causes of severe constant epigastric pain that bores through to the back, and the single biochemical test that separates them. Then read how severity is judged in the first 24 hours."
+  ],
+  "teaching_points": [
+    "Acute pancreatitis is diagnosed when two of three are present: characteristic pain, lipase or amylase above three times the upper limit, and characteristic imaging.",
+    "The first ultrasound is for gallstones, not for the pancreas — because a gallstone aetiology changes management.",
+    "Do not order a CT in the first 72 hours unless the diagnosis is in doubt or the patient deteriorates; it understates necrosis and delays fluids.",
+    "Severity is judged by organ dysfunction and haemoconcentration, not by the height of the amylase.",
+    "Always do an ECG in epigastric pain with vomiting — inferior myocardial infarction is the mimic that kills."
+  ],
+  "revision_topics": [
+    "Diagnostic criteria and aetiology of acute pancreatitis (I GET SMASHED)",
+    "Severity scoring: modified Glasgow, BISAP, revised Atlanta classification",
+    "Fluid resuscitation in acute pancreatitis",
+    "Differential diagnosis of the acute epigastric abdomen"
+  ],
+  "provenance": {
+    "author": "Simulator seed content",
+    "reviewed_by": "",
+    "review_date": "",
+    "status": "draft",
+    "references": [
+      "Revised Atlanta classification of acute pancreatitis",
+      "IAP/APA evidence-based guidelines for the management of acute pancreatitis"
+    ]
+  }
+}

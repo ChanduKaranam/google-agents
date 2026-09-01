@@ -1,0 +1,151 @@
+{
+  "_README": "Copy this file to <SPECIALTY>-<NNN>.json and fill it in. Files beginning with an underscore are ignored by the loader. Run `python -m clinical_simulator.validate` after editing. Every field marked REQUIRED must be present.",
+  "case_id": "IM-000 (REQUIRED, unique, uppercase)",
+  "title": "REQUIRED. Presenting problem, not the diagnosis. The student sees this.",
+  "specialty": "Internal Medicine",
+  "difficulty": 1,
+  "setting": "Where the encounter happens, e.g. Emergency department",
+  "opening_brief": "REQUIRED. Read verbatim to the student. State their role, the patient's age and sex, the presenting complaint and the objective. NEVER hint at the diagnosis.",
+  "patient": {
+    "name": "REQUIRED",
+    "age": 0,
+    "sex": "male | female",
+    "occupation": "",
+    "background": ""
+  },
+  "persona": {
+    "speech_style": "How this person talks.",
+    "emotional_state": "",
+    "education_level": "",
+    "knows_not": [
+      "Things this patient genuinely cannot answer. Keeps the patient honest instead of omniscient."
+    ],
+    "volunteers_only_if_asked": true,
+    "quirks": [
+      "Behaviours that make the encounter realistic, e.g. minimises symptoms, blames food poisoning."
+    ]
+  },
+  "chief_complaint": "REQUIRED. In the patient's own words.",
+  "history": {
+    "present_illness": {
+      "onset": "",
+      "site": "",
+      "character": "",
+      "radiation": "",
+      "duration": "",
+      "severity": "",
+      "timing": "",
+      "aggravating": "",
+      "relieving": "",
+      "associated": [],
+      "progression": ""
+    },
+    "past_medical": [],
+    "medications": [],
+    "allergies": [],
+    "family": [],
+    "social": [],
+    "review_of_systems_positive": [
+      "Things the patient HAS noticed but will only mention if asked."
+    ],
+    "review_of_systems_negative": [
+      "Explicit negatives. Without these the patient invents answers to unanticipated questions."
+    ]
+  },
+  "examination": [
+    {
+      "id": "vitals",
+      "label": "Vital signs",
+      "aliases": [
+        "every phrasing a student might use for this manoeuvre"
+      ],
+      "result": "The finding, stated factually. No interpretation, no diagnosis."
+    }
+  ],
+  "investigations": [
+    {
+      "id": "ecg",
+      "label": "12-lead ECG",
+      "aliases": [
+        "ecg",
+        "ekg",
+        "electrocardiogram"
+      ],
+      "tier": "bedside | first-line | second-line | specialist",
+      "appropriate": true,
+      "result": "The result, reported as a report would be.",
+      "note": "If appropriate is false, explain here why this test was low-yield or premature. Shown to the evaluator, not the student."
+    }
+  ],
+  "differentials": [
+    {
+      "dx": "The leading diagnosis",
+      "status": "correct | must-exclude | plausible | incorrect",
+      "aliases": [
+        "synonyms and abbreviations the student might write"
+      ],
+      "why": "One or two sentences a marker could read aloud.",
+      "excluded_by": [
+        "REQUIRED for must-exclude items. Ids of examinations or investigations",
+        "in THIS case that let a student actually act on the diagnosis.",
+        "The validator fails if this is empty or names a finding you did not define."
+      ]
+    }
+  ],
+  "final_diagnosis": "REQUIRED. The full diagnosis including severity and complications.",
+  "diagnosis_reasoning": "REQUIRED. The reasoning chain, as an examiner would explain it.",
+  "critical_clues": [
+    "Short lowercase fragments matched against the student's own reasoning text. Use word stems, e.g. 'radiat' not 'radiating'."
+  ],
+  "red_flags": [
+    "Findings that make this urgent."
+  ],
+  "rubric": {
+    "history": [
+      {
+        "id": "h_example",
+        "label": "What the student should have asked about",
+        "keywords": [
+          "phrases",
+          "that",
+          "count",
+          "as",
+          "having asked it"
+        ],
+        "weight": 3,
+        "critical": false,
+        "teaching_note": "Why it mattered clinically in THIS case. Shown to the student when missed."
+      }
+    ],
+    "examination": [],
+    "investigations": []
+  },
+  "hints": [
+    "Level 1: point at an area of the case without naming a system.",
+    "Level 2: name the pattern or the mechanism, still not the diagnosis.",
+    "Level 3: name the topic to review. Still not the diagnosis."
+  ],
+  "teaching_points": [
+    "What a student should take away, whether or not they got it right."
+  ],
+  "revision_topics": [
+    "What to go and read."
+  ],
+  "evolution": [
+    {
+      "id": "unique_id",
+      "after_turn": 12,
+      "after_action": "an examination or investigation id, as an alternative trigger",
+      "update": "EVENT: text handed to the preceptor when this fires. Level 4 cases only."
+    }
+  ],
+  "provenance": {
+    "author": "Who wrote it",
+    "reviewed_by": "REQUIRED before student assessment use",
+    "review_date": "YYYY-MM-DD",
+    "status": "draft | expert-reviewed | retired",
+    "references": [
+      "Guideline or textbook the content is grounded in"
+    ]
+  }
+}

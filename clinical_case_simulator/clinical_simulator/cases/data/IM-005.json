@@ -1,0 +1,958 @@
+{
+  "case_id": "IM-005",
+  "title": "Fever for eight days in a 24-year-old woman",
+  "specialty": "Internal Medicine",
+  "difficulty": 3,
+  "setting": "Medicine outpatient department, monsoon season",
+  "opening_brief": "You are a medical student in the medicine outpatient department during the monsoon.\n\nA 24-year-old woman has had fever for eight days. She has already taken paracetamol and a course of antibiotics from a local pharmacy without improvement.\n\nTake a history, examine her, and work out what is going on. Several endemic illnesses can look like this — your job is to separate them.",
+  "patient": {
+    "name": "Priya Deshmukh",
+    "age": 24,
+    "sex": "female",
+    "occupation": "postgraduate student",
+    "background": "Hostel accommodation, eats in the hostel mess and at street stalls."
+  },
+  "persona": {
+    "speech_style": "Tired, cooperative, gives clear answers but does not elaborate.",
+    "emotional_state": "Worn down by eight days of fever, worried about missing exams.",
+    "education_level": "Postgraduate student, not medical.",
+    "knows_not": [
+      "the name of the antibiotic she took",
+      "her exact temperature",
+      "whether her platelet count was checked"
+    ],
+    "quirks": [
+      "Mentions the pattern of the fever accurately if asked, because she has been noting it."
+    ]
+  },
+  "chief_complaint": "fever for eight days that is not settling",
+  "history": {
+    "present_illness": {
+      "onset": "Started eight days ago, gradually. Low grade at first.",
+      "site": "Whole-body aches; headache mostly behind the eyes for the first three days.",
+      "character": "A steady fever that climbs a little more each day rather than spiking and settling.",
+      "radiation": "Not applicable.",
+      "duration": "Eight days, continuous, never fully normal even with paracetamol.",
+      "severity": "Highest reading she took was 103 degrees Fahrenheit.",
+      "timing": "Rises through the day and is highest in the evening. Does not come down fully at night.",
+      "aggravating": "Nothing specific.",
+      "relieving": "Paracetamol brings it down by about a degree for two hours only.",
+      "associated": [
+        "constipation for the last five days, which is unusual for her",
+        "dull ache in the upper left side of the abdomen",
+        "poor appetite and nausea",
+        "dry cough for the last three days",
+        "feels mentally slow and drowsy in the evenings"
+      ],
+      "progression": "The fever has climbed steadily and the abdominal discomfort started around day five."
+    },
+    "past_medical": [
+      "Had dengue three years ago, recovered without admission",
+      "No diabetes, no tuberculosis, no chronic illness",
+      "Has not had any vaccinations since childhood that she can remember"
+    ],
+    "medications": [
+      "Paracetamol several times a day",
+      "A course of antibiotic tablets from the pharmacy for three days, name unknown, stopped because it was not helping"
+    ],
+    "allergies": [
+      "None known"
+    ],
+    "family": [
+      "No one else at home is ill",
+      "Two hostel-mates had fever last month"
+    ],
+    "social": [
+      "Eats at roadside stalls two or three times a week",
+      "Hostel water supply; drinks from the common filter, which she is not sure is maintained",
+      "No alcohol, no smoking",
+      "No travel outside the city in six months",
+      "No contact with animals, no recent wading through floodwater"
+    ],
+    "review_of_systems_positive": [
+      "some pain in the muscles of the thighs",
+      "one episode of loose stools on day two, then constipation"
+    ],
+    "review_of_systems_negative": [
+      "no rash that she has noticed",
+      "no bleeding from gums or nose",
+      "no burning when passing urine",
+      "no joint swelling",
+      "no neck stiffness",
+      "no shortness of breath",
+      "no vomiting blood or black stools",
+      "no chills and rigors",
+      "no yellow discolouration of the eyes"
+    ]
+  },
+  "examination": [
+    {
+      "id": "vitals",
+      "label": "Vital signs",
+      "aliases": [
+        "vitals",
+        "vital signs",
+        "temperature",
+        "pulse",
+        "blood pressure",
+        "bp",
+        "respiratory rate",
+        "saturation",
+        "spo2"
+      ],
+      "result": "Temperature 39.4 C. Pulse 74/min, regular — relatively slow for the temperature. BP 104/68 mmHg. Respiratory rate 18/min. SpO2 98% on room air."
+    },
+    {
+      "id": "general",
+      "label": "General examination",
+      "aliases": [
+        "general examination",
+        "pallor",
+        "icterus",
+        "rash",
+        "lymph nodes",
+        "hydration",
+        "clubbing"
+      ],
+      "result": "Toxic-looking, coated tongue, mildly dehydrated. No pallor, no icterus. No lymphadenopathy. A few faint blanching pink macules over the upper abdomen, about 2-3 mm, easily missed."
+    },
+    {
+      "id": "rash",
+      "label": "Detailed skin examination",
+      "aliases": [
+        "skin",
+        "rash",
+        "spots",
+        "petechiae",
+        "rose spots",
+        "tourniquet test"
+      ],
+      "result": "Two to three crops of 2-3 mm blanching erythematous macules on the anterior abdominal wall and lower chest. No petechiae, no purpura. Tourniquet test negative."
+    },
+    {
+      "id": "abdomen",
+      "label": "Abdominal examination",
+      "aliases": [
+        "abdomen",
+        "abdominal examination",
+        "per abdomen",
+        "spleen",
+        "liver",
+        "palpation",
+        "tenderness"
+      ],
+      "result": "Soft, mild diffuse tenderness. Spleen palpable 2 cm below the left costal margin, soft. Liver just palpable, non-tender. No ascites, no mass."
+    },
+    {
+      "id": "chest",
+      "label": "Respiratory examination",
+      "aliases": [
+        "chest",
+        "respiratory",
+        "lungs",
+        "auscultation",
+        "breath sounds"
+      ],
+      "result": "Clear, equal air entry, no added sounds."
+    },
+    {
+      "id": "cvs",
+      "label": "Cardiovascular examination",
+      "aliases": [
+        "cardiovascular",
+        "cvs",
+        "heart sounds",
+        "murmur",
+        "jvp"
+      ],
+      "result": "Heart sounds normal, no murmur. Relative bradycardia noted for the degree of fever."
+    },
+    {
+      "id": "cns",
+      "label": "Neurological examination",
+      "aliases": [
+        "cns",
+        "neurological",
+        "neuro",
+        "neck stiffness",
+        "meningeal",
+        "kernig",
+        "conscious level",
+        "gcs"
+      ],
+      "result": "Alert but slow to respond, oriented. No neck stiffness, no focal deficit. Fundi normal."
+    }
+  ],
+  "investigations": [
+    {
+      "id": "cbc",
+      "label": "Complete blood count with peripheral smear",
+      "aliases": [
+        "cbc",
+        "blood count",
+        "hemogram",
+        "haemogram",
+        "fbc",
+        "platelet",
+        "wbc",
+        "peripheral smear",
+        "smear"
+      ],
+      "tier": "first-line",
+      "result": "Hb 11.8 g/dL. WBC 3,400/uL with 62% neutrophils, no eosinophils seen. Platelets 118,000/uL. Smear: no malarial parasites, no atypical lymphocytes, no schistocytes."
+    },
+    {
+      "id": "bloodculture",
+      "label": "Blood culture",
+      "aliases": [
+        "blood culture",
+        "blood cultures",
+        "culture"
+      ],
+      "tier": "first-line",
+      "result": "Two sets taken. At 48 hours: Salmonella enterica serovar Typhi isolated from both bottles. Sensitive to ceftriaxone and azithromycin; resistant to ciprofloxacin."
+    },
+    {
+      "id": "widal",
+      "label": "Widal test",
+      "aliases": [
+        "widal",
+        "widal test"
+      ],
+      "tier": "first-line",
+      "appropriate": false,
+      "result": "TO 1:160, TH 1:160.",
+      "note": "Poor sensitivity and specificity, confounded by prior infection and vaccination. It should never replace a blood culture, though it is still widely ordered."
+    },
+    {
+      "id": "dengue",
+      "label": "Dengue NS1 antigen and IgM/IgG",
+      "aliases": [
+        "dengue",
+        "ns1",
+        "dengue serology",
+        "dengue igm"
+      ],
+      "tier": "first-line",
+      "result": "NS1 negative. IgM negative. IgG positive (consistent with her infection three years ago)."
+    },
+    {
+      "id": "malaria",
+      "label": "Malaria rapid test and thick/thin smear",
+      "aliases": [
+        "malaria",
+        "mp",
+        "malarial parasite",
+        "rapid test",
+        "thick smear",
+        "mp qbc",
+        "smear for malaria"
+      ],
+      "tier": "first-line",
+      "result": "Rapid antigen test negative for both P. falciparum and P. vivax. Thick and thin smears negative on three samples."
+    },
+    {
+      "id": "lepto",
+      "label": "Leptospira IgM",
+      "aliases": [
+        "lepto",
+        "leptospira",
+        "leptospirosis"
+      ],
+      "tier": "second-line",
+      "result": "IgM negative."
+    },
+    {
+      "id": "scrubtyphus",
+      "label": "Scrub typhus IgM ELISA",
+      "aliases": [
+        "scrub typhus",
+        "typhus",
+        "orientia",
+        "rickettsia"
+      ],
+      "tier": "second-line",
+      "result": "IgM negative. No eschar found on repeat full skin examination."
+    },
+    {
+      "id": "lft",
+      "label": "Liver function tests",
+      "aliases": [
+        "lft",
+        "liver function",
+        "bilirubin",
+        "alt",
+        "ast",
+        "sgpt",
+        "sgot"
+      ],
+      "tier": "first-line",
+      "result": "Total bilirubin 1.1 mg/dL. ALT 88 U/L, AST 96 U/L, ALP 130 U/L. Albumin 3.4 g/dL."
+    },
+    {
+      "id": "rft",
+      "label": "Renal function and electrolytes",
+      "aliases": [
+        "rft",
+        "renal",
+        "urea",
+        "creatinine",
+        "electrolytes",
+        "kft",
+        "sodium"
+      ],
+      "tier": "first-line",
+      "result": "Urea 26 mg/dL, creatinine 0.7 mg/dL, Na 130 mEq/L, K 3.6 mEq/L."
+    },
+    {
+      "id": "urine",
+      "label": "Urine routine and microscopy",
+      "aliases": [
+        "urine",
+        "urine routine",
+        "urinalysis",
+        "urine microscopy",
+        "urine culture"
+      ],
+      "tier": "first-line",
+      "result": "No pus cells, no nitrites, no protein. Culture sterile."
+    },
+    {
+      "id": "cxr",
+      "label": "Chest X-ray",
+      "aliases": [
+        "chest x ray",
+        "chest xray",
+        "cxr",
+        "chest radiograph"
+      ],
+      "tier": "first-line",
+      "result": "Normal."
+    },
+    {
+      "id": "usg",
+      "label": "Ultrasound abdomen",
+      "aliases": [
+        "ultrasound",
+        "usg",
+        "sonography",
+        "us abdomen"
+      ],
+      "tier": "second-line",
+      "result": "Mild splenomegaly (13.4 cm). Mild hepatomegaly. Small amount of free fluid in the pelvis. No abscess, no bowel thickening."
+    },
+    {
+      "id": "crp",
+      "label": "C-reactive protein and procalcitonin",
+      "aliases": [
+        "crp",
+        "procalcitonin",
+        "inflammatory markers",
+        "esr"
+      ],
+      "tier": "first-line",
+      "result": "CRP 96 mg/L. Procalcitonin 1.4 ng/mL. ESR 44 mm/hr."
+    },
+    {
+      "id": "hiv",
+      "label": "HIV, HBsAg and HCV serology",
+      "aliases": [
+        "hiv",
+        "hbsag",
+        "hepatitis",
+        "viral markers",
+        "hcv"
+      ],
+      "tier": "first-line",
+      "result": "All non-reactive."
+    },
+    {
+      "id": "boneMarrow",
+      "label": "Bone marrow aspiration and culture",
+      "aliases": [
+        "bone marrow",
+        "marrow",
+        "bone marrow culture"
+      ],
+      "tier": "specialist",
+      "appropriate": false,
+      "result": "Not performed.",
+      "note": "More sensitive than blood culture in enteric fever, but invasive and not justified before blood cultures have been given a chance."
+    }
+  ],
+  "differentials": [
+    {
+      "dx": "Enteric fever (typhoid)",
+      "status": "correct",
+      "aliases": [
+        "typhoid",
+        "enteric fever",
+        "salmonella typhi",
+        "typhoid fever",
+        "salmonella"
+      ],
+      "why": "Stepladder fever over eight days, relative bradycardia, constipation rather than diarrhoea, splenomegaly, rose spots, leucopenia with mild thrombocytopenia, street-food exposure, and a positive blood culture."
+    },
+    {
+      "dx": "Dengue fever",
+      "status": "must-exclude",
+      "aliases": [
+        "dengue",
+        "dengue fever",
+        "dhf",
+        "dengue haemorrhagic fever"
+      ],
+      "why": "The default assumption in an Indian monsoon fever and the main mimic. Argued against by the eight-day steadily climbing course, the absence of retro-orbital pain after day three, the constipation, a negative NS1 and IgM, and a platelet count that is only mildly low.",
+      "excluded_by": [
+        "dengue",
+        "cbc",
+        "rash"
+      ]
+    },
+    {
+      "dx": "Malaria",
+      "status": "must-exclude",
+      "aliases": [
+        "malaria",
+        "falciparum",
+        "vivax",
+        "plasmodium"
+      ],
+      "why": "Endemic, treatable, and lethal if missed. Argued against by the absence of chills and rigors and the continuous rather than intermittent fever; excluded by three negative smears and a negative rapid test.",
+      "excluded_by": [
+        "malaria"
+      ]
+    },
+    {
+      "dx": "Scrub typhus",
+      "status": "must-exclude",
+      "aliases": [
+        "scrub typhus",
+        "typhus",
+        "rickettsial",
+        "orientia"
+      ],
+      "why": "A very common cause of undifferentiated monsoon fever with hepatosplenomegaly. Requires an active search for an eschar and a specific IgM, both negative here.",
+      "excluded_by": [
+        "scrubtyphus",
+        "rash"
+      ]
+    },
+    {
+      "dx": "Leptospirosis",
+      "status": "plausible",
+      "aliases": [
+        "lepto",
+        "leptospirosis",
+        "weil"
+      ],
+      "why": "Monsoon exposure, myalgia and transaminitis fit, but there is no conjunctival suffusion, no jaundice, no renal failure and no floodwater contact."
+    },
+    {
+      "dx": "Tuberculosis",
+      "status": "plausible",
+      "aliases": [
+        "tb",
+        "tuberculosis",
+        "disseminated tb",
+        "abdominal tb"
+      ],
+      "why": "Always in the differential for prolonged fever in India, but eight days is too short and there is no weight loss or night sweats."
+    },
+    {
+      "dx": "Urinary tract infection",
+      "status": "incorrect",
+      "aliases": [
+        "uti",
+        "pyelonephritis",
+        "urinary infection"
+      ],
+      "why": "No urinary symptoms and a clean urinalysis."
+    },
+    {
+      "dx": "Viral upper respiratory infection",
+      "status": "incorrect",
+      "aliases": [
+        "viral fever",
+        "flu",
+        "influenza",
+        "upper respiratory"
+      ],
+      "why": "Does not persist for eight days with rising fever, splenomegaly and rose spots."
+    }
+  ],
+  "final_diagnosis": "Enteric fever caused by Salmonella enterica serovar Typhi (fluoroquinolone-resistant), confirmed on blood culture",
+  "diagnosis_reasoning": "The discriminating features are all in the pattern rather than in any single finding. A stepladder fever climbing over eight days without rigors, relative bradycardia at 74/min with a temperature of 39.4 C, constipation instead of diarrhoea, a soft palpable spleen, faint blanching rose spots and leucopenia with only mild thrombocytopenia together point away from dengue and malaria and towards enteric fever. Street-food and unreliable water exposure supply the route. Blood culture — not the Widal test — confirms it, and the sensitivity pattern matters because empirical ciprofloxacin would have failed.",
+  "critical_clues": [
+    "stepladder",
+    "relative bradycardia",
+    "constipation",
+    "rose spot",
+    "splenomegaly",
+    "leucopenia",
+    "leukopenia",
+    "street food",
+    "blood culture",
+    "eight days"
+  ],
+  "red_flags": [
+    "altered sensorium",
+    "abdominal tenderness",
+    "persistent fever despite antibiotics",
+    "thrombocytopenia"
+  ],
+  "rubric": {
+    "history": [
+      {
+        "id": "h_pattern",
+        "label": "Pattern of the fever through the day",
+        "keywords": [
+          "pattern",
+          "time of day",
+          "evening",
+          "morning",
+          "come down",
+          "continuous",
+          "intermittent",
+          "chart",
+          "how does the fever",
+          "spike"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "A stepladder continuous fever, an intermittent fever with rigors and a saddleback fever point to three different diseases. Students almost never ask about the pattern."
+      },
+      {
+        "id": "h_rigors",
+        "label": "Chills and rigors",
+        "keywords": [
+          "chill",
+          "rigor",
+          "shiver",
+          "shaking"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Rigors strongly suggest malaria or bacteraemia with abscess; their absence here is informative."
+      },
+      {
+        "id": "h_bowel",
+        "label": "Bowel habit",
+        "keywords": [
+          "stool",
+          "motion",
+          "bowel",
+          "constipat",
+          "diarrhoea",
+          "diarrhea",
+          "loose"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Constipation in enteric fever surprises students who expect diarrhoea from a gut pathogen. It is a genuine discriminator."
+      },
+      {
+        "id": "h_food",
+        "label": "Food and water source",
+        "keywords": [
+          "food",
+          "eat",
+          "street",
+          "outside",
+          "water",
+          "drink",
+          "hostel",
+          "mess",
+          "hygiene"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Establishes the faeco-oral route and is the exposure question for enteric fever and hepatitis A/E."
+      },
+      {
+        "id": "h_headache",
+        "label": "Headache and retro-orbital pain",
+        "keywords": [
+          "headache",
+          "head",
+          "behind the eyes",
+          "retro orbital",
+          "eye pain"
+        ],
+        "weight": 2,
+        "teaching_note": "Retro-orbital pain with a severe early headache is characteristic of dengue."
+      },
+      {
+        "id": "h_bleeding",
+        "label": "Bleeding from any site",
+        "keywords": [
+          "bleed",
+          "gums",
+          "nose",
+          "epistaxis",
+          "blood in",
+          "bruis",
+          "petechia"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "The screening question for dengue with warning signs, which changes disposition immediately."
+      },
+      {
+        "id": "h_rash",
+        "label": "Rash",
+        "keywords": [
+          "rash",
+          "spots",
+          "skin",
+          "marks"
+        ],
+        "weight": 3,
+        "teaching_note": "Rose spots, the dengue macular rash and the eschar of scrub typhus are each diagnostic when found."
+      },
+      {
+        "id": "h_urinary",
+        "label": "Urinary symptoms",
+        "keywords": [
+          "urine",
+          "burning",
+          "urinat",
+          "passing water",
+          "frequency"
+        ],
+        "weight": 2,
+        "teaching_note": "Excludes urinary sepsis, a common and easily treated cause of prolonged fever in young women."
+      },
+      {
+        "id": "h_travel",
+        "label": "Travel and environmental exposure",
+        "keywords": [
+          "travel",
+          "trip",
+          "outside the city",
+          "village",
+          "flood",
+          "water logging",
+          "animal",
+          "mosquito",
+          "rats"
+        ],
+        "weight": 3,
+        "teaching_note": "Separates leptospirosis, scrub typhus and malaria by exposure rather than by symptoms."
+      },
+      {
+        "id": "h_priormeds",
+        "label": "Antibiotics already taken",
+        "keywords": [
+          "antibiotic",
+          "medicine",
+          "tablet",
+          "pharmacy",
+          "treatment",
+          "medication",
+          "taken anything"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Prior antibiotics sterilise blood cultures and blunt the fever, and partial treatment is itself a reason a fever persists."
+      },
+      {
+        "id": "h_contacts",
+        "label": "Similar illness in contacts",
+        "keywords": [
+          "contact",
+          "anyone else",
+          "family",
+          "hostel",
+          "friends",
+          "roommate",
+          "neighbour"
+        ],
+        "weight": 2,
+        "teaching_note": "Clusters point to a common source — water, food or vector."
+      },
+      {
+        "id": "h_weightloss",
+        "label": "Weight loss and night sweats",
+        "keywords": [
+          "weight",
+          "night sweat",
+          "appetite",
+          "losing"
+        ],
+        "weight": 2,
+        "teaching_note": "Screens for tuberculosis and malignancy in prolonged fever."
+      },
+      {
+        "id": "h_sensorium",
+        "label": "Drowsiness or confusion",
+        "keywords": [
+          "confus",
+          "drowsy",
+          "sleepy",
+          "conscious",
+          "behaviour",
+          "behavior",
+          "mental",
+          "slow"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Altered sensorium in enteric fever marks severe disease and is an indication for steroids in some protocols."
+      }
+    ],
+    "examination": [
+      {
+        "id": "e_vitals",
+        "label": "Vital signs, comparing pulse with temperature",
+        "keywords": [
+          "vitals",
+          "vital signs",
+          "pulse",
+          "temperature",
+          "blood pressure",
+          "bp",
+          "respiratory rate",
+          "bradycardia"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Faget's sign — relative bradycardia — is free, takes ten seconds, and is one of the strongest bedside pointers to enteric fever."
+      },
+      {
+        "id": "e_abdomen",
+        "label": "Abdominal examination including the spleen",
+        "keywords": [
+          "abdomen",
+          "abdominal",
+          "spleen",
+          "splenomegaly",
+          "liver",
+          "palpat",
+          "per abdomen"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Splenomegaly narrows an undifferentiated fever dramatically: enteric fever, malaria, scrub typhus, endocarditis and haematological disease."
+      },
+      {
+        "id": "e_skin",
+        "label": "Full skin examination for rash and eschar",
+        "keywords": [
+          "skin",
+          "rash",
+          "rose spot",
+          "eschar",
+          "petechia",
+          "tourniquet",
+          "spots"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Rose spots are faint and on the trunk; an eschar is painless and hides in the axilla or groin. Both are missed unless the patient is undressed and examined properly."
+      },
+      {
+        "id": "e_cns",
+        "label": "Conscious level and meningeal signs",
+        "keywords": [
+          "cns",
+          "neuro",
+          "conscious",
+          "gcs",
+          "neck stiffness",
+          "meningeal",
+          "kernig",
+          "orientation"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Any fever with altered sensorium demands consideration of meningitis and cerebral malaria."
+      },
+      {
+        "id": "e_general",
+        "label": "General examination for pallor, icterus and nodes",
+        "keywords": [
+          "general",
+          "pallor",
+          "icterus",
+          "jaundice",
+          "lymph node",
+          "conjunctiva",
+          "tongue"
+        ],
+        "weight": 2,
+        "teaching_note": "Conjunctival suffusion suggests leptospirosis; lymphadenopathy suggests scrub typhus or lymphoma."
+      }
+    ],
+    "investigations": [
+      {
+        "id": "i_cbc",
+        "label": "Complete blood count with peripheral smear",
+        "keywords": [
+          "cbc",
+          "blood count",
+          "hemogram",
+          "haemogram",
+          "platelet",
+          "smear",
+          "wbc"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Leucopenia with mild thrombocytopenia fits enteric fever; marked thrombocytopenia with a rising haematocrit fits dengue."
+      },
+      {
+        "id": "i_bloodculture",
+        "label": "Blood culture",
+        "keywords": [
+          "blood culture",
+          "culture"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "The definitive test for enteric fever, and the only one that gives you the antibiotic sensitivity. Two sets, before antibiotics."
+      },
+      {
+        "id": "i_malaria",
+        "label": "Malaria smear and rapid antigen test",
+        "keywords": [
+          "malaria",
+          "mp",
+          "malarial parasite",
+          "thick smear",
+          "rapid test",
+          "qbc"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Mandatory in any acute undifferentiated fever in an endemic country, and a single negative smear is not enough."
+      },
+      {
+        "id": "i_dengue",
+        "label": "Dengue NS1 and serology",
+        "keywords": [
+          "dengue",
+          "ns1",
+          "dengue igm"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "NS1 is useful in the first five days; after that IgM is the test. Interpreting the wrong one for the day of illness is a common error."
+      },
+      {
+        "id": "i_lft",
+        "label": "Liver function tests",
+        "keywords": [
+          "lft",
+          "liver function",
+          "bilirubin",
+          "alt",
+          "sgpt",
+          "transaminase"
+        ],
+        "weight": 2,
+        "teaching_note": "Mild transaminitis is near-universal in enteric fever, scrub typhus and dengue; marked jaundice points to leptospirosis or hepatitis."
+      },
+      {
+        "id": "i_urine",
+        "label": "Urine routine and culture",
+        "keywords": [
+          "urine",
+          "urinalysis",
+          "urine culture",
+          "urine routine"
+        ],
+        "weight": 2,
+        "teaching_note": "Cheap, and excludes a very common cause of fever in young women."
+      },
+      {
+        "id": "i_scrub",
+        "label": "Scrub typhus IgM",
+        "keywords": [
+          "scrub",
+          "typhus",
+          "rickettsia",
+          "orientia"
+        ],
+        "weight": 3,
+        "teaching_note": "Should be sent in any monsoon fever beyond five days without a source; treatment is doxycycline and the response is dramatic."
+      },
+      {
+        "id": "i_lepto",
+        "label": "Leptospira IgM",
+        "keywords": [
+          "lepto",
+          "leptospira",
+          "leptospirosis"
+        ],
+        "weight": 2,
+        "teaching_note": "Consider with monsoon exposure, myalgia and conjunctival suffusion."
+      },
+      {
+        "id": "i_usg",
+        "label": "Ultrasound abdomen",
+        "keywords": [
+          "ultrasound",
+          "usg",
+          "sonography"
+        ],
+        "weight": 2,
+        "teaching_note": "Confirms organomegaly and looks for an occult abscess or bowel thickening."
+      },
+      {
+        "id": "i_rft",
+        "label": "Renal function and electrolytes",
+        "keywords": [
+          "renal",
+          "urea",
+          "creatinine",
+          "electrolyte",
+          "rft",
+          "sodium"
+        ],
+        "weight": 2,
+        "teaching_note": "Hyponatraemia is common in enteric fever and scrub typhus; renal failure suggests leptospirosis or severe malaria."
+      },
+      {
+        "id": "i_cxr",
+        "label": "Chest X-ray",
+        "keywords": [
+          "chest x ray",
+          "cxr",
+          "chest xray"
+        ],
+        "weight": 2,
+        "teaching_note": "Screens for an occult chest source and for tuberculosis."
+      }
+    ]
+  },
+  "hints": [
+    "Compare her pulse rate with her temperature, and look again at what her bowels have been doing.",
+    "The fever pattern over eight days is not the pattern of dengue or of malaria. What does a steadily climbing fever with constipation and a palpable spleen suggest?",
+    "Review the approach to acute undifferentiated fever in a tropical setting, and which single investigation gives you both the diagnosis and the treatment."
+  ],
+  "teaching_points": [
+    "In acute undifferentiated fever, the pattern of the fever and the presence or absence of rigors carry more diagnostic weight than any single symptom.",
+    "Relative bradycardia (Faget's sign) with a high fever suggests enteric fever, scrub typhus, legionella or a drug fever.",
+    "Enteric fever classically causes constipation in adults, not diarrhoea.",
+    "The Widal test is neither sensitive nor specific and should not be used to diagnose or exclude enteric fever. Blood culture is the standard, and it also gives sensitivities that now matter because fluoroquinolone resistance is widespread.",
+    "Always undress the patient and search actively for rose spots and for an eschar. Both are easy to find and easy to miss.",
+    "Prior over-the-counter antibiotics reduce blood culture yield — record exactly what was taken."
+  ],
+  "revision_topics": [
+    "Approach to acute undifferentiated fever in the tropics",
+    "Enteric fever: pathogenesis, clinical course week by week, complications and current treatment",
+    "Dengue: warning signs, phases and fluid management",
+    "Why the Widal test should be abandoned in favour of blood culture"
+  ],
+  "provenance": {
+    "author": "Simulator seed content",
+    "reviewed_by": "",
+    "review_date": "",
+    "status": "draft",
+    "references": [
+      "WHO background document: the diagnosis, treatment and prevention of typhoid fever",
+      "National guidelines for the clinical management of dengue fever, Government of India"
+    ]
+  }
+}

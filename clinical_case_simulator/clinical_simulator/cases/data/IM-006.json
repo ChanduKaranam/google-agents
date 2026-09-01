@@ -1,0 +1,1194 @@
+{
+  "case_id": "IM-006",
+  "title": "Confusion and falls in a 76-year-old woman with an incomplete history",
+  "specialty": "Internal Medicine",
+  "difficulty": 4,
+  "setting": "Emergency department, brought in by a neighbour",
+  "opening_brief": "You are a medical student in the emergency department.\n\nA 76-year-old woman has been brought in by a neighbour after two falls at home over the past week. The neighbour says she has been \"not herself\" and confused for several days, and then leaves to collect her own children.\n\nThe patient is drowsy and gives an unreliable history. No family member is present yet and no records are available.\n\nThis case is deliberately incomplete. Work with what you can get, and keep reassessing — information may arrive as the encounter goes on.",
+  "patient": {
+    "name": "Sarala Iyer",
+    "age": 76,
+    "sex": "female",
+    "occupation": "retired schoolteacher",
+    "background": "Widowed, lives alone. A daughter lives in the same city."
+  },
+  "persona": {
+    "speech_style": "Slow, vague, sometimes loses the thread mid-sentence. Repeats herself.",
+    "emotional_state": "Drowsy and mildly disoriented; not distressed.",
+    "education_level": "Educated, but currently confused.",
+    "knows_not": [
+      "what medicines she takes or their names",
+      "how many times she has fallen",
+      "what day or month it is",
+      "whether she hit her head",
+      "how much she has been drinking or passing urine"
+    ],
+    "quirks": [
+      "Answers 'I think so' or 'I don't remember' to most specific questions.",
+      "If asked the same question twice, may give a slightly different answer — she is genuinely confused, not evasive.",
+      "Says 'my daughter knows all that' when asked about medicines."
+    ]
+  },
+  "chief_complaint": "confusion and two falls over the past week",
+  "history": {
+    "present_illness": {
+      "onset": "She is not sure. Thinks she has felt 'off' for maybe a week or two.",
+      "site": "Not applicable. She says her legs feel weak and she keeps sitting down.",
+      "character": "Feels muddled and very tired.",
+      "radiation": "Not applicable.",
+      "duration": "Cannot say. Possibly two weeks.",
+      "severity": "Cannot quantify.",
+      "timing": "Thinks it is worse in the last two or three days.",
+      "aggravating": "Standing up makes her feel unsteady.",
+      "relieving": "Lying down.",
+      "associated": [
+        "feels sick in the stomach and has not eaten much",
+        "had a headache 'somewhere' but cannot localise it",
+        "thinks she may have vomited once",
+        "has been very thirsty and drinking a lot of water"
+      ],
+      "progression": "She says it is getting worse but cannot describe how."
+    },
+    "past_medical": [
+      "High blood pressure for many years",
+      "Knee arthritis",
+      "Says she was 'feeling low' after her husband died last year and the doctor gave her something for it",
+      "Denies diabetes, denies stroke, denies fits — but is an unreliable historian"
+    ],
+    "medications": [
+      "Cannot name any of them",
+      "Says there is a bag of medicines at home and that her daughter manages them",
+      "Thinks the doctor changed something a few weeks ago"
+    ],
+    "allergies": [
+      "Cannot recall"
+    ],
+    "family": [
+      "Daughter lives in the same city and visits at weekends"
+    ],
+    "social": [
+      "Lives alone since her husband died last year",
+      "Manages her own cooking, but says she has not been cooking much lately",
+      "Does not smoke, does not drink alcohol",
+      "Walks with a stick since her knee got bad"
+    ],
+    "review_of_systems_positive": [
+      "very thirsty",
+      "unsteady on her feet",
+      "poor appetite"
+    ],
+    "review_of_systems_negative": [
+      "no chest pain that she recalls",
+      "no fever that she is aware of",
+      "no cough",
+      "no burning when passing urine, though she is unsure",
+      "no weakness of one side",
+      "no double vision"
+    ]
+  },
+  "examination": [
+    {
+      "id": "vitals",
+      "label": "Vital signs including postural blood pressure",
+      "aliases": [
+        "vitals",
+        "vital signs",
+        "temperature",
+        "pulse",
+        "blood pressure",
+        "bp",
+        "postural",
+        "orthostatic",
+        "respiratory rate",
+        "saturation",
+        "spo2"
+      ],
+      "result": "Temperature 36.8 C. Pulse 84/min regular. BP 138/78 lying, 118/70 sitting. Respiratory rate 16/min. SpO2 96% on room air. Capillary glucose 104 mg/dL."
+    },
+    {
+      "id": "capglucose",
+      "label": "Capillary blood glucose",
+      "aliases": [
+        "glucose",
+        "capillary glucose",
+        "blood sugar",
+        "rbs",
+        "glucometer",
+        "bedside glucose",
+        "sugar",
+        "finger prick"
+      ],
+      "result": "104 mg/dL — hypoglycaemia excluded as a cause of the confusion."
+    },
+    {
+      "id": "gcs",
+      "label": "Conscious level and cognitive assessment",
+      "aliases": [
+        "gcs",
+        "conscious",
+        "consciousness",
+        "amt",
+        "mmse",
+        "cognitive",
+        "orientation",
+        "mental status",
+        "confusion assessment",
+        "cam",
+        "4at"
+      ],
+      "result": "GCS 14 (E4 V4 M6) — drowsy, disoriented to time and place, oriented to person. Abbreviated Mental Test score 5/10. Attention impaired: cannot recite the months backwards. Fluctuating through the assessment."
+    },
+    {
+      "id": "cns",
+      "label": "Neurological examination",
+      "aliases": [
+        "cns",
+        "neurological",
+        "neuro",
+        "power",
+        "tone",
+        "reflexes",
+        "plantar",
+        "cranial nerves",
+        "focal",
+        "pupils"
+      ],
+      "result": "Pupils equal and reactive. Cranial nerves intact. Tone normal, power 4+/5 symmetrically and effort-dependent. Reflexes symmetrical, plantars flexor. No focal deficit. No tremor, no myoclonus."
+    },
+    {
+      "id": "meningeal",
+      "label": "Meningeal signs",
+      "aliases": [
+        "neck stiffness",
+        "meningeal",
+        "kernig",
+        "brudzinski",
+        "meningism"
+      ],
+      "result": "No neck stiffness. Kernig's sign negative."
+    },
+    {
+      "id": "head",
+      "label": "Head and scalp examination for injury",
+      "aliases": [
+        "head",
+        "scalp",
+        "head injury",
+        "bruise",
+        "laceration",
+        "skull",
+        "battle",
+        "raccoon"
+      ],
+      "result": "A resolving 4 cm bruise over the left parietal scalp, several days old. No boggy swelling, no laceration, no bleeding from ears or nose, no periorbital or mastoid bruising."
+    },
+    {
+      "id": "hydration",
+      "label": "Hydration and volume status",
+      "aliases": [
+        "hydration",
+        "volume status",
+        "dehydration",
+        "skin turgor",
+        "mucous membranes",
+        "jvp",
+        "dry"
+      ],
+      "result": "Mucous membranes moist. Skin turgor difficult to assess at this age. JVP not raised, not collapsed. No pedal oedema. Clinically close to euvolaemic."
+    },
+    {
+      "id": "cvs",
+      "label": "Cardiovascular examination",
+      "aliases": [
+        "cardiovascular",
+        "cvs",
+        "heart sounds",
+        "murmur",
+        "apex"
+      ],
+      "result": "Heart sounds normal, no murmur. Pulse regular."
+    },
+    {
+      "id": "chest",
+      "label": "Respiratory examination",
+      "aliases": [
+        "chest",
+        "respiratory",
+        "lungs",
+        "auscultation",
+        "breath sounds",
+        "crackles"
+      ],
+      "result": "Clear, equal air entry, no crackles."
+    },
+    {
+      "id": "abdomen",
+      "label": "Abdominal examination",
+      "aliases": [
+        "abdomen",
+        "abdominal",
+        "per abdomen",
+        "bladder",
+        "palpable bladder",
+        "tenderness"
+      ],
+      "result": "Soft, non-tender. Bladder not palpable. No organomegaly."
+    },
+    {
+      "id": "thyroid",
+      "label": "Thyroid examination",
+      "aliases": [
+        "thyroid",
+        "goitre",
+        "goiter"
+      ],
+      "result": "No goitre. No signs of hypothyroidism on inspection."
+    },
+    {
+      "id": "collateral",
+      "label": "Collateral history and medication reconciliation",
+      "aliases": [
+        "collateral",
+        "collateral history",
+        "daughter",
+        "family",
+        "relative",
+        "medication list",
+        "medicine list",
+        "drug chart",
+        "pharmacy",
+        "records",
+        "gp",
+        "old notes",
+        "call the family",
+        "phone the daughter",
+        "who can tell",
+        "next of kin"
+      ],
+      "result": "The daughter, reached by phone and arriving shortly, brings the medicine bag: amlodipine 5 mg daily for years; hydrochlorothiazide 12.5 mg started SIX WEEKS ago when the BP was high at a check-up; sertraline 50 mg started FIVE WEEKS ago for low mood after bereavement; paracetamol as needed. The daughter says her mother has been drinking large amounts of water 'because someone told her it was healthy' and has eaten almost nothing for ten days. No head injury was witnessed. She was completely lucid at a family lunch three weeks ago."
+    }
+  ],
+  "investigations": [
+    {
+      "id": "electrolytes",
+      "label": "Serum electrolytes and renal function",
+      "aliases": [
+        "electrolytes",
+        "sodium",
+        "na",
+        "potassium",
+        "rft",
+        "renal function",
+        "urea",
+        "creatinine",
+        "kft",
+        "serum sodium"
+      ],
+      "tier": "first-line",
+      "result": "Sodium 116 mEq/L. Potassium 3.2 mEq/L. Chloride 84 mEq/L. Bicarbonate 26 mEq/L. Urea 18 mg/dL (low-normal). Creatinine 0.6 mg/dL. Corrected calcium 9.1 mg/dL. Magnesium 1.8 mg/dL."
+    },
+    {
+      "id": "serumosmo",
+      "label": "Serum osmolality",
+      "aliases": [
+        "serum osmolality",
+        "plasma osmolality",
+        "osmolality",
+        "osmolarity"
+      ],
+      "tier": "first-line",
+      "result": "248 mOsm/kg (low) — a true hypotonic hyponatraemia, not pseudohyponatraemia."
+    },
+    {
+      "id": "urineosmo",
+      "label": "Urine osmolality",
+      "aliases": [
+        "urine osmolality",
+        "urinary osmolality",
+        "urine osmolarity"
+      ],
+      "tier": "first-line",
+      "result": "462 mOsm/kg — inappropriately concentrated for the degree of hypotonicity."
+    },
+    {
+      "id": "urinena",
+      "label": "Urine sodium",
+      "aliases": [
+        "urine sodium",
+        "urinary sodium",
+        "spot urine sodium",
+        "fena"
+      ],
+      "tier": "first-line",
+      "result": "58 mEq/L — inappropriately high, indicating renal sodium loss rather than a hypovolaemic or oedematous state."
+    },
+    {
+      "id": "glucose",
+      "label": "Blood glucose",
+      "aliases": [
+        "glucose",
+        "sugar",
+        "rbs",
+        "blood sugar",
+        "capillary glucose"
+      ],
+      "tier": "bedside",
+      "result": "104 mg/dL."
+    },
+    {
+      "id": "tsh",
+      "label": "Thyroid function tests",
+      "aliases": [
+        "tsh",
+        "thyroid function",
+        "t4",
+        "thyroid profile"
+      ],
+      "tier": "first-line",
+      "result": "TSH 2.6 mIU/L, free T4 normal — hypothyroidism excluded as a cause."
+    },
+    {
+      "id": "cortisol",
+      "label": "Morning serum cortisol",
+      "aliases": [
+        "cortisol",
+        "serum cortisol",
+        "adrenal",
+        "short synacthen"
+      ],
+      "tier": "second-line",
+      "result": "18 mcg/dL at 8 am — adrenal insufficiency effectively excluded."
+    },
+    {
+      "id": "ctbrain",
+      "label": "Non-contrast CT brain",
+      "aliases": [
+        "ct brain",
+        "ct head",
+        "computed tomography brain",
+        "ct scan head",
+        "neuroimaging",
+        "brain scan"
+      ],
+      "tier": "first-line",
+      "result": "No acute intracranial haemorrhage. No subdural or extradural collection. No midline shift, no mass. Age-related atrophy and small-vessel ischaemic change only."
+    },
+    {
+      "id": "cbc",
+      "label": "Complete blood count",
+      "aliases": [
+        "cbc",
+        "blood count",
+        "hemogram",
+        "haemogram",
+        "fbc",
+        "wbc"
+      ],
+      "tier": "first-line",
+      "result": "Hb 11.4 g/dL, WBC 7,800/uL, platelets 240,000/uL."
+    },
+    {
+      "id": "urine",
+      "label": "Urine routine, microscopy and culture",
+      "aliases": [
+        "urine",
+        "urine routine",
+        "urinalysis",
+        "urine culture",
+        "urine microscopy",
+        "urine c s"
+      ],
+      "tier": "first-line",
+      "result": "No pus cells, no nitrites, no bacteria. Culture sterile at 48 hours."
+    },
+    {
+      "id": "cxr",
+      "label": "Chest X-ray",
+      "aliases": [
+        "chest x ray",
+        "chest xray",
+        "cxr",
+        "chest radiograph"
+      ],
+      "tier": "first-line",
+      "result": "Clear lung fields, no consolidation, no mass lesion, normal heart size."
+    },
+    {
+      "id": "lft",
+      "label": "Liver function tests",
+      "aliases": [
+        "lft",
+        "liver function",
+        "bilirubin",
+        "albumin",
+        "alt"
+      ],
+      "tier": "first-line",
+      "result": "Bilirubin 0.7 mg/dL, ALT 22 U/L, albumin 3.5 g/dL."
+    },
+    {
+      "id": "ecg",
+      "label": "12-lead ECG",
+      "aliases": [
+        "ecg",
+        "ekg",
+        "electrocardiogram"
+      ],
+      "tier": "bedside",
+      "result": "Sinus rhythm at 84/min. Flattened T waves and a U wave in V2-V3, consistent with hypokalaemia. QTc 448 ms. No ischaemic changes."
+    },
+    {
+      "id": "b12",
+      "label": "Vitamin B12 and folate",
+      "aliases": [
+        "b12",
+        "vitamin b12",
+        "folate",
+        "cobalamin"
+      ],
+      "tier": "second-line",
+      "result": "B12 318 pg/mL, folate 6.2 ng/mL — both adequate."
+    },
+    {
+      "id": "lp",
+      "label": "Lumbar puncture",
+      "aliases": [
+        "lumbar puncture",
+        "lp",
+        "csf",
+        "spinal tap"
+      ],
+      "tier": "specialist",
+      "appropriate": false,
+      "result": "Not performed.",
+      "note": "Not indicated without fever, meningism or a persistent unexplained encephalopathy after correcting the metabolic cause."
+    },
+    {
+      "id": "mri",
+      "label": "MRI brain",
+      "aliases": [
+        "mri",
+        "mri brain",
+        "magnetic resonance"
+      ],
+      "tier": "specialist",
+      "appropriate": false,
+      "result": "Not performed acutely.",
+      "note": "Reserve for confusion that does not resolve once the sodium is corrected, or for a focal deficit."
+    }
+  ],
+  "differentials": [
+    {
+      "dx": "Severe hyponatraemia",
+      "status": "correct",
+      "aliases": [
+        "hyponatremia",
+        "hyponatraemia",
+        "low sodium",
+        "sodium 116",
+        "siadh",
+        "electrolyte imbalance"
+      ],
+      "why": "Sodium 116 with low serum osmolality, inappropriately concentrated urine and a high urine sodium in a clinically euvolaemic patient, precipitated by a thiazide plus an SSRI plus excessive water intake and poor solute intake."
+    },
+    {
+      "dx": "Drug-induced hyponatraemia (thiazide and SSRI)",
+      "status": "correct",
+      "aliases": [
+        "thiazide",
+        "hydrochlorothiazide",
+        "ssri",
+        "sertraline",
+        "drug induced",
+        "medication induced",
+        "iatrogenic"
+      ],
+      "why": "Both drugs were started in the six weeks before the symptoms began, and both are leading causes of hyponatraemia in older adults. Naming the cause, not just the electrolyte, is the point of the case."
+    },
+    {
+      "dx": "Chronic subdural haematoma",
+      "status": "must-exclude",
+      "aliases": [
+        "subdural",
+        "sdh",
+        "chronic subdural",
+        "intracranial bleed",
+        "haematoma",
+        "hematoma"
+      ],
+      "why": "Falls, a scalp bruise, an elderly patient and a fluctuating conscious level. Must be excluded by CT before anything is attributed to metabolism — and here the CT is clean.",
+      "excluded_by": [
+        "ctbrain",
+        "head"
+      ]
+    },
+    {
+      "dx": "Urinary tract infection or sepsis",
+      "status": "must-exclude",
+      "aliases": [
+        "uti",
+        "urinary tract infection",
+        "sepsis",
+        "infection",
+        "urosepsis"
+      ],
+      "why": "The reflex diagnosis in any confused elderly woman, and frequently wrong. There is no fever, no leucocytosis and a clean urine. Treating an imagined UTI here would have delayed the real diagnosis.",
+      "excluded_by": [
+        "urine",
+        "vitals",
+        "cbc"
+      ]
+    },
+    {
+      "dx": "Hypoglycaemia",
+      "status": "must-exclude",
+      "aliases": [
+        "hypoglycemia",
+        "hypoglycaemia",
+        "low sugar",
+        "low glucose"
+      ],
+      "why": "Instantly reversible and instantly fatal if missed. A capillary glucose is mandatory in every confused patient; it is 104 here.",
+      "excluded_by": [
+        "capglucose",
+        "glucose"
+      ]
+    },
+    {
+      "dx": "Delirium secondary to a metabolic cause",
+      "status": "plausible",
+      "aliases": [
+        "delirium",
+        "acute confusional state",
+        "encephalopathy"
+      ],
+      "why": "Correct as a syndrome — the fluctuating course and inattention define delirium — but delirium is a presentation, not a diagnosis. Credit is limited unless the underlying cause is named."
+    },
+    {
+      "dx": "Dementia",
+      "status": "incorrect",
+      "aliases": [
+        "dementia",
+        "alzheimer",
+        "cognitive decline"
+      ],
+      "why": "She was lucid three weeks ago and the course fluctuates over days. Dementia does not develop in three weeks, and labelling her as demented would end the diagnostic process prematurely."
+    },
+    {
+      "dx": "Stroke",
+      "status": "incorrect",
+      "aliases": [
+        "stroke",
+        "cva",
+        "infarct",
+        "tia"
+      ],
+      "why": "No focal neurological deficit and a CT with no infarct or bleed."
+    },
+    {
+      "dx": "Hypothyroidism",
+      "status": "plausible",
+      "aliases": [
+        "hypothyroid",
+        "myxoedema",
+        "thyroid"
+      ],
+      "why": "A recognised cause of hyponatraemia and of cognitive slowing; reasonable to check, and normal here."
+    }
+  ],
+  "final_diagnosis": "Severe symptomatic hypotonic hyponatraemia (serum sodium 116 mEq/L) with associated hypokalaemia, caused by hydrochlorothiazide started six weeks ago combined with sertraline started five weeks ago, compounded by high free-water intake and low solute intake — presenting as delirium with falls in an older adult",
+  "diagnosis_reasoning": "The syndrome is delirium: acute onset over days, fluctuating, with impaired attention. The cause is metabolic. Serum sodium 116 with a serum osmolality of 248 confirms true hypotonic hyponatraemia; a urine osmolality of 462 and urine sodium of 58 in a clinically euvolaemic patient indicate that free water is being retained inappropriately with ongoing renal sodium loss — the thiazide pattern, with sertraline-associated SIADH acting on top. Both drugs were started within the six weeks preceding the illness, which the collateral history supplies and the patient herself cannot. Chronic subdural haematoma was the necessary competing diagnosis given the falls and scalp bruise, and it was excluded on CT rather than by assumption. A urinary tract infection was neither present nor plausible.",
+  "critical_clues": [
+    "sodium 116",
+    "urine osmolality",
+    "urine sodium",
+    "euvolaemic",
+    "euvolemic",
+    "thiazide",
+    "hydrochlorothiazide",
+    "sertraline",
+    "ssri",
+    "collateral",
+    "medication",
+    "water intake",
+    "fluctuat",
+    "attention",
+    "ct brain"
+  ],
+  "red_flags": [
+    "sodium below 120",
+    "reduced conscious level",
+    "recurrent falls in an older adult",
+    "scalp bruise with possible head injury",
+    "risk of osmotic demyelination if corrected too fast"
+  ],
+  "rubric": {
+    "history": [
+      {
+        "id": "h_collateral",
+        "label": "Actively seeking a collateral history",
+        "keywords": [
+          "collateral",
+          "daughter",
+          "family",
+          "relative",
+          "neighbour",
+          "neighbor",
+          "who can tell",
+          "call",
+          "phone",
+          "next of kin",
+          "someone else",
+          "records",
+          "old notes",
+          "gp"
+        ],
+        "weight": 5,
+        "critical": true,
+        "teaching_note": "The single most important action in this case. The patient cannot give the history that makes the diagnosis. A student who never seeks collateral cannot solve this case honestly, whatever they eventually guess."
+      },
+      {
+        "id": "h_meds",
+        "label": "Full medication history, including recent changes",
+        "keywords": [
+          "medicine",
+          "medication",
+          "tablet",
+          "drug",
+          "prescription",
+          "pharmacy",
+          "what does she take",
+          "recently started",
+          "changed",
+          "new medicine"
+        ],
+        "weight": 5,
+        "critical": true,
+        "teaching_note": "Two drugs started in the preceding six weeks cause the entire presentation. In an older adult with delirium, the drug chart is part of the physical examination."
+      },
+      {
+        "id": "h_timecourse",
+        "label": "Time course and fluctuation of the confusion",
+        "keywords": [
+          "when did",
+          "how long",
+          "started",
+          "gradual",
+          "sudden",
+          "fluctuat",
+          "worse at",
+          "days",
+          "weeks",
+          "baseline",
+          "normally"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Acute and fluctuating means delirium; chronic and progressive means dementia. Establishing the baseline is what separates them."
+      },
+      {
+        "id": "h_headinjury",
+        "label": "Head injury and the circumstances of the falls",
+        "keywords": [
+          "fall",
+          "fell",
+          "head",
+          "hit",
+          "injury",
+          "trauma",
+          "knock",
+          "how did she fall",
+          "before or after",
+          "trip",
+          "faint",
+          "blackout"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Whether the fall caused the confusion or the confusion caused the fall changes the whole approach — and a chronic subdural must be excluded either way."
+      },
+      {
+        "id": "h_fluid",
+        "label": "Fluid and food intake",
+        "keywords": [
+          "drink",
+          "water",
+          "fluid",
+          "eat",
+          "eating",
+          "appetite",
+          "food",
+          "meals",
+          "thirsty",
+          "how much"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "High free-water intake with low solute intake is the third arm of this hyponatraemia and is only found by asking."
+      },
+      {
+        "id": "h_urine",
+        "label": "Urinary symptoms and output",
+        "keywords": [
+          "urine",
+          "urinat",
+          "passing water",
+          "burning",
+          "incontinen",
+          "output",
+          "catheter"
+        ],
+        "weight": 3,
+        "teaching_note": "Necessary to address the urinary tract infection that everyone assumes, and to gauge volume status."
+      },
+      {
+        "id": "h_infection",
+        "label": "Fever and infective symptoms",
+        "keywords": [
+          "fever",
+          "temperature",
+          "cough",
+          "infection",
+          "unwell",
+          "chills",
+          "breathless"
+        ],
+        "weight": 3,
+        "teaching_note": "Infection is the commonest precipitant of delirium in older adults and must be actively excluded, not assumed."
+      },
+      {
+        "id": "h_mood",
+        "label": "Mood, bereavement and psychiatric history",
+        "keywords": [
+          "mood",
+          "depress",
+          "low",
+          "sad",
+          "psychiatr",
+          "bereave",
+          "husband",
+          "died",
+          "alone",
+          "sleep"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "The bereavement is why she was started on sertraline. The psychiatric history leads directly to the pharmacological cause."
+      },
+      {
+        "id": "h_alcohol",
+        "label": "Alcohol and substance use",
+        "keywords": [
+          "alcohol",
+          "drink",
+          "smoke",
+          "substance"
+        ],
+        "weight": 2,
+        "teaching_note": "Withdrawal and Wernicke's encephalopathy are important reversible causes of delirium."
+      },
+      {
+        "id": "h_focal",
+        "label": "Focal neurological symptoms and seizures",
+        "keywords": [
+          "weakness",
+          "one side",
+          "speech",
+          "vision",
+          "double",
+          "fit",
+          "seizure",
+          "numb",
+          "facial"
+        ],
+        "weight": 3,
+        "teaching_note": "Screens for stroke and for a space-occupying lesion."
+      },
+      {
+        "id": "h_function",
+        "label": "Baseline functional and cognitive level",
+        "keywords": [
+          "baseline",
+          "normally",
+          "cook",
+          "manage",
+          "independent",
+          "before this",
+          "memory",
+          "usual self",
+          "look after"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Without the baseline, an abnormal mental test score is uninterpretable."
+      },
+      {
+        "id": "h_bowel",
+        "label": "Bowel habit and constipation",
+        "keywords": [
+          "bowel",
+          "stool",
+          "constipat",
+          "motion"
+        ],
+        "weight": 1,
+        "teaching_note": "Constipation and urinary retention are common and easily missed precipitants of delirium."
+      }
+    ],
+    "examination": [
+      {
+        "id": "e_glucose",
+        "label": "Capillary blood glucose",
+        "keywords": [
+          "glucose",
+          "sugar",
+          "rbs",
+          "capillary",
+          "glucometer",
+          "blood sugar"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Non-negotiable in every confused patient, at the bedside, before anything else."
+      },
+      {
+        "id": "e_gcs",
+        "label": "Conscious level and formal cognitive assessment",
+        "keywords": [
+          "gcs",
+          "conscious",
+          "amt",
+          "mmse",
+          "cognitive",
+          "orientation",
+          "mental",
+          "attention",
+          "4at",
+          "confusion assessment",
+          "cam"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Documenting inattention and fluctuation is what allows you to call this delirium rather than dementia."
+      },
+      {
+        "id": "e_vitals",
+        "label": "Vital signs including postural blood pressure",
+        "keywords": [
+          "vitals",
+          "vital signs",
+          "temperature",
+          "pulse",
+          "blood pressure",
+          "bp",
+          "postural",
+          "orthostatic",
+          "saturation",
+          "respiratory rate"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Screens for sepsis and for the postural drop that explains recurrent falls."
+      },
+      {
+        "id": "e_head",
+        "label": "Head and scalp examination for injury",
+        "keywords": [
+          "head",
+          "scalp",
+          "bruise",
+          "injury",
+          "skull",
+          "laceration",
+          "battle",
+          "raccoon",
+          "ear",
+          "nose"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "An old scalp bruise in a faller mandates imaging for a chronic subdural haematoma."
+      },
+      {
+        "id": "e_hydration",
+        "label": "Assessment of volume status",
+        "keywords": [
+          "hydration",
+          "volume",
+          "dehydrat",
+          "turgor",
+          "mucous",
+          "jvp",
+          "oedema",
+          "edema",
+          "fluid status"
+        ],
+        "weight": 5,
+        "critical": true,
+        "teaching_note": "Volume status is the fork in the entire hyponatraemia algorithm. Hypovolaemic, euvolaemic and hypervolaemic hyponatraemia have completely different causes and treatments."
+      },
+      {
+        "id": "e_cns",
+        "label": "Neurological examination for focal signs",
+        "keywords": [
+          "cns",
+          "neuro",
+          "power",
+          "tone",
+          "reflex",
+          "plantar",
+          "cranial",
+          "pupil",
+          "focal"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "A focal deficit would redirect the entire workup towards stroke or a mass lesion."
+      },
+      {
+        "id": "e_infection",
+        "label": "Examination for a source of infection",
+        "keywords": [
+          "chest",
+          "respiratory",
+          "abdomen",
+          "abdominal",
+          "skin",
+          "pressure sore",
+          "calf",
+          "lung",
+          "auscultat",
+          "bladder"
+        ],
+        "weight": 3,
+        "teaching_note": "Delirium in an older adult demands a systematic hunt for an occult source."
+      },
+      {
+        "id": "e_meningeal",
+        "label": "Meningeal signs",
+        "keywords": [
+          "neck stiffness",
+          "meningeal",
+          "kernig",
+          "brudzinski",
+          "meningism"
+        ],
+        "weight": 2,
+        "teaching_note": "Cheap, and meningitis in older adults presents atypically."
+      }
+    ],
+    "investigations": [
+      {
+        "id": "i_electrolytes",
+        "label": "Serum electrolytes and renal function",
+        "keywords": [
+          "electrolyte",
+          "sodium",
+          "potassium",
+          "urea",
+          "creatinine",
+          "rft",
+          "renal",
+          "kft",
+          "na"
+        ],
+        "weight": 5,
+        "critical": true,
+        "teaching_note": "The diagnostic test. A sodium of 116 explains everything, and it costs almost nothing to check."
+      },
+      {
+        "id": "i_glucose",
+        "label": "Blood glucose",
+        "keywords": [
+          "glucose",
+          "sugar",
+          "rbs"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Also needed to interpret the sodium, since hyperglycaemia causes a translocational pseudo-hyponatraemia."
+      },
+      {
+        "id": "i_ctbrain",
+        "label": "CT brain",
+        "keywords": [
+          "ct brain",
+          "ct head",
+          "ct scan",
+          "neuroimaging",
+          "brain scan",
+          "ct"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Mandatory here: falls, a scalp bruise, anticoagulation risk and a reduced conscious level. Excluding a chronic subdural is not optional."
+      },
+      {
+        "id": "i_serumosmo",
+        "label": "Serum osmolality",
+        "keywords": [
+          "serum osmolality",
+          "plasma osmolality",
+          "osmolality",
+          "osmolarity"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Step one of the hyponatraemia algorithm: confirm the hyponatraemia is genuinely hypotonic before going further."
+      },
+      {
+        "id": "i_urineosmo",
+        "label": "Urine osmolality",
+        "keywords": [
+          "urine osmolality",
+          "urinary osmolality"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Step two: distinguishes appropriate water excretion (primary polydipsia, low solute intake) from inappropriate ADH activity."
+      },
+      {
+        "id": "i_urinena",
+        "label": "Urine sodium",
+        "keywords": [
+          "urine sodium",
+          "urinary sodium",
+          "spot urine",
+          "fena"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Step three: separates renal sodium loss (thiazides, SIADH, adrenal insufficiency) from extrarenal loss. Without all three tests you are guessing."
+      },
+      {
+        "id": "i_tsh",
+        "label": "Thyroid function",
+        "keywords": [
+          "tsh",
+          "thyroid",
+          "t4"
+        ],
+        "weight": 3,
+        "teaching_note": "Part of the standard workup of euvolaemic hyponatraemia before labelling it SIADH."
+      },
+      {
+        "id": "i_cortisol",
+        "label": "Serum cortisol",
+        "keywords": [
+          "cortisol",
+          "adrenal",
+          "synacthen"
+        ],
+        "weight": 3,
+        "teaching_note": "Adrenal insufficiency mimics SIADH exactly and must be excluded before that label is applied."
+      },
+      {
+        "id": "i_urine",
+        "label": "Urine routine and culture",
+        "keywords": [
+          "urine routine",
+          "urinalysis",
+          "urine culture",
+          "urine microscopy"
+        ],
+        "weight": 3,
+        "teaching_note": "Needed to disprove the assumed urinary tract infection. Note that asymptomatic bacteriuria is common in older women and is not a diagnosis."
+      },
+      {
+        "id": "i_cbc",
+        "label": "Complete blood count",
+        "keywords": [
+          "cbc",
+          "blood count",
+          "hemogram",
+          "haemogram",
+          "wbc"
+        ],
+        "weight": 2,
+        "teaching_note": "Screens for infection and anaemia."
+      },
+      {
+        "id": "i_cxr",
+        "label": "Chest X-ray",
+        "keywords": [
+          "chest x ray",
+          "cxr",
+          "chest xray"
+        ],
+        "weight": 3,
+        "teaching_note": "Two purposes here: an occult chest infection, and a lung malignancy as a cause of SIADH."
+      },
+      {
+        "id": "i_ecg",
+        "label": "ECG",
+        "keywords": [
+          "ecg",
+          "ekg",
+          "electrocardiogram"
+        ],
+        "weight": 2,
+        "teaching_note": "Shows the hypokalaemic changes and screens for a cardiac cause of the falls."
+      },
+      {
+        "id": "i_lft",
+        "label": "Liver function tests",
+        "keywords": [
+          "lft",
+          "liver",
+          "albumin",
+          "bilirubin"
+        ],
+        "weight": 2,
+        "teaching_note": "Excludes hepatic encephalopathy and hypoalbuminaemic states."
+      }
+    ]
+  },
+  "hints": [
+    "The patient cannot tell you what you need to know. Who else can, and what would you ask them for first?",
+    "Her confusion began within a few weeks of something in her life changing. What commonly changes for an older person living alone, and how could that make them confused?",
+    "Review the biochemical work-up of a confused older adult: which single panel you send first, and the algorithm that follows from an abnormal result — plasma osmolality, volume status, then the urine."
+  ],
+  "teaching_points": [
+    "In a confused older adult the medication list is a diagnostic test. Thiazides, SSRIs, opiates, anticholinergics and benzodiazepines cause a large share of delirium.",
+    "Collateral history is not optional when the patient cannot give a reliable one. Failing to obtain it is a process failure, not a bad-luck outcome.",
+    "Delirium is a syndrome, not a diagnosis. Naming it is only the first half of the job.",
+    "Work up hyponatraemia in order: confirm hypotonicity with serum osmolality, assess volume status clinically, then interpret urine osmolality and urine sodium. Skipping to a label of SIADH without excluding hypothyroidism and adrenal insufficiency is a common error.",
+    "Falls plus a scalp bruise plus fluctuating consciousness in an older adult means a CT head, even when a metabolic cause has already been found. Two diagnoses can coexist.",
+    "Correct chronic hyponatraemia slowly — no more than 8 to 10 mEq/L in 24 hours — or risk osmotic demyelination.",
+    "Do not diagnose a urinary tract infection in a confused older woman on the basis of bacteriuria alone."
+  ],
+  "revision_topics": [
+    "Diagnostic algorithm for hyponatraemia and the classification by volume status",
+    "Safe rates of sodium correction and osmotic demyelination syndrome",
+    "Delirium in older adults: causes, assessment tools (4AT, CAM) and the distinction from dementia",
+    "Drug-induced electrolyte disturbance in the elderly and deprescribing",
+    "Chronic subdural haematoma: presentation and indications for imaging"
+  ],
+  "evolution": [
+    {
+      "id": "daughter_arrives",
+      "after_turn": 12,
+      "update": "EVENT: The patient's daughter arrives in the department carrying a cloth bag of her mother's medicines and asks to speak to you. Offer this to the student as new information — do not summarise the contents unless they ask for them. If they ask, use the 'collateral history and medication reconciliation' examination entry."
+    },
+    {
+      "id": "sodium_flagged",
+      "after_action": "electrolytes",
+      "update": "EVENT: The laboratory telephones the department to flag a critical result. Relay only that the lab has called about the electrolytes; the student has already seen the value."
+    },
+    {
+      "id": "second_fall",
+      "after_turn": 24,
+      "update": "EVENT: The patient tries to get off the trolley unaided and is caught by a nurse. She is more drowsy than she was twenty minutes ago. Report this as an observation and ask the student what they want to do about it."
+    }
+  ],
+  "provenance": {
+    "author": "Simulator seed content",
+    "reviewed_by": "",
+    "review_date": "",
+    "status": "draft",
+    "references": [
+      "European clinical practice guideline on the diagnosis and treatment of hyponatraemia",
+      "NICE guideline: delirium — prevention, diagnosis and management"
+    ]
+  }
+}

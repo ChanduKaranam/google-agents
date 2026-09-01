@@ -1,0 +1,22 @@
+[project]
+name = "clinical-case-simulator"
+version = "0.1.0"
+description = "A grounded AI virtual patient for training and assessing clinical reasoning"
+requires-python = ">=3.11"
+dependencies = [
+    "google-adk>=1.0.0",
+    "pydantic>=2.7",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+# Needed only on the machine that runs ./deploy_agent_engine.sh
+deploy = ["google-cloud-aiplatform[agent_engines,adk]>=1.100"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
