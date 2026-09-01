@@ -1,0 +1,893 @@
+{
+  "case_id": "IM-004",
+  "title": "Chest tightness and palpitations in an anxious 29-year-old woman",
+  "specialty": "Internal Medicine",
+  "difficulty": 3,
+  "setting": "Emergency department",
+  "opening_brief": "You are a medical student in the emergency department.\n\nA 29-year-old woman has presented with chest tightness and a racing heart. She tells the triage nurse she has had panic attacks before and thinks this is another one.\n\nAssess her. Be careful: an explanation the patient offers you is a hypothesis, not a diagnosis.",
+  "patient": {
+    "name": "Ananya Rao",
+    "age": 29,
+    "sex": "female",
+    "occupation": "software engineer",
+    "background": "Recently returned from a work trip. Under pressure at work."
+  },
+  "persona": {
+    "speech_style": "Fast, slightly breathless, apologetic. Keeps saying she is probably wasting everyone's time.",
+    "emotional_state": "Anxious and embarrassed. Becomes more forthcoming if the student is reassuring.",
+    "education_level": "Postgraduate, but no medical training.",
+    "knows_not": [
+      "what a blood clot in the lung feels like",
+      "her exact heart rate",
+      "the name of her contraceptive pill brand beyond 'the daily one'"
+    ],
+    "quirks": [
+      "Volunteers 'I get panic attacks' more than once, because she genuinely believes it.",
+      "Mentions the flight only if asked about travel, immobility or the last few weeks."
+    ]
+  },
+  "chief_complaint": "chest tightness and a racing heart since yesterday evening",
+  "history": {
+    "present_illness": {
+      "onset": "Started yesterday evening while sitting at her desk. Nothing in particular set it off.",
+      "site": "Right side of the chest, more towards the side than the middle.",
+      "character": "Tight, and also a catching pain when she breathes in deeply.",
+      "radiation": "Does not go anywhere.",
+      "duration": "On and off since yesterday; the tightness has not fully gone.",
+      "severity": "4 out of 10 at rest, 7 out of 10 when she takes a deep breath.",
+      "timing": "Worse on deep breathing and when she walks.",
+      "aggravating": "Deep breaths, coughing, climbing the stairs to her flat.",
+      "relieving": "Nothing much. Breathing slowly into her hands did not help this time, which surprised her.",
+      "associated": [
+        "heart feels like it is racing",
+        "more breathless than usual climbing stairs for about four days",
+        "coughed once yesterday and saw a small streak of blood",
+        "felt light-headed twice"
+      ],
+      "progression": "The breathlessness has been building for four days; the chest pain started yesterday."
+    },
+    "past_medical": [
+      "Diagnosed with generalised anxiety two years ago, has had several panic attacks",
+      "Migraine with aura occasionally",
+      "No asthma, no heart problems"
+    ],
+    "medications": [
+      "Combined oral contraceptive pill daily for the last three years",
+      "Propranolol occasionally when very anxious"
+    ],
+    "allergies": [
+      "None known"
+    ],
+    "family": [
+      "Mother has hypothyroidism",
+      "An aunt had 'a clot in the leg' after an operation",
+      "No family history of heart attacks"
+    ],
+    "social": [
+      "Flew back from a 9-hour work trip five days ago, window seat, did not get up",
+      "Non-smoker",
+      "Drinks socially, rarely",
+      "Sits at a desk 10 hours a day"
+    ],
+    "review_of_systems_positive": [
+      "left calf has felt achy and tight for a few days, she assumed it was from the gym",
+      "sleeping badly because of work stress"
+    ],
+    "review_of_systems_negative": [
+      "no fever",
+      "no productive cough or sputum",
+      "no ankle swelling that she has noticed",
+      "no vomiting",
+      "no recent surgery",
+      "no pregnancy, last period was normal and two weeks ago",
+      "no previous clots herself",
+      "no rash or joint pains"
+    ]
+  },
+  "examination": [
+    {
+      "id": "vitals",
+      "label": "Vital signs",
+      "aliases": [
+        "vitals",
+        "vital signs",
+        "temperature",
+        "pulse",
+        "blood pressure",
+        "bp",
+        "respiratory rate",
+        "saturation",
+        "spo2",
+        "observations"
+      ],
+      "result": "Pulse 104/min regular. BP 118/72 mmHg. Respiratory rate 24/min. SpO2 94% on room air (96% when the nurse checked at triage while she was sitting still). Temperature 37.4 C."
+    },
+    {
+      "id": "general",
+      "label": "General examination",
+      "aliases": [
+        "general examination",
+        "pallor",
+        "cyanosis",
+        "clubbing",
+        "tremor",
+        "sweating"
+      ],
+      "result": "Anxious, mildly tachypnoeic at rest, speaking in full sentences. Fine tremor of the outstretched hands. No pallor, no cyanosis, no clubbing."
+    },
+    {
+      "id": "cvs",
+      "label": "Cardiovascular examination",
+      "aliases": [
+        "cardiovascular",
+        "cvs",
+        "heart sounds",
+        "murmur",
+        "apex",
+        "precordium"
+      ],
+      "result": "Regular tachycardia. Heart sounds normal; a loud P2 is appreciable. No murmur, no rub."
+    },
+    {
+      "id": "jvp",
+      "label": "Jugular venous pressure",
+      "aliases": [
+        "jvp",
+        "jugular",
+        "neck veins"
+      ],
+      "result": "Just visible at 4 cm above the sternal angle — borderline raised."
+    },
+    {
+      "id": "chest",
+      "label": "Respiratory examination",
+      "aliases": [
+        "chest",
+        "respiratory",
+        "lungs",
+        "auscultation",
+        "breath sounds",
+        "percussion",
+        "air entry"
+      ],
+      "result": "Equal air entry. A soft pleural rub at the right base. No crackles, no wheeze, resonant throughout."
+    },
+    {
+      "id": "legs",
+      "label": "Lower limb examination",
+      "aliases": [
+        "legs",
+        "calf",
+        "leg swelling",
+        "dvt",
+        "calf tenderness",
+        "pedal oedema",
+        "lower limb"
+      ],
+      "result": "Left calf 3 cm greater in circumference than the right, measured 10 cm below the tibial tuberosity. Tender along the deep calf. No erythema, no cord palpable, no pitting oedema."
+    },
+    {
+      "id": "thyroid",
+      "label": "Thyroid examination",
+      "aliases": [
+        "thyroid",
+        "goitre",
+        "goiter",
+        "neck"
+      ],
+      "result": "No goitre, no bruit, no lid lag."
+    },
+    {
+      "id": "chestwall",
+      "label": "Chest wall palpation",
+      "aliases": [
+        "chest wall",
+        "tenderness",
+        "palpation",
+        "press"
+      ],
+      "result": "No reproducible tenderness."
+    }
+  ],
+  "investigations": [
+    {
+      "id": "ecg",
+      "label": "12-lead ECG",
+      "aliases": [
+        "ecg",
+        "ekg",
+        "electrocardiogram"
+      ],
+      "tier": "bedside",
+      "result": "Sinus tachycardia at 106/min. T-wave inversion in V1 to V3. Incomplete right bundle branch block. No S1Q3T3 pattern. No ST elevation."
+    },
+    {
+      "id": "ddimer",
+      "label": "D-dimer",
+      "aliases": [
+        "d dimer",
+        "ddimer"
+      ],
+      "tier": "first-line",
+      "result": "2,940 ng/mL (reference <500)."
+    },
+    {
+      "id": "abg",
+      "label": "Arterial blood gas",
+      "aliases": [
+        "abg",
+        "arterial blood gas",
+        "blood gas"
+      ],
+      "tier": "first-line",
+      "result": "pH 7.49, PaO2 68 mmHg, PaCO2 29 mmHg, HCO3 22 on room air. Alveolar-arterial gradient widened."
+    },
+    {
+      "id": "ctpa",
+      "label": "CT pulmonary angiogram",
+      "aliases": [
+        "ctpa",
+        "ct pulmonary angiogram",
+        "ct angio",
+        "ct chest",
+        "ct pulmonary angiography"
+      ],
+      "tier": "second-line",
+      "result": "Filling defects in the right lower lobe segmental and subsegmental pulmonary arteries. Right ventricle to left ventricle diameter ratio 0.95. No infarction. No alternative pathology."
+    },
+    {
+      "id": "dopplerlegs",
+      "label": "Doppler ultrasound of the legs",
+      "aliases": [
+        "doppler",
+        "venous doppler",
+        "leg doppler",
+        "duplex",
+        "ultrasound legs",
+        "compression ultrasound"
+      ],
+      "tier": "first-line",
+      "result": "Non-compressible left popliteal and femoral veins with echogenic thrombus. Right leg normal."
+    },
+    {
+      "id": "cxr",
+      "label": "Chest X-ray",
+      "aliases": [
+        "chest x ray",
+        "chest xray",
+        "cxr",
+        "chest radiograph"
+      ],
+      "tier": "first-line",
+      "result": "Normal heart size, clear lung fields, no consolidation, no pneumothorax, no effusion."
+    },
+    {
+      "id": "troponin",
+      "label": "High-sensitivity troponin",
+      "aliases": [
+        "troponin",
+        "cardiac enzymes",
+        "trop",
+        "cardiac markers"
+      ],
+      "tier": "first-line",
+      "result": "Troponin I 46 ng/L (upper reference limit 34) — mildly elevated, static on repeat."
+    },
+    {
+      "id": "bnp",
+      "label": "NT-proBNP",
+      "aliases": [
+        "bnp",
+        "nt probnp",
+        "pro bnp"
+      ],
+      "tier": "second-line",
+      "result": "412 pg/mL — mildly elevated."
+    },
+    {
+      "id": "cbc",
+      "label": "Complete blood count",
+      "aliases": [
+        "cbc",
+        "blood count",
+        "hemogram",
+        "haemogram",
+        "fbc"
+      ],
+      "tier": "first-line",
+      "result": "Hb 12.6 g/dL, WBC 9,800/uL, platelets 288,000/uL."
+    },
+    {
+      "id": "tsh",
+      "label": "Thyroid function tests",
+      "aliases": [
+        "tsh",
+        "thyroid function",
+        "t3",
+        "t4",
+        "thyroid profile"
+      ],
+      "tier": "first-line",
+      "result": "TSH 1.9 mIU/L, free T4 normal."
+    },
+    {
+      "id": "upt",
+      "label": "Urine pregnancy test",
+      "aliases": [
+        "pregnancy test",
+        "upt",
+        "beta hcg",
+        "hcg"
+      ],
+      "tier": "bedside",
+      "result": "Negative."
+    },
+    {
+      "id": "echo",
+      "label": "Transthoracic echocardiogram",
+      "aliases": [
+        "echo",
+        "echocardiogram",
+        "2d echo",
+        "bedside echo"
+      ],
+      "tier": "second-line",
+      "result": "Mildly dilated right ventricle with preserved systolic function (TAPSE 19 mm). Estimated pulmonary artery systolic pressure 42 mmHg. No septal flattening. Left ventricle normal."
+    },
+    {
+      "id": "electrolytes",
+      "label": "Renal function and electrolytes",
+      "aliases": [
+        "electrolytes",
+        "rft",
+        "renal",
+        "urea",
+        "creatinine",
+        "kft"
+      ],
+      "tier": "first-line",
+      "result": "Urea 22 mg/dL, creatinine 0.8 mg/dL, Na 139, K 4.0 mEq/L."
+    }
+  ],
+  "differentials": [
+    {
+      "dx": "Pulmonary embolism",
+      "status": "correct",
+      "aliases": [
+        "pe",
+        "pulmonary embolism",
+        "pulmonary thromboembolism",
+        "embolus",
+        "vte",
+        "venous thromboembolism"
+      ],
+      "why": "Four risk factors (long-haul flight, combined oral contraceptive, prolonged sitting, family history), pleuritic pain with haemoptysis, hypoxia with a widened A-a gradient, an asymmetric tender calf, right-heart strain on ECG and echo, and a confirmed filling defect."
+    },
+    {
+      "dx": "Deep vein thrombosis",
+      "status": "correct",
+      "aliases": [
+        "dvt",
+        "deep vein thrombosis",
+        "leg clot",
+        "venous thrombosis"
+      ],
+      "why": "The source. Confirmed on Doppler; the two diagnoses are one disease and must be named together."
+    },
+    {
+      "dx": "Panic attack or anxiety-related hyperventilation",
+      "status": "must-exclude",
+      "aliases": [
+        "panic",
+        "panic attack",
+        "anxiety",
+        "hyperventilation",
+        "somatic"
+      ],
+      "why": "The patient's own explanation and the trap in this case. Panic does not cause hypoxia, haemoptysis, a pleural rub, an asymmetric calf or right-heart strain. It must be a diagnosis of exclusion, never an anchor.",
+      "excluded_by": [
+        "vitals",
+        "abg",
+        "legs"
+      ]
+    },
+    {
+      "dx": "Acute coronary syndrome",
+      "status": "must-exclude",
+      "aliases": [
+        "acs",
+        "myocardial infarction",
+        "mi",
+        "heart attack",
+        "nstemi"
+      ],
+      "why": "The mildly raised troponin has to be explained. Here it reflects right ventricular strain, not coronary occlusion — the pain is pleuritic, the pattern is anterior T inversion with incomplete RBBB, and the troponin is static.",
+      "excluded_by": [
+        "ecg",
+        "troponin"
+      ]
+    },
+    {
+      "dx": "Pneumothorax",
+      "status": "must-exclude",
+      "aliases": [
+        "pneumothorax",
+        "collapsed lung"
+      ],
+      "why": "Sudden pleuritic pain with breathlessness. Excluded by equal air entry, resonance and a normal chest X-ray.",
+      "excluded_by": [
+        "chest",
+        "cxr"
+      ]
+    },
+    {
+      "dx": "Pneumonia or pleurisy",
+      "status": "plausible",
+      "aliases": [
+        "pneumonia",
+        "pleurisy",
+        "chest infection",
+        "lower respiratory tract infection"
+      ],
+      "why": "A pleural rub with a low-grade temperature could fit, but there is no productive cough, no consolidation and no leucocytosis."
+    },
+    {
+      "dx": "Thyrotoxicosis",
+      "status": "plausible",
+      "aliases": [
+        "thyrotoxicosis",
+        "hyperthyroidism",
+        "thyroid"
+      ],
+      "why": "Tachycardia with a fine tremor and anxiety is worth a TSH, but it does not explain the hypoxia or the calf."
+    },
+    {
+      "dx": "Costochondritis",
+      "status": "incorrect",
+      "aliases": [
+        "costochondritis",
+        "musculoskeletal"
+      ],
+      "why": "No reproducible chest-wall tenderness, and it does not cause desaturation."
+    }
+  ],
+  "final_diagnosis": "Acute pulmonary embolism (submassive / intermediate-risk, with right ventricular dilatation and a mildly raised troponin) arising from a left lower-limb deep vein thrombosis, provoked by long-haul travel and combined oral contraceptive use — presenting in a patient with a prior diagnosis of anxiety",
+  "diagnosis_reasoning": "The pre-existing anxiety diagnosis is a distractor. Four independent thrombotic risk factors were present. The pain is pleuritic rather than central, there was haemoptysis, and the breathlessness preceded the pain by four days — none of which fits panic. Objective signs that anxiety cannot produce: SpO2 94% with a widened A-a gradient, a pleural rub, a 3 cm calf asymmetry, a loud P2, and anterior T-wave inversion with incomplete RBBB. The CTPA confirms segmental emboli and the echo shows right ventricular dilatation, placing her in the intermediate-risk category rather than low-risk.",
+  "critical_clues": [
+    "flight",
+    "contraceptive",
+    "pill",
+    "calf",
+    "asymmetr",
+    "pleuritic",
+    "haemoptysis",
+    "hemoptysis",
+    "blood",
+    "hypoxia",
+    "spo2",
+    "right ventric",
+    "t wave inversion"
+  ],
+  "red_flags": [
+    "hypoxia at rest",
+    "haemoptysis",
+    "asymmetric calf swelling",
+    "right ventricular strain",
+    "raised troponin"
+  ],
+  "rubric": {
+    "history": [
+      {
+        "id": "h_pleuritic",
+        "label": "Relation of the pain to breathing",
+        "keywords": [
+          "breathe",
+          "breathing",
+          "deep breath",
+          "worse when",
+          "inspiration",
+          "cough"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Pleuritic pain moves the differential to the pleura and the pulmonary vasculature, away from panic."
+      },
+      {
+        "id": "h_travel",
+        "label": "Recent travel or prolonged immobility",
+        "keywords": [
+          "travel",
+          "flight",
+          "flew",
+          "journey",
+          "trip",
+          "immobil",
+          "sitting",
+          "long",
+          "car"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "The single highest-yield question in this case. She will not volunteer the flight."
+      },
+      {
+        "id": "h_ocp",
+        "label": "Contraceptive and hormone use",
+        "keywords": [
+          "contracept",
+          "pill",
+          "ocp",
+          "hormone",
+          "oestrogen",
+          "estrogen",
+          "medication",
+          "medicine",
+          "tablet"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Combined oral contraceptives raise VTE risk three- to five-fold. Always ask a woman of reproductive age about them by name."
+      },
+      {
+        "id": "h_calf",
+        "label": "Leg pain or swelling",
+        "keywords": [
+          "leg",
+          "calf",
+          "swelling",
+          "ankle",
+          "thigh",
+          "leg pain"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Asks directly for the source of the embolus. Her calf ache was dismissed as a gym injury."
+      },
+      {
+        "id": "h_haemoptysis",
+        "label": "Blood in the sputum",
+        "keywords": [
+          "blood",
+          "haemoptysis",
+          "hemoptysis",
+          "cough up",
+          "coughing",
+          "sputum",
+          "phlegm"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Haemoptysis with pleuritic pain suggests pulmonary infarction."
+      },
+      {
+        "id": "h_dyspnoea",
+        "label": "Breathlessness and its time course",
+        "keywords": [
+          "breathless",
+          "short of breath",
+          "breathing",
+          "stairs",
+          "exertion",
+          "how long"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Four days of progressive exertional breathlessness preceding the pain does not fit a panic attack."
+      },
+      {
+        "id": "h_priorpanic",
+        "label": "How this episode compares with her previous panic attacks",
+        "keywords": [
+          "same as",
+          "different",
+          "compare",
+          "previous",
+          "before",
+          "usual",
+          "panic attack",
+          "like the others"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Asking a patient whether this feels like their usual episode is one of the cheapest and most powerful anti-anchoring questions in medicine."
+      },
+      {
+        "id": "h_syncope",
+        "label": "Light-headedness or syncope",
+        "keywords": [
+          "dizzy",
+          "light headed",
+          "lightheaded",
+          "faint",
+          "blackout",
+          "syncope",
+          "collaps"
+        ],
+        "weight": 2,
+        "teaching_note": "Syncope in pulmonary embolism implies haemodynamic significance."
+      },
+      {
+        "id": "h_vtehistory",
+        "label": "Personal or family history of clots",
+        "keywords": [
+          "clot",
+          "thrombosis",
+          "dvt",
+          "family",
+          "mother",
+          "aunt",
+          "relative",
+          "previous clot"
+        ],
+        "weight": 3,
+        "teaching_note": "A first-degree family history raises suspicion of an inherited thrombophilia."
+      },
+      {
+        "id": "h_pregnancy",
+        "label": "Pregnancy and menstrual history",
+        "keywords": [
+          "pregnan",
+          "period",
+          "menstrual",
+          "lmp",
+          "last period"
+        ],
+        "weight": 2,
+        "critical": true,
+        "teaching_note": "Changes both the risk assessment and every imaging decision that follows."
+      },
+      {
+        "id": "h_surgery",
+        "label": "Recent surgery, trauma or malignancy",
+        "keywords": [
+          "surgery",
+          "operation",
+          "injury",
+          "trauma",
+          "cancer",
+          "malignan",
+          "hospital"
+        ],
+        "weight": 2,
+        "teaching_note": "Completes the Wells score risk factors."
+      },
+      {
+        "id": "h_fever",
+        "label": "Fever and infective symptoms",
+        "keywords": [
+          "fever",
+          "temperature",
+          "chills",
+          "infection",
+          "unwell"
+        ],
+        "weight": 1,
+        "teaching_note": "Pulmonary embolism can produce a low-grade fever; it does not exclude the diagnosis."
+      }
+    ],
+    "examination": [
+      {
+        "id": "e_vitals",
+        "label": "Vital signs including oxygen saturation",
+        "keywords": [
+          "vitals",
+          "vital signs",
+          "saturation",
+          "spo2",
+          "oxygen",
+          "pulse",
+          "blood pressure",
+          "bp",
+          "respiratory rate"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "SpO2 94% at rest is the finding that anxiety cannot explain. Anyone who skips it will anchor on panic."
+      },
+      {
+        "id": "e_legs",
+        "label": "Both legs, with calf circumference compared",
+        "keywords": [
+          "leg",
+          "calf",
+          "circumference",
+          "measure",
+          "dvt",
+          "lower limb",
+          "both legs",
+          "swelling"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "A 3 cm difference scores in the Wells DVT criteria and points straight to the source."
+      },
+      {
+        "id": "e_chest",
+        "label": "Respiratory examination",
+        "keywords": [
+          "chest",
+          "lung",
+          "respiratory",
+          "auscultat",
+          "breath sounds",
+          "rub",
+          "percussion"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "A pleural rub is an objective sign; it also excludes pneumothorax when combined with normal percussion."
+      },
+      {
+        "id": "e_cvs",
+        "label": "Cardiovascular examination",
+        "keywords": [
+          "cardiovascular",
+          "cvs",
+          "heart",
+          "p2",
+          "murmur",
+          "heart sounds"
+        ],
+        "weight": 2,
+        "teaching_note": "A loud P2 signals raised pulmonary artery pressure."
+      },
+      {
+        "id": "e_jvp",
+        "label": "Jugular venous pressure",
+        "keywords": [
+          "jvp",
+          "jugular",
+          "neck vein"
+        ],
+        "weight": 2,
+        "teaching_note": "A raised JVP with clear lungs is the classic combination in pulmonary embolism."
+      }
+    ],
+    "investigations": [
+      {
+        "id": "i_ecg",
+        "label": "ECG",
+        "keywords": [
+          "ecg",
+          "ekg",
+          "electrocardiogram"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Anterior T-wave inversion with incomplete RBBB is right-heart strain, not ischaemia. S1Q3T3 is neither sensitive nor common."
+      },
+      {
+        "id": "i_ddimer",
+        "label": "D-dimer",
+        "keywords": [
+          "d dimer",
+          "ddimer"
+        ],
+        "weight": 2,
+        "teaching_note": "Useful only to rule out in low-probability patients. With a high Wells score, proceed to imaging whatever it shows."
+      },
+      {
+        "id": "i_ctpa",
+        "label": "CT pulmonary angiogram",
+        "keywords": [
+          "ctpa",
+          "ct pulmonary",
+          "ct angio",
+          "ct chest"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "The confirmatory test. Withholding it because 'she has anxiety' is the error this case is built around."
+      },
+      {
+        "id": "i_cxr",
+        "label": "Chest X-ray",
+        "keywords": [
+          "chest x ray",
+          "chest xray",
+          "cxr",
+          "chest radiograph"
+        ],
+        "weight": 2,
+        "teaching_note": "Usually normal in pulmonary embolism; its job here is to exclude pneumothorax and consolidation."
+      },
+      {
+        "id": "i_abg",
+        "label": "Arterial blood gas",
+        "keywords": [
+          "abg",
+          "blood gas",
+          "arterial"
+        ],
+        "weight": 2,
+        "teaching_note": "A widened A-a gradient with hypocapnia distinguishes true hypoxia from hyperventilation."
+      },
+      {
+        "id": "i_doppler",
+        "label": "Doppler ultrasound of the legs",
+        "keywords": [
+          "doppler",
+          "duplex",
+          "venous ultrasound",
+          "leg ultrasound",
+          "compression ultrasound"
+        ],
+        "weight": 3,
+        "teaching_note": "Confirms the source, and in pregnancy can secure the diagnosis without radiation."
+      },
+      {
+        "id": "i_troponin",
+        "label": "Troponin",
+        "keywords": [
+          "troponin",
+          "cardiac marker",
+          "cardiac enzyme"
+        ],
+        "weight": 2,
+        "teaching_note": "Here it is a risk-stratification tool, not a coronary test — it separates low-risk from intermediate-risk pulmonary embolism."
+      },
+      {
+        "id": "i_echo",
+        "label": "Echocardiogram",
+        "keywords": [
+          "echo",
+          "echocardiogram"
+        ],
+        "weight": 3,
+        "teaching_note": "Right ventricular dilatation defines submassive pulmonary embolism and changes monitoring and treatment."
+      },
+      {
+        "id": "i_upt",
+        "label": "Pregnancy test",
+        "keywords": [
+          "pregnancy",
+          "upt",
+          "hcg"
+        ],
+        "weight": 2,
+        "critical": true,
+        "teaching_note": "Mandatory before CT in any woman of reproductive age."
+      },
+      {
+        "id": "i_tsh",
+        "label": "Thyroid function",
+        "keywords": [
+          "tsh",
+          "thyroid",
+          "t4"
+        ],
+        "weight": 1,
+        "teaching_note": "Reasonable to check given the tremor and tachycardia, but it must not delay imaging."
+      }
+    ]
+  },
+  "hints": [
+    "She gave you an explanation before you examined her. Which of your findings does that explanation fail to account for?",
+    "Two objective findings here cannot be produced by anxiety at all. Look again at the saturation and at the legs.",
+    "Review the risk factors for clot formation in a young woman on hormonal contraception, and the clinical scoring tool used to decide who needs imaging for chest pain with breathlessness."
+  ],
+  "teaching_points": [
+    "Premature closure on a patient's own explanation — especially a psychiatric one — is the commonest diagnostic error in emergency medicine. Anxiety is a diagnosis of exclusion in anyone who is hypoxic.",
+    "Ask every patient with recurrent episodes whether this one felt the same as the others. A 'no' is a red flag.",
+    "Combined oral contraceptives plus long-haul travel is a classic provoked-VTE combination in a young woman.",
+    "A normal chest X-ray is expected in pulmonary embolism and never excludes it.",
+    "A raised troponin in pulmonary embolism reflects right ventricular strain, not coronary occlusion — but it does mean a worse prognosis.",
+    "Measure both calves. Eyeballing them misses a 3 cm difference."
+  ],
+  "revision_topics": [
+    "Wells score and the PERC rule for pulmonary embolism",
+    "Risk stratification of pulmonary embolism: low-risk, submassive and massive",
+    "Cognitive bias in diagnosis: anchoring, premature closure and diagnostic momentum",
+    "Venous thromboembolism risk factors in women of reproductive age"
+  ],
+  "provenance": {
+    "author": "Simulator seed content",
+    "reviewed_by": "",
+    "review_date": "",
+    "status": "draft",
+    "references": [
+      "ESC guidelines on the diagnosis and management of acute pulmonary embolism",
+      "Wells PS et al., derivation of a clinical model for pulmonary embolism"
+    ]
+  }
+}

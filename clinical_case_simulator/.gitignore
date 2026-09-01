@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.adk/
+sessions/
+*.egg-info/
+.pytest_cache/
+
+# adk deploy agent_engine scratch folders
+clinical_simulator_tmp*/

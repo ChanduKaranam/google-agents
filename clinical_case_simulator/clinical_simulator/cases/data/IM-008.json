@@ -1,0 +1,1035 @@
+{
+  "case_id": "IM-008",
+  "title": "Tiredness and breathlessness in a 58-year-old man",
+  "specialty": "Internal Medicine",
+  "difficulty": 2,
+  "setting": "Medicine outpatient department",
+  "opening_brief": "You are a medical student in the medicine outpatient department.\n\nA 58-year-old man has been referred by a general practitioner with a haemoglobin of 7.8 g/dL found on a routine test. He has come in for an opinion.\n\nAnaemia is a finding, not a diagnosis. Your job is to work out why.",
+  "patient": {
+    "name": "Mohan Das",
+    "age": 58,
+    "sex": "male",
+    "occupation": "school administrator",
+    "background": "Married, two grown children. Fairly sedentary."
+  },
+  "persona": {
+    "speech_style": "Polite, measured, slightly formal. Answers exactly what is asked.",
+    "emotional_state": "Not particularly worried; thinks the test was a mistake because he feels 'basically fine'.",
+    "education_level": "Graduate.",
+    "knows_not": [
+      "what his haemoglobin means",
+      "whether he has ever had a colonoscopy",
+      "the name of the painkiller he takes for his knee beyond 'a red tablet'"
+    ],
+    "quirks": [
+      "Minimises symptoms — says he is 'fine' until asked about specific activities.",
+      "Mentions the change in bowel habit only if asked directly; he considers it too minor and too embarrassing to bring up."
+    ]
+  },
+  "chief_complaint": "referred with a low haemoglobin found on a routine blood test",
+  "history": {
+    "present_illness": {
+      "onset": "He cannot date it. Looking back, he has been slowing down for perhaps six months.",
+      "site": "Not applicable.",
+      "character": "General tiredness. Breathless walking up the two flights of stairs at work, which never used to trouble him.",
+      "radiation": "Not applicable.",
+      "duration": "About six months, very gradual.",
+      "severity": "Enough that he now takes the lift, but he did not think it was worth mentioning.",
+      "timing": "Constant, worse with exertion.",
+      "aggravating": "Climbing stairs, walking quickly.",
+      "relieving": "Rest.",
+      "associated": [
+        "occasional palpitations on exertion",
+        "bowels have changed over about four months — looser, going three or four times a day when he used to go once",
+        "sometimes feels he has not fully emptied his bowels",
+        "lost about 5 kg over six months without trying",
+        "an odd craving to chew ice"
+      ],
+      "progression": "Very gradual and steady. Nothing sudden."
+    },
+    "past_medical": [
+      "Osteoarthritis of the right knee for four years",
+      "Borderline high blood pressure, not on treatment",
+      "Piles diagnosed about ten years ago, occasional bleeding then, nothing recently that he has noticed",
+      "No known ulcer, no previous surgery"
+    ],
+    "medications": [
+      "A red painkiller tablet for the knee, almost daily for the past two years — he thinks it is diclofenac",
+      "Occasional antacid",
+      "No blood thinners, no aspirin"
+    ],
+    "allergies": [
+      "None known"
+    ],
+    "family": [
+      "Father died at 66 of 'a growth in the stomach or intestine' — he was never told exactly which",
+      "No known blood disorders",
+      "No family history of coeliac disease"
+    ],
+    "social": [
+      "Non-vegetarian, eats a mixed diet, no dietary restriction",
+      "Drinks alcohol perhaps twice a month",
+      "Smoked 10 cigarettes a day for 20 years, stopped 8 years ago",
+      "No travel abroad, no exposure to lead or industrial chemicals"
+    ],
+    "review_of_systems_positive": [
+      "occasional mild cramping in the left lower abdomen",
+      "feels cold more easily than he used to",
+      "brittle nails"
+    ],
+    "review_of_systems_negative": [
+      "no vomiting blood",
+      "no black tarry stools that he has noticed",
+      "no fresh bleeding per rectum recently",
+      "no chest pain",
+      "no swelling of the legs",
+      "no fever or night sweats",
+      "no joint pains other than the knee",
+      "no numbness or tingling in the hands or feet",
+      "no dark urine"
+    ]
+  },
+  "examination": [
+    {
+      "id": "vitals",
+      "label": "Vital signs",
+      "aliases": [
+        "vitals",
+        "vital signs",
+        "pulse",
+        "blood pressure",
+        "bp",
+        "temperature",
+        "respiratory rate",
+        "saturation",
+        "spo2",
+        "postural"
+      ],
+      "result": "Pulse 96/min regular. BP 128/80 mmHg, no postural drop. Respiratory rate 18/min. SpO2 98% on room air. Temperature 36.8 C."
+    },
+    {
+      "id": "general",
+      "label": "General examination for signs of anaemia",
+      "aliases": [
+        "general examination",
+        "pallor",
+        "conjunctiva",
+        "koilonychia",
+        "nails",
+        "glossitis",
+        "tongue",
+        "angular stomatitis",
+        "cheilitis",
+        "icterus",
+        "clubbing",
+        "lymph nodes"
+      ],
+      "result": "Marked conjunctival and palmar pallor. Koilonychia of several fingernails. Angular stomatitis at both corners of the mouth. Atrophic glossitis. No icterus, no clubbing, no lymphadenopathy, no purpura."
+    },
+    {
+      "id": "cvs",
+      "label": "Cardiovascular examination",
+      "aliases": [
+        "cardiovascular",
+        "cvs",
+        "heart sounds",
+        "murmur",
+        "apex",
+        "jvp",
+        "precordium"
+      ],
+      "result": "Hyperdynamic apex. A soft ejection systolic murmur at the left sternal edge, grade 2/6 — a flow murmur. Heart sounds otherwise normal. JVP not raised. No pedal oedema."
+    },
+    {
+      "id": "abdomen",
+      "label": "Abdominal examination",
+      "aliases": [
+        "abdomen",
+        "abdominal",
+        "per abdomen",
+        "palpation",
+        "mass",
+        "liver",
+        "spleen",
+        "tenderness"
+      ],
+      "result": "Soft. A vague, mildly tender fullness in the left iliac fossa; no discrete mass definitely palpable. Liver and spleen not enlarged. No ascites."
+    },
+    {
+      "id": "pr",
+      "label": "Per-rectal examination",
+      "aliases": [
+        "per rectal",
+        "pr",
+        "rectal examination",
+        "dre",
+        "digital rectal",
+        "rectal",
+        "proctoscopy"
+      ],
+      "result": "External haemorrhoids present, not bleeding. No rectal mass palpable within reach. Stool on the glove is dark brown; faecal occult blood on that sample is positive."
+    },
+    {
+      "id": "chest",
+      "label": "Respiratory examination",
+      "aliases": [
+        "chest",
+        "respiratory",
+        "lungs",
+        "auscultation",
+        "breath sounds"
+      ],
+      "result": "Clear, equal air entry, no added sounds."
+    },
+    {
+      "id": "cns",
+      "label": "Neurological examination",
+      "aliases": [
+        "cns",
+        "neurological",
+        "neuro",
+        "proprioception",
+        "vibration",
+        "reflexes",
+        "posterior column",
+        "power",
+        "sensation"
+      ],
+      "result": "Normal tone, power and reflexes. Vibration and joint position sense intact — no evidence of subacute combined degeneration."
+    },
+    {
+      "id": "thyroid",
+      "label": "Thyroid examination",
+      "aliases": [
+        "thyroid",
+        "goitre",
+        "goiter",
+        "neck"
+      ],
+      "result": "No goitre, no nodule."
+    }
+  ],
+  "investigations": [
+    {
+      "id": "cbc",
+      "label": "Complete blood count with indices and peripheral smear",
+      "aliases": [
+        "cbc",
+        "blood count",
+        "hemogram",
+        "haemogram",
+        "fbc",
+        "mcv",
+        "indices",
+        "peripheral smear",
+        "smear",
+        "rdw",
+        "reticulocyte"
+      ],
+      "tier": "first-line",
+      "result": "Hb 7.6 g/dL. MCV 66 fL. MCH 20 pg. MCHC 28 g/dL. RDW 19.8%. WBC 6,900/uL, normal differential. Platelets 486,000/uL. Smear: microcytic hypochromic red cells with anisopoikilocytosis and pencil cells. Reticulocyte count 1.2% (inadequate for the degree of anaemia)."
+    },
+    {
+      "id": "ironstudies",
+      "label": "Iron studies",
+      "aliases": [
+        "iron studies",
+        "ferritin",
+        "serum iron",
+        "tibc",
+        "transferrin",
+        "iron profile",
+        "transferrin saturation"
+      ],
+      "tier": "first-line",
+      "result": "Serum ferritin 6 ng/mL. Serum iron 22 mcg/dL. TIBC 468 mcg/dL. Transferrin saturation 4.7%. Diagnostic of iron deficiency."
+    },
+    {
+      "id": "b12folate",
+      "label": "Vitamin B12 and folate",
+      "aliases": [
+        "b12",
+        "vitamin b12",
+        "folate",
+        "cobalamin"
+      ],
+      "tier": "first-line",
+      "result": "B12 402 pg/mL, folate 8.1 ng/mL — both normal, so this is a pure iron deficiency rather than a dimorphic anaemia."
+    },
+    {
+      "id": "fob",
+      "label": "Faecal occult blood test",
+      "aliases": [
+        "faecal occult blood",
+        "fecal occult blood",
+        "fob",
+        "fit test",
+        "stool for blood",
+        "occult blood"
+      ],
+      "tier": "first-line",
+      "result": "Positive."
+    },
+    {
+      "id": "colonoscopy",
+      "label": "Colonoscopy with biopsy",
+      "aliases": [
+        "colonoscopy",
+        "lower gi endoscopy",
+        "lower gi scopy",
+        "sigmoidoscopy",
+        "scope the colon"
+      ],
+      "tier": "second-line",
+      "result": "An ulcerated, partly circumferential mass at 28 cm from the anal verge in the sigmoid colon, narrowing the lumen but traversable. Biopsies taken. Remainder of the colon normal; no other polyps."
+    },
+    {
+      "id": "histology",
+      "label": "Histopathology of the biopsy",
+      "aliases": [
+        "histopathology",
+        "biopsy",
+        "histology",
+        "pathology",
+        "biopsy report"
+      ],
+      "tier": "second-line",
+      "result": "Moderately differentiated invasive adenocarcinoma. Mismatch repair proteins retained on immunohistochemistry."
+    },
+    {
+      "id": "ugie",
+      "label": "Upper GI endoscopy",
+      "aliases": [
+        "upper gi endoscopy",
+        "gastroscopy",
+        "ugi scopy",
+        "endoscopy",
+        "opd scopy",
+        "oesophagogastroduodenoscopy"
+      ],
+      "tier": "second-line",
+      "result": "Mild antral gastritis with two small erosions, consistent with chronic NSAID use. No ulcer, no varices, no mass. Duodenal biopsies taken."
+    },
+    {
+      "id": "duodenalbiopsy",
+      "label": "Duodenal biopsy for coeliac disease",
+      "aliases": [
+        "duodenal biopsy",
+        "coeliac",
+        "celiac",
+        "tissue transglutaminase",
+        "ttg",
+        "anti ttg"
+      ],
+      "tier": "second-line",
+      "result": "Anti-tTG IgA negative with normal total IgA. Duodenal histology normal — coeliac disease excluded."
+    },
+    {
+      "id": "cect",
+      "label": "CT chest, abdomen and pelvis for staging",
+      "aliases": [
+        "ct",
+        "cect",
+        "ct abdomen",
+        "staging ct",
+        "ct scan",
+        "ct chest abdomen pelvis"
+      ],
+      "tier": "second-line",
+      "result": "Circumferential sigmoid wall thickening over 5 cm with pericolic fat stranding and two enlarged regional nodes. No liver or lung metastases. Staged as T3 N1 M0."
+    },
+    {
+      "id": "cea",
+      "label": "Carcinoembryonic antigen",
+      "aliases": [
+        "cea",
+        "tumour marker",
+        "tumor marker",
+        "carcinoembryonic"
+      ],
+      "tier": "second-line",
+      "result": "CEA 8.4 ng/mL (raised). Useful as a baseline for follow-up, not for diagnosis."
+    },
+    {
+      "id": "lft",
+      "label": "Liver and renal function",
+      "aliases": [
+        "lft",
+        "liver function",
+        "rft",
+        "renal function",
+        "urea",
+        "creatinine",
+        "albumin",
+        "bilirubin"
+      ],
+      "tier": "first-line",
+      "result": "Albumin 3.4 g/dL. Bilirubin, transaminases, urea and creatinine all normal."
+    },
+    {
+      "id": "tsh",
+      "label": "Thyroid function",
+      "aliases": [
+        "tsh",
+        "thyroid function",
+        "t4"
+      ],
+      "tier": "first-line",
+      "result": "Normal."
+    },
+    {
+      "id": "hbelectro",
+      "label": "Haemoglobin electrophoresis (HPLC)",
+      "aliases": [
+        "electrophoresis",
+        "hplc",
+        "hb electrophoresis",
+        "thalassemia",
+        "thalassaemia",
+        "hba2"
+      ],
+      "tier": "second-line",
+      "result": "Deferred until after iron repletion. HbA2 1.9% on the sample taken while iron deficient — uninterpretable in this state, and to be repeated after treatment.",
+      "note": "Iron deficiency suppresses HbA2 and can mask beta-thalassaemia trait. Order it after iron replacement, not before."
+    },
+    {
+      "id": "transfuse",
+      "label": "Cross-match and packed cell transfusion",
+      "aliases": [
+        "transfusion",
+        "cross match",
+        "packed cells",
+        "blood transfusion",
+        "prbc"
+      ],
+      "tier": "first-line",
+      "appropriate": false,
+      "result": "Two units cross-matched. He is haemodynamically stable and not actively bleeding.",
+      "note": "Chronic iron deficiency anaemia in a stable patient is corrected with oral or intravenous iron, not with transfusion. Transfusing first also removes the chance to interpret the indices."
+    }
+  ],
+  "differentials": [
+    {
+      "dx": "Iron deficiency anaemia",
+      "status": "correct",
+      "aliases": [
+        "iron deficiency",
+        "ida",
+        "microcytic anaemia",
+        "microcytic anemia",
+        "iron deficiency anemia"
+      ],
+      "why": "Hb 7.6 with MCV 66, a high RDW, pencil cells, ferritin 6 and transferrin saturation 4.7%, with koilonychia, angular stomatitis and pica for ice."
+    },
+    {
+      "dx": "Colorectal carcinoma",
+      "status": "correct",
+      "aliases": [
+        "colon cancer",
+        "colorectal cancer",
+        "carcinoma colon",
+        "sigmoid carcinoma",
+        "bowel cancer",
+        "malignancy",
+        "gi malignancy",
+        "adenocarcinoma"
+      ],
+      "why": "The cause of the iron deficiency, and the diagnosis this case is really about. Iron deficiency anaemia in a man over 50 is gastrointestinal blood loss from a malignancy until proved otherwise — supported here by four months of altered bowel habit, tenesmus, 5 kg weight loss, a positive occult blood test and a family history."
+    },
+    {
+      "dx": "NSAID-induced gastrointestinal blood loss",
+      "status": "must-exclude",
+      "aliases": [
+        "nsaid",
+        "diclofenac",
+        "peptic ulcer",
+        "gastritis",
+        "erosions",
+        "drug induced bleeding"
+      ],
+      "why": "Two years of near-daily diclofenac is a genuine and sufficient explanation for iron deficiency — which is exactly why it is dangerous. Accepting it without a colonoscopy is how a curable cancer gets missed.",
+      "excluded_by": [
+        "ugie"
+      ]
+    },
+    {
+      "dx": "Haemorrhoidal bleeding",
+      "status": "must-exclude",
+      "aliases": [
+        "piles",
+        "haemorrhoids",
+        "hemorrhoids",
+        "anal bleeding"
+      ],
+      "why": "He has known piles, and they are visible on examination. Haemorrhoids rarely cause iron deficiency of this severity, and attributing rectal bleeding to piles without visualising the colon is a classic and serious error.",
+      "excluded_by": [
+        "pr",
+        "colonoscopy"
+      ]
+    },
+    {
+      "dx": "Coeliac disease",
+      "status": "plausible",
+      "aliases": [
+        "coeliac",
+        "celiac",
+        "gluten",
+        "malabsorption"
+      ],
+      "why": "A recognised cause of iron deficiency at any age and worth excluding with serology and duodenal biopsy, both negative here."
+    },
+    {
+      "dx": "Thalassaemia trait",
+      "status": "plausible",
+      "aliases": [
+        "thalassemia",
+        "thalassaemia",
+        "beta thalassemia trait",
+        "hemoglobinopathy",
+        "haemoglobinopathy"
+      ],
+      "why": "The other common cause of a very low MCV in India. Distinguished by a normal or high ferritin, a disproportionately low MCV for the haemoglobin, a normal RDW and a raised HbA2. Here the ferritin of 6 settles it."
+    },
+    {
+      "dx": "Anaemia of chronic disease",
+      "status": "plausible",
+      "aliases": [
+        "anaemia of chronic disease",
+        "anemia of chronic disease",
+        "acd",
+        "chronic inflammation"
+      ],
+      "why": "Can be microcytic, but ferritin is normal or raised and TIBC is low — the opposite of the pattern here."
+    },
+    {
+      "dx": "Dietary iron deficiency",
+      "status": "incorrect",
+      "aliases": [
+        "dietary",
+        "nutritional deficiency",
+        "poor diet"
+      ],
+      "why": "Not an acceptable explanation in a non-vegetarian adult man with an adequate diet. Dietary iron deficiency is a diagnosis of exclusion in men and post-menopausal women, and never before the gut has been examined."
+    }
+  ],
+  "final_diagnosis": "Severe iron deficiency anaemia (Hb 7.6 g/dL, ferritin 6 ng/mL) due to chronic occult blood loss from a moderately differentiated adenocarcinoma of the sigmoid colon, staged T3 N1 M0 — with chronic NSAID use as a contributing but insufficient explanation",
+  "diagnosis_reasoning": "The blood picture is unambiguous: microcytic, hypochromic, high RDW, pencil cells, ferritin 6 and transferrin saturation under 5%. Ferritin below 15 ng/mL is diagnostic of iron deficiency and excludes thalassaemia trait and anaemia of chronic disease as the primary problem. The important reasoning step is what follows: in a 58-year-old man with no menstrual or dietary explanation, iron deficiency means gastrointestinal blood loss and mandates visualisation of both the upper and lower gut. Two years of diclofenac is a plausible decoy, and the antral erosions found on gastroscopy would have satisfied a less careful clinician. The history that overrides it is four months of altered bowel habit with tenesmus, 5 kg of unintentional weight loss, a left iliac fossa fullness, a positive faecal occult blood test and a father who died of a gastrointestinal malignancy. Colonoscopy shows the sigmoid tumour and biopsy confirms adenocarcinoma.",
+  "critical_clues": [
+    "mcv",
+    "microcytic",
+    "ferritin",
+    "koilonychia",
+    "pica",
+    "ice",
+    "bowel habit",
+    "weight loss",
+    "occult blood",
+    "nsaid",
+    "diclofenac",
+    "family history",
+    "tenesmus",
+    "colonoscopy"
+  ],
+  "red_flags": [
+    "unintentional weight loss",
+    "change in bowel habit over 50",
+    "iron deficiency in a man",
+    "positive faecal occult blood",
+    "family history of gastrointestinal malignancy"
+  ],
+  "rubric": {
+    "history": [
+      {
+        "id": "h_bowelhabit",
+        "label": "Change in bowel habit",
+        "keywords": [
+          "bowel",
+          "stool",
+          "motion",
+          "constipat",
+          "diarrhoea",
+          "diarrhea",
+          "loose",
+          "frequency",
+          "habit",
+          "toilet"
+        ],
+        "weight": 5,
+        "critical": true,
+        "teaching_note": "A four-month change in bowel habit in a man over 50 is a red-flag symptom in its own right. He will not volunteer it."
+      },
+      {
+        "id": "h_bleeding",
+        "label": "Bleeding per rectum, melaena and haematemesis",
+        "keywords": [
+          "blood",
+          "bleed",
+          "melaena",
+          "melena",
+          "black",
+          "tarry",
+          "stool colour",
+          "stool color",
+          "vomit blood",
+          "rectal bleeding",
+          "piles"
+        ],
+        "weight": 5,
+        "critical": true,
+        "teaching_note": "Both ends of the gut must be asked about. Note that occult bleeding by definition produces no visible change — a negative answer does not exclude it."
+      },
+      {
+        "id": "h_weightloss",
+        "label": "Unintentional weight loss and appetite",
+        "keywords": [
+          "weight",
+          "lost",
+          "losing",
+          "appetite",
+          "clothes",
+          "thinner"
+        ],
+        "weight": 5,
+        "critical": true,
+        "teaching_note": "Five kilograms over six months without trying is a cancer red flag and shifts the entire probability."
+      },
+      {
+        "id": "h_nsaid",
+        "label": "NSAID, aspirin and anticoagulant use",
+        "keywords": [
+          "painkiller",
+          "medicine",
+          "medication",
+          "tablet",
+          "nsaid",
+          "diclofenac",
+          "ibuprofen",
+          "aspirin",
+          "blood thinner",
+          "anticoagulant",
+          "drug"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Two years of daily diclofenac is real and relevant — but it is a contributory factor, not a licence to skip the colonoscopy."
+      },
+      {
+        "id": "h_diet",
+        "label": "Dietary history and iron intake",
+        "keywords": [
+          "diet",
+          "eat",
+          "vegetarian",
+          "food",
+          "meat",
+          "nutrition",
+          "milk"
+        ],
+        "weight": 3,
+        "teaching_note": "Establishes whether a dietary explanation is even plausible. In this patient it is not."
+      },
+      {
+        "id": "h_famhx",
+        "label": "Family history of gastrointestinal cancer",
+        "keywords": [
+          "family",
+          "father",
+          "mother",
+          "brother",
+          "sister",
+          "cancer",
+          "growth",
+          "tumour",
+          "tumor",
+          "relative",
+          "runs in"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "A first-degree relative with colorectal cancer roughly doubles the risk and lowers the threshold for colonoscopy."
+      },
+      {
+        "id": "h_exertion",
+        "label": "Exertional symptoms and functional capacity",
+        "keywords": [
+          "breathless",
+          "short of breath",
+          "stairs",
+          "walk",
+          "exertion",
+          "tired",
+          "fatigue",
+          "palpitation",
+          "dizzy",
+          "climbing"
+        ],
+        "weight": 3,
+        "teaching_note": "Quantifying exercise tolerance is how you judge whether chronic anaemia is being tolerated or is decompensating."
+      },
+      {
+        "id": "h_pica",
+        "label": "Pica and unusual cravings",
+        "keywords": [
+          "pica",
+          "crav",
+          "ice",
+          "chew",
+          "mud",
+          "clay",
+          "unusual",
+          "eating things"
+        ],
+        "weight": 3,
+        "teaching_note": "Pica, especially pagophagia, is specific for iron deficiency and disappears within days of iron replacement."
+      },
+      {
+        "id": "h_tenesmus",
+        "label": "Tenesmus and incomplete evacuation",
+        "keywords": [
+          "tenesmus",
+          "incomplete",
+          "fully empty",
+          "not emptied",
+          "urge",
+          "straining"
+        ],
+        "weight": 3,
+        "critical": true,
+        "teaching_note": "Tenesmus localises the pathology to the rectum or distal colon."
+      },
+      {
+        "id": "h_neuro",
+        "label": "Neurological symptoms of B12 deficiency",
+        "keywords": [
+          "numb",
+          "tingling",
+          "pins and needles",
+          "balance",
+          "walking",
+          "sensation",
+          "memory"
+        ],
+        "weight": 2,
+        "teaching_note": "Separates a pure iron deficiency from a dimorphic or B12-deficient anaemia."
+      },
+      {
+        "id": "h_pasthistory",
+        "label": "Previous anaemia, endoscopy or surgery",
+        "keywords": [
+          "before",
+          "previous",
+          "endoscopy",
+          "colonoscopy",
+          "scan",
+          "surgery",
+          "operation",
+          "anaemia",
+          "anemia",
+          "past"
+        ],
+        "weight": 3,
+        "teaching_note": "Prior investigations shape how much further work is needed and whether this is recurrent."
+      },
+      {
+        "id": "h_haematuria",
+        "label": "Urinary and other sources of blood loss",
+        "keywords": [
+          "urine",
+          "haematuria",
+          "hematuria",
+          "blood in urine",
+          "nose bleed",
+          "epistaxis",
+          "gums"
+        ],
+        "weight": 2,
+        "teaching_note": "Iron is lost from wherever blood is lost; the gut is the commonest site but not the only one."
+      }
+    ],
+    "examination": [
+      {
+        "id": "e_anaemiasigns",
+        "label": "Signs of iron deficiency: pallor, koilonychia, glossitis, angular stomatitis",
+        "keywords": [
+          "pallor",
+          "conjunctiva",
+          "koilonychia",
+          "nails",
+          "glossitis",
+          "tongue",
+          "angular stomatitis",
+          "cheilitis",
+          "mouth",
+          "general examination"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "These four signs together make the diagnosis of chronic iron deficiency at the bedside, before any blood test comes back."
+      },
+      {
+        "id": "e_pr",
+        "label": "Per-rectal examination",
+        "keywords": [
+          "per rectal",
+          "pr",
+          "rectal",
+          "dre",
+          "digital rectal",
+          "proctoscopy"
+        ],
+        "weight": 5,
+        "critical": true,
+        "teaching_note": "Mandatory in anyone with iron deficiency or altered bowel habit. Omitting it is the commonest examination failure in this presentation, and here it yields both a positive occult blood result and reassurance that the tumour is out of finger reach."
+      },
+      {
+        "id": "e_abdomen",
+        "label": "Abdominal examination for a mass and organomegaly",
+        "keywords": [
+          "abdomen",
+          "abdominal",
+          "palpat",
+          "mass",
+          "liver",
+          "spleen",
+          "per abdomen",
+          "tenderness"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "A left iliac fossa mass and hepatomegaly would each change the diagnosis and the staging immediately."
+      },
+      {
+        "id": "e_vitals",
+        "label": "Vital signs including postural blood pressure",
+        "keywords": [
+          "vitals",
+          "vital signs",
+          "pulse",
+          "blood pressure",
+          "bp",
+          "postural",
+          "saturation",
+          "respiratory rate"
+        ],
+        "weight": 3,
+        "teaching_note": "Distinguishes chronic compensated anaemia from acute blood loss requiring resuscitation."
+      },
+      {
+        "id": "e_cvs",
+        "label": "Cardiovascular examination",
+        "keywords": [
+          "cardiovascular",
+          "cvs",
+          "heart",
+          "murmur",
+          "apex",
+          "jvp"
+        ],
+        "weight": 3,
+        "teaching_note": "A hyperdynamic circulation with a flow murmur is expected; signs of failure would change the transfusion threshold."
+      },
+      {
+        "id": "e_lymph",
+        "label": "Lymph node examination",
+        "keywords": [
+          "lymph node",
+          "lymphadenopathy",
+          "nodes",
+          "neck",
+          "axilla",
+          "groin",
+          "supraclavicular",
+          "virchow"
+        ],
+        "weight": 2,
+        "teaching_note": "A left supraclavicular node would suggest advanced intra-abdominal malignancy."
+      },
+      {
+        "id": "e_neuro",
+        "label": "Neurological examination for posterior column signs",
+        "keywords": [
+          "neuro",
+          "cns",
+          "vibration",
+          "proprioception",
+          "joint position",
+          "reflexes",
+          "sensation"
+        ],
+        "weight": 2,
+        "teaching_note": "Excludes concurrent B12 deficiency, which would change treatment."
+      }
+    ],
+    "investigations": [
+      {
+        "id": "i_cbc",
+        "label": "Complete blood count with indices and smear",
+        "keywords": [
+          "cbc",
+          "blood count",
+          "hemogram",
+          "haemogram",
+          "mcv",
+          "indices",
+          "smear",
+          "rdw",
+          "reticulocyte"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "The MCV, RDW and smear direct the entire subsequent workup. Never accept a bare haemoglobin value."
+      },
+      {
+        "id": "i_iron",
+        "label": "Iron studies including ferritin",
+        "keywords": [
+          "ferritin",
+          "iron studies",
+          "iron profile",
+          "tibc",
+          "transferrin",
+          "serum iron",
+          "saturation"
+        ],
+        "weight": 5,
+        "critical": true,
+        "teaching_note": "Ferritin below 15 ng/mL is diagnostic of iron deficiency. Remember ferritin is an acute-phase reactant and can be falsely normal with inflammation."
+      },
+      {
+        "id": "i_colonoscopy",
+        "label": "Colonoscopy",
+        "keywords": [
+          "colonoscopy",
+          "lower gi",
+          "sigmoidoscopy",
+          "scope"
+        ],
+        "weight": 5,
+        "critical": true,
+        "teaching_note": "The single investigation that makes the diagnosis. In a man over 50 with iron deficiency, it is mandatory whatever the gastroscopy shows."
+      },
+      {
+        "id": "i_ugie",
+        "label": "Upper GI endoscopy",
+        "keywords": [
+          "upper gi",
+          "gastroscopy",
+          "endoscopy",
+          "ugi scopy",
+          "opd scopy"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "Both ends of the gut must be examined. Finding gastritis at the top does not excuse skipping the bottom — and up to 10% of patients have a lesion at each end."
+      },
+      {
+        "id": "i_fob",
+        "label": "Faecal occult blood test",
+        "keywords": [
+          "occult blood",
+          "fob",
+          "fit",
+          "stool for blood"
+        ],
+        "weight": 3,
+        "teaching_note": "A positive result supports gastrointestinal loss; a negative result never excludes it, because bleeding from a tumour is intermittent."
+      },
+      {
+        "id": "i_b12",
+        "label": "Vitamin B12 and folate",
+        "keywords": [
+          "b12",
+          "folate",
+          "vitamin b12",
+          "cobalamin"
+        ],
+        "weight": 3,
+        "teaching_note": "Confirms a pure rather than a dimorphic anaemia, and a dimorphic picture can mask microcytosis by normalising the MCV."
+      },
+      {
+        "id": "i_coeliac",
+        "label": "Coeliac serology",
+        "keywords": [
+          "coeliac",
+          "celiac",
+          "ttg",
+          "tissue transglutaminase",
+          "endomysial",
+          "duodenal biopsy"
+        ],
+        "weight": 3,
+        "teaching_note": "Recommended in all adults with unexplained iron deficiency, and easily added to the gastroscopy as duodenal biopsies."
+      },
+      {
+        "id": "i_biopsy",
+        "label": "Biopsy and histopathology",
+        "keywords": [
+          "biopsy",
+          "histopath",
+          "histology",
+          "pathology"
+        ],
+        "weight": 4,
+        "critical": true,
+        "teaching_note": "No cancer is diagnosed on appearance alone; tissue is required before any treatment decision."
+      },
+      {
+        "id": "i_staging",
+        "label": "Staging CT of chest, abdomen and pelvis",
+        "keywords": [
+          "ct",
+          "staging",
+          "cect",
+          "ct abdomen",
+          "ct chest"
+        ],
+        "weight": 3,
+        "teaching_note": "Staging determines whether surgery is curative and whether neoadjuvant therapy is needed."
+      },
+      {
+        "id": "i_lft",
+        "label": "Liver function tests",
+        "keywords": [
+          "lft",
+          "liver function",
+          "albumin",
+          "bilirubin"
+        ],
+        "weight": 2,
+        "teaching_note": "A screen for hepatic metastases and a marker of nutritional state."
+      }
+    ]
+  },
+  "hints": [
+    "Look at the red cell indices, not just the haemoglobin. What kind of anaemia is this, and what does that narrow it to?",
+    "You have established iron deficiency in a 58-year-old man who eats meat and does not menstruate. Where must the iron be going, and what does that oblige you to do?",
+    "Review the mandatory investigation of iron deficiency anaemia in men and post-menopausal women, and why a plausible explanation at one end of the gut does not excuse you from examining the other."
+  ],
+  "teaching_points": [
+    "Anaemia is a finding, never a final diagnosis. The question is always why.",
+    "Classify first by MCV, then by iron studies. Ferritin below 15 ng/mL is diagnostic of iron deficiency; ferritin is an acute-phase reactant and may be falsely normal in inflammation.",
+    "Iron deficiency anaemia in a man or a post-menopausal woman means gastrointestinal blood loss until proven otherwise, and requires both upper and lower endoscopy.",
+    "Do not accept a convenient explanation — NSAIDs, piles, 'poor diet' — as the cause of iron deficiency in an at-risk age group. This is the single commonest way a curable colorectal cancer is missed.",
+    "Never attribute rectal bleeding to haemorrhoids without visualising the colon.",
+    "A per-rectal examination is part of the examination, not an optional extra.",
+    "Do not transfuse chronic, well-compensated iron deficiency anaemia; treat with iron and treat the cause.",
+    "Check haemoglobin electrophoresis for suspected thalassaemia trait only after iron repletion, because iron deficiency suppresses HbA2."
+  ],
+  "revision_topics": [
+    "Classification and investigation of anaemia by red cell indices",
+    "Iron studies and their interpretation, including ferritin in inflammation",
+    "Investigation of iron deficiency anaemia in adults: who needs endoscopy",
+    "Red-flag symptoms and referral criteria for suspected colorectal cancer",
+    "Differentiating iron deficiency from thalassaemia trait and anaemia of chronic disease"
+  ],
+  "provenance": {
+    "author": "Simulator seed content",
+    "reviewed_by": "",
+    "review_date": "",
+    "status": "draft",
+    "references": [
+      "British Society of Gastroenterology guidelines for the management of iron deficiency anaemia",
+      "NICE guideline NG12: suspected cancer recognition and referral"
+    ]
+  }
+}
