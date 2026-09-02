@@ -248,6 +248,10 @@ def _structure_suggestions(structure_analysis: dict) -> list[dict]:
                 "For each role include: Job Title, Company, Location, Dates (Month/Year).",
                 "List 3-5 bullet points per role describing your accomplishments.",
                 "Focus on impact and results, not just duties.",
+                "Student with no work history? Add an 'Internships' or 'Projects' "
+                "section instead — internships, college projects, hackathons, and "
+                "volunteer work all count. Frame each like a job: title, "
+                "organisation/context, dates, and outcome bullets.",
             ],
         },
         "education": {
