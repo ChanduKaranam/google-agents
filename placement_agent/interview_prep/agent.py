@@ -7,7 +7,6 @@ routed from the root placement_assistant agent.
 """
 
 from google.adk.agents.llm_agent import Agent
-from google.adk.tools.preload_memory_tool import PreloadMemoryTool
 
 from .resources import (
     detect_role_category,
@@ -223,9 +222,5 @@ interview_prep_agent = Agent(
         log_mock_interview,
         get_progress_summary,
         suggest_next_step,
-        # This agent takes over turns after a transfer_to_agent, sharing the
-        # root runner's memory service — so preloading works here too (unlike
-        # AgentTool sub-agents, which get an empty in-memory service).
-        PreloadMemoryTool(),
     ],
 )

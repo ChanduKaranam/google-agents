@@ -251,7 +251,7 @@ def get_resume_sections(resume_text: str) -> dict:
     section_patterns = {
         "contact": r"(contact\s*(information|details)?)",
         "summary": r"(summary|objective|profile|about\s*me)",
-        "experience": r"(experience|work\s*(history|experience)|employment|internships?)",
+        "experience": r"(experience|work\s*(history|experience)|employment)",
         "education": r"(education|academic|qualification)",
         "skills": r"(skills|technical\s*skills|core\s*competencies|competencies)",
         "certifications": r"(certifications?|licenses?|credentials?)",

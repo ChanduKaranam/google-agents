@@ -243,19 +243,6 @@ def analyze_structure(sections: dict) -> dict:
     missing = [s for s in _EXPECTED_SECTIONS if s not in sections]
     notes = []
 
-    # Fresher rule: a student with no work history but a real Projects section
-    # is not structurally broken — projects ARE their experience. Count it and
-    # coach the framing instead of flagging a CRITICAL gap they cannot fill.
-    experience_via_projects = "experience" in missing and "projects" in sections
-    if experience_via_projects:
-        missing.remove("experience")
-        present.append("experience")
-        notes.append(
-            "No formal Experience section, but Projects found — for a student "
-            "resume that's fine. Frame each project like a job: what you built, "
-            "the tech used, and a measurable outcome (users, marks, speed)."
-        )
-
     # Check content quality for present sections
     if "experience" in sections:
         exp_text = sections["experience"]
@@ -312,28 +299,19 @@ def calculate_ats_score(
           - breakdown (dict): per-dimension scores and weights
           - summary (str): one-line verdict
     """
-    # Weights. Without a JD there is nothing to match against, so the JD slice
-    # is redistributed proportionally across the other three dimensions —
-    # otherwise every student who has no JD handy is silently capped at 90.
-    jd_scored = bool(job_description.strip()) and jd_total_keywords > 0
-    if jd_scored:
-        weights = {
-            "keywords": 0.35,
-            "formatting": 0.30,
-            "structure": 0.25,
-            "jd_match": 0.10,
-        }
-        jd_match_score = int(100 * jd_match_count / jd_total_keywords)
-    else:
-        weights = {
-            "keywords": 0.35 / 0.90,
-            "formatting": 0.30 / 0.90,
-            "structure": 0.25 / 0.90,
-            "jd_match": 0.0,
-        }
-        jd_match_score = 0
+    # Weights
+    weights = {
+        "keywords": 0.35,
+        "formatting": 0.30,
+        "structure": 0.25,
+        "jd_match": 0.10,
+    }
 
-    overall = round(
+    jd_match_score = 0
+    if job_description.strip() and jd_total_keywords > 0:
+        jd_match_score = int(100 * jd_match_count / jd_total_keywords)
+
+    overall = int(
         keyword_score * weights["keywords"]
         + formatting_score * weights["formatting"]
         + structure_score * weights["structure"]
@@ -361,19 +339,10 @@ def calculate_ats_score(
         "grade": grade,
         "summary": summary,
         "breakdown": {
-            "keyword_score": {"score": keyword_score, "weight": f"{weights['keywords']:.0%}", "max": 100},
-            "formatting_score": {"score": formatting_score, "weight": f"{weights['formatting']:.0%}", "max": 100},
-            "structure_score": {"score": structure_score, "weight": f"{weights['structure']:.0%}", "max": 100},
-            "jd_match_score": {
-                "score": jd_match_score,
-                "weight": "10%" if jd_scored else "0%",
-                "max": 100,
-                "scored": jd_scored,
-                "note": "" if jd_scored else (
-                    "Not scored — no job description was provided. Share the JD "
-                    "of a role you're targeting for a more precise, tailored score."
-                ),
-            },
+            "keyword_score": {"score": keyword_score, "weight": "35%", "max": 100},
+            "formatting_score": {"score": formatting_score, "weight": "30%", "max": 100},
+            "structure_score": {"score": structure_score, "weight": "25%", "max": 100},
+            "jd_match_score": {"score": jd_match_score, "weight": "10%", "max": 100},
         },
     }
 

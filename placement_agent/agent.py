@@ -11,12 +11,7 @@ Capabilities:
   - Route interview preparation intents to interview_prep_agent sub-agent
 """
 
-import logging
-
 from google.adk.agents.llm_agent import Agent
-from google.adk.tools.preload_memory_tool import PreloadMemoryTool
-
-logger = logging.getLogger(__name__)
 
 # -- ATS tool imports ---------------------------------------------------------
 from .resume_parser import parse_resume, get_resume_sections, list_uploaded_files
@@ -33,24 +28,11 @@ from .suggestions import (
     compare_resume_versions,
 )
 
-# -- A2UI (rich UI) -----------------------------------------------------------
-from .a2ui.emit import emit_queued_a2ui
+# -- A2UI (rich UI) diagnostic ------------------------------------------------
 from .a2ui.probe import show_a2ui_probe_card
 
 # -- Sub-agent import ---------------------------------------------------------
 from .interview_prep import interview_prep_agent
-
-# -- Memory persistence -------------------------------------------------------
-async def remember_session(callback_context):
-    """Persist this session to Memory Bank so the student's score, role and
-    progress survive into their next conversation. Best-effort: locally (and
-    on deploys without a memory service) there is nothing to write to, and
-    that must never break the turn."""
-    try:
-        await callback_context.add_session_to_memory()
-    except Exception:
-        logger.warning("could not persist session to memory", exc_info=True)
-
 
 # -- Root agent definition ----------------------------------------------------
 root_agent = Agent(
@@ -168,11 +150,10 @@ root_agent = Agent(
         "  Overall Score : XX / 100   Grade: X\n"
         "  Verdict       : <one-line summary>\n\n"
         "  Breakdown:\n"
-        "    Show each dimension as 'XX/100 (weight NN%)' using the weights the\n"
-        "    tool returned -- they change depending on whether a JD was given.\n"
-        "    If the jd_match_score entry has scored=false, do NOT show a JD Match\n"
-        "    score line; instead relay its 'note' -- the score was computed fairly\n"
-        "    without it, and sharing a JD will tailor the analysis.\n\n"
+        "    Keywords   : XX/100  (weight 35%)\n"
+        "    Formatting : XX/100  (weight 30%)\n"
+        "    Structure  : XX/100  (weight 25%)\n"
+        "    JD Match   : XX/100  (weight 10%)\n\n"
 
         "STEP 5 -- STRENGTHS & WEAKNESSES\n"
         "  List 2-3 strengths. List top issues CRITICAL first, then HIGH.\n\n"
@@ -181,20 +162,6 @@ root_agent = Agent(
         "  Call generate_improvement_suggestions() then generate_step_by_step_action_plan().\n"
         "  Show CRITICAL -> HIGH -> MEDIUM. End with Quick Wins (top 3 easiest fixes).\n\n"
 
-        "STEP 6b -- OFFER TO REWRITE (after the action plan)\n"
-        "  Diagnosis alone leaves students stuck -- offer to do the writing:\n"
-        "  'Want me to rewrite the weak parts for you? I can turn your objective\n"
-        "   into a professional summary and your project descriptions into strong\n"
-        "   bullet points.'\n"
-        "  When they accept:\n"
-        "  - Rewrite using ONLY facts already in their resume or told to you in\n"
-        "    this chat. NEVER invent employers, titles, dates, tools, or numbers.\n"
-        "  - Missing a number that would strengthen a bullet? ASK for it\n"
-        "    ('How many users? What marks/rank? How much faster?') -- never guess.\n"
-        "  - Show each rewrite as BEFORE -> AFTER so they learn the pattern.\n"
-        "  - Offer a final complete improved resume as clean markdown they can\n"
-        "    copy into Word/Google Docs. Resume content is always in English.\n\n"
-
         "STEP 7 -- ITERATIVE LOOP\n"
         "  Invite re-upload. On second file, call compare_resume_versions() and\n"
         "  show delta score with what improved vs. what still needs work.\n\n"
@@ -202,21 +169,7 @@ root_agent = Agent(
         "  'Would you also like help preparing for interviews for this role?\n"
         "   I can connect you with your Interview Prep Coach.'\n\n"
 
-        "=== MEMORY OF PAST SESSIONS ===\n\n"
-        "  Facts from the user's previous conversations may be provided to you\n"
-        "  as recalled memories.\n"
-        "  - If memory shows a past ATS score, target role, or prep progress,\n"
-        "    acknowledge it naturally ('Last time your resume scored 62 -- let's\n"
-        "    beat that') and build on it instead of starting from zero.\n"
-        "  - When transferring to interview_prep_agent, restate the relevant\n"
-        "    remembered facts in the conversation first so the coach has them.\n"
-        "  - NEVER claim to remember something that is not in the recalled\n"
-        "    memories or this conversation. No memories -> just don't mention it.\n\n"
-
         "=== COMMUNICATION GUIDELINES ===\n\n"
-        "  - Reply in the language the user writes in (Telugu, Hindi, Hinglish,\n"
-        "    anything) -- but keep resume content itself in English, since Indian\n"
-        "    recruiters and ATS systems expect English resumes.\n"
         "  - Be encouraging but honest. Do not sugarcoat critical issues.\n"
         "  - Use clear language -- assume the user is NOT a recruiting expert.\n"
         "  - Always explain WHY a change matters.\n"
@@ -239,17 +192,14 @@ root_agent = Agent(
         "  - show_a2ui_probe_card() is a diagnostic. Call it ONLY when the user asks\n"
         "    to test, check or verify rich UI / interactive cards. Never call it as\n"
         "    part of resume or interview work.\n"
-        "  - The card draws itself. It is sent to the screen for you the moment the\n"
-        "    tool returns, so you do NOT need to output it.\n"
-        "  - NEVER print, quote, echo, summarise or pretty-print the JSON in the\n"
-        "    'a2ui_block' field, and never wrap it in a code fence. The user would\n"
-        "    see a wall of raw JSON sitting next to the card that already rendered.\n"
-        "  - Just say something short in plain words -- follow the 'say_next' hint --\n"
-        "    and stop.\n"
-        "  - When the user presses a button you receive a userAction with its name.\n"
-        "    Respond to that name; see 'on_button_press'.\n"
-        "  - If the user replies that they can see no card at all, use\n"
-        "    'fallback_text' and tell them rich UI is not supported in this surface.\n\n"
+        "  - When it returns, your reply must end with the value of its 'a2ui_block'\n"
+        "    field copied VERBATIM -- character for character, on its own line, with\n"
+        "    no code fence, no backticks, no reformatting and no pretty-printing of\n"
+        "    the JSON. The client finds the card by scanning for the exact tags; one\n"
+        "    edited character and nothing renders.\n"
+        "  - Put any words you want to say BEFORE the block, never after it.\n"
+        "  - If the user replies that they see no card, use 'fallback_text' and tell\n"
+        "    them rich UI is not supported in this surface.\n\n"
 
         "=== REMEMBER ===\n\n"
         "Your goal is to coach the user to build a resume that gets them hired AND\n"
@@ -269,11 +219,6 @@ root_agent = Agent(
         generate_step_by_step_action_plan,
         compare_resume_versions,
         show_a2ui_probe_card,
-        PreloadMemoryTool(),
     ],
     sub_agents=[interview_prep_agent],
-    # Emits any A2UI surface a tool queued, as its own event, so the component
-    # JSON never has to survive a round trip through the model. Then persists
-    # the session to Memory Bank so the next conversation remembers this one.
-    after_agent_callback=[emit_queued_a2ui, remember_session],
 )
