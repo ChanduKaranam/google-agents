@@ -1,4 +1,6 @@
-google-adk>=2.5.0
+# Pinned to match the deployed runtime and the repo's other agents; a floating
+# lower bound risks a future breaking google-adk major on redeploy.
+google-adk==2.6.0
 google-genai>=2.14.0
 google-cloud-aiplatform>=1.162.0
 fpdf2>=2.8.7

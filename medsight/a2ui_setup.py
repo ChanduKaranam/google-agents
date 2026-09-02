@@ -9,14 +9,13 @@ How it works
 ------------
 1. A ``DirectJsonFormat`` (the schema manager) is built over the v0.8
    ``BasicCatalog``. From it we pull:
-     * ``CATALOG``  — the resolved catalog object (fed to the ``show_card`` tool
-       and the A2A part converter for validation).
-     * ``EXAMPLES`` — few-shot A2UI payloads.
+     * ``CATALOG``  — the resolved catalog object (used by the card tools and the
+       A2A part converter for validation).
      * ``A2UI_INSTRUCTION`` — the full system prompt: MedSight's medical-domain
-       rules plus how to drive the UI via the ``show_card`` tool.
-2. ``agent.py`` gives the agent a custom ``show_card`` tool (in ``ui_tools.py``)
-   that assembles the A2UI component tree server-side and validates it against
-   ``CATALOG``.
+       rules plus how to drive the UI via the card tools.
+2. ``agent.py`` gives the agent custom card tools (``show_card`` /
+   ``show_finding_card`` / ``show_comparison`` in ``ui_tools.py``) that assemble
+   the A2UI component tree server-side and validate it against ``CATALOG``.
 3. ``a2a_server.py`` serves the agent over A2A and converts that validated
    payload into an ``application/a2ui+json`` A2A DataPart, which Gemini
    Enterprise renders natively.
@@ -42,7 +41,7 @@ from a2ui.inference_formats.direct_json import DirectJsonFormat
 A2UI_VERSION = "0.8"
 
 # ---------------------------------------------------------------------------
-# Schema manager + catalog + few-shot examples
+# Schema manager + catalog
 # ---------------------------------------------------------------------------
 _FORMAT = DirectJsonFormat(
     version=A2UI_VERSION,
@@ -50,12 +49,9 @@ _FORMAT = DirectJsonFormat(
     accepts_inline_catalogs=True,
 )
 
-# The resolved catalog object. Shared by the show_card tool (LLM-side validation)
+# The resolved catalog object. Shared by the card tools (LLM-side validation)
 # and the A2A part converter (server-side validation before shipping to client).
 CATALOG = _FORMAT.get_selected_catalog()
-
-# Few-shot A2UI payloads that show what valid v0.8 JSON looks like.
-EXAMPLES = _FORMAT.load_examples(CATALOG)
 
 
 # ---------------------------------------------------------------------------
@@ -271,9 +267,9 @@ HARD RULES
 """
 
 # The complete system prompt: medical role + workflow + how to drive the UI via
-# the `show_card` tool. We deliberately do NOT inject the raw A2UI JSON schema:
-# the model does not emit A2UI JSON (that caused malformed function calls on large
-# payloads) — `show_card` builds the UI server-side from tiny args.
+# the card tools. We deliberately do NOT inject the raw A2UI JSON schema: the
+# model does not emit A2UI JSON (that caused malformed function calls on large
+# payloads) — the card tools build the UI server-side from tiny args.
 A2UI_INSTRUCTION = "\n\n".join(
     [
         _ROLE_DESCRIPTION,

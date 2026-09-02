@@ -3,7 +3,7 @@
 MedSight helps medical / allied-health students interpret medical images and
 understand medicine topics as an ACADEMIC exercise. It renders native, tappable
 A2UI in Gemini Enterprise (via the `show_card` tool) and can export a PDF
-summary. Image understanding is native to Gemini 2.5 Pro — an uploaded image is
+summary. Image understanding is native to the Gemini 2.5 models — an uploaded image is
 pulled into context with `load_artifacts` and read directly; there is no separate
 vision model/endpoint to call.
 

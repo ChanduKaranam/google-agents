@@ -20,8 +20,9 @@ Design choices that matter here:
 from __future__ import annotations
 
 import json
+import os
 import re
-from io import BytesIO
+import tempfile
 from typing import Any
 
 from google.adk.tools.tool_context import ToolContext
@@ -93,9 +94,6 @@ async def generate_resume_pdf(
     # Render to a temp path then read bytes — the generators write to a path,
     # and a scratch file keeps that contract without a filesystem dependency
     # on the caller.
-    import os
-    import tempfile
-
     tmp = os.path.join(tempfile.gettempdir(), filename)
     try:
         render(data, tpl, tmp)
@@ -132,9 +130,9 @@ def analyze_resume(
 ) -> dict:
     """Score the resume: ATS score, keyword gap vs a JD, and per-bullet impact.
 
-    Use this before presenting the STAGE_3 analysis so the numbers are real and
-    reproducible, not estimated. Interpret the output for the user — decide
-    which missing keywords actually matter for their target role.
+    Use this in the analysis step so the numbers are real and reproducible, not
+    estimated. Interpret the output for the user — decide which missing keywords
+    actually matter for their target role.
 
     Args:
       resume_json: The resume as a JSON string (same shape as
@@ -163,7 +161,7 @@ def analyze_resume(
         "impact": analysis.score_impact(bullets),
         "target_role": target_role,
     }
-    if job_description.strip():
+    if (job_description or "").strip():
         result["keyword_gap"] = analysis.keyword_gap(data, job_description)
     return result
 

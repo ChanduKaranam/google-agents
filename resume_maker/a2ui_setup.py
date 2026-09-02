@@ -9,14 +9,13 @@ How it works
 ------------
 1. A ``DirectJsonFormat`` (the schema manager) is built over the v0.8
    ``BasicCatalog``. From it we pull:
-     * ``CATALOG``  — the resolved catalog object (fed to the toolset and the
-       A2A part converter for validation).
-     * ``EXAMPLES`` — few-shot A2UI payloads that teach the model valid JSON.
+     * ``CATALOG``  — the resolved catalog object (used by the ``show_card`` tool
+       and the A2A part converter for validation).
      * ``A2UI_INSTRUCTION`` — the full system prompt: our resume-domain rules
-       plus the SDK-generated A2UI schema/tool teaching and examples.
-2. ``agent.py`` gives the agent a ``SendA2uiToClientToolset``. When the model
-   wants to show UI it calls the ``send_a2ui_json_to_client`` tool with an A2UI
-   component tree; the toolset validates it against ``CATALOG``.
+       plus how to drive the UI via the ``show_card`` tool.
+2. ``agent.py`` gives the agent the custom ``show_card`` tool (``ui_tools.py``).
+   The model calls it with tiny args and the tool assembles + validates the A2UI
+   component tree against ``CATALOG``, returning ``validated_a2ui_json``.
 3. ``a2a_server.py`` serves the agent over A2A and converts that validated
    payload into an ``application/a2ui+json`` A2A DataPart, which Gemini
    Enterprise renders natively.
@@ -54,9 +53,6 @@ _FORMAT = DirectJsonFormat(
 # The resolved catalog object. Shared by the toolset (LLM-side validation) and
 # the A2A part converter (server-side validation before shipping to the client).
 CATALOG = _FORMAT.get_selected_catalog()
-
-# Few-shot A2UI payloads that show the model what valid v0.8 JSON looks like.
-EXAMPLES = _FORMAT.load_examples(CATALOG)
 
 
 # ---------------------------------------------------------------------------

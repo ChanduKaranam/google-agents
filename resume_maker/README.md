@@ -6,12 +6,13 @@ polished, ATS-optimized PDF through a seven-stage guided flow: intake → contex
 analysis → rewrite → design → PDF → refine.
 
 **Rich UI is real A2UI.** At every decision point the agent renders native,
-tappable UI in Gemini Enterprise — `MultipleChoice` chips for suggested replies,
-`Card`s for the ATS analysis and the design gallery, `Button` rows for next
-steps — using the official `a2ui-agent-sdk` (v0.8 basic catalog). This requires
-serving the agent over **A2A** and registering it via the `a2aAgentDefinition`
-path (see [Deploy](#deploy-to-gemini-enterprise)); on the managed Agent Engine
-path Gemini Enterprise does not render A2UI and the agent degrades to plain text.
+tappable UI in Gemini Enterprise — `Card`s with `Button` rows for suggested
+replies and next steps — via a custom `show_card` tool (`ui_tools.py`) that
+assembles the A2UI component tree server-side against the `a2ui-agent-sdk` v0.8
+basic catalog. This requires serving the agent over **A2A** and registering it
+via the `a2aAgentDefinition` path (see [Deploy](#deploy-to-gemini-enterprise));
+on the managed Agent Engine path Gemini Enterprise does not render A2UI and the
+agent degrades to plain text.
 
 ## What it does
 
@@ -36,8 +37,9 @@ path Gemini Enterprise does not render A2UI and the agent degrades to plain text
 
 | File | Role |
 |---|---|
-| `agent.py` | `root_agent` — single ADK agent with the A2UI system prompt + `SendA2uiToClientToolset` |
-| `a2ui_setup.py` | A2UI wiring: v0.8 catalog, few-shot examples, generated system prompt, part converter |
+| `agent.py` | `root_agent` — single ADK agent with the A2UI system prompt + the `show_card` tool |
+| `a2ui_setup.py` | A2UI wiring: v0.8 catalog, the `show_card` system prompt, and the A2A part converter |
+| `ui_tools.py` | `show_card` — builds the `Card -> Column -> [Text, Row of Buttons]` A2UI server-side |
 | `a2a_server.py` | Serves the agent over A2A (the endpoint GE's A2UI path registers) — `uvicorn resume_maker.a2a_server:app` |
 | `Dockerfile` | Cloud Run image for the A2A server |
 | `pdf_templates.py` | Five ReportLab renderers + `normalize_resume` |
@@ -77,9 +79,10 @@ PYTHONPATH=. .venv/bin/python resume_maker/test_resume.py   # offline checks
 ## A2UI rendering: which components, and the one platform constraint
 
 The agent emits UI from the **A2UI v0.8 basic catalog** (the only version Gemini
-Enterprise renders today). Suggested-reply chips use `MultipleChoice` or a `Row`
-of `Button`s; results use `Card`/`List`/`Text`/`Divider`. There is **no
-`ChoicePicker`** in v0.8 — that name only exists in later drafts.
+Enterprise renders today). The `show_card` tool builds a `Card -> Column ->
+[Text, Row of Button]` tree; the v0.8 catalog also offers `MultipleChoice`,
+`List`, `Divider`, `Image`, etc. There is **no `ChoicePicker`** in v0.8 — that
+name only exists in later drafts.
 
 > **Platform constraint (confirmed in Google Cloud docs):** Gemini Enterprise
 > renders A2UI only for agents registered via the **A2A path**

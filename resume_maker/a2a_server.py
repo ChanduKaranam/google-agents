@@ -24,17 +24,7 @@ service URL in Gemini Enterprise via the A2A path.
 
 from __future__ import annotations
 
-import logging
 import os
-import sys
-
-logger = logging.getLogger("resume_maker.a2ui")
-logger.setLevel(logging.INFO)
-if not logger.handlers:  # ensure INFO diagnostics actually reach Cloud Run stdout
-    _h = logging.StreamHandler(sys.stdout)
-    _h.setFormatter(logging.Formatter("%(levelname)s %(name)s %(message)s"))
-    logger.addHandler(_h)
-    logger.propagate = False
 
 from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 from google.adk.a2a.executor.a2a_agent_executor import A2aAgentExecutor
@@ -121,36 +111,8 @@ def _gen_ai_part_converter(part):
 
 async def _activate_a2ui(context):
     """Best-effort activation of the A2UI extension for negotiating clients."""
-    activated = try_activate_a2ui_extension(context, AGENT_CARD)
-    try:  # TEMP diagnostic: what does GE actually send?
-        rc = getattr(context, "_params", None) or getattr(context, "message", None)
-        exts = getattr(getattr(context, "message", None), "extensions", None)
-        cc = getattr(context, "call_context", None)
-        hdrs = getattr(cc, "state", None) if cc else None
-        logger.info(
-            "A2UI-DIAG request: activated_ext=%s msg_extensions=%s ctx_state=%s",
-            activated, exts, str(hdrs)[:300],
-        )
-    except Exception as e:
-        logger.info("A2UI-DIAG request log failed: %s", e)
+    try_activate_a2ui_extension(context, AGENT_CARD)
     return context
-
-
-def _describe_part(part) -> str:
-    root = getattr(part, "root", part)
-    kind = getattr(root, "kind", "?")
-    if kind == "data":
-        meta = getattr(root, "metadata", None) or {}
-        data = getattr(root, "data", None)
-        acts = (
-            [k for k in data if k in ("surfaceUpdate", "beginRendering")]
-            if isinstance(data, dict)
-            else []
-        )
-        return f"data[mime={meta.get('mimeType')} acts={acts}]"
-    if kind == "text":
-        return f"text[{(getattr(root, 'text', '') or '')[:40]!r}]"
-    return f"{kind}"
 
 
 def _is_leaked_tool_json(part) -> bool:
@@ -271,20 +233,12 @@ async def _strip_leaked_a2ui_text(ctx, a2a_event, adk_event):
         if artifact is not None:
             if _process_parts_container(artifact):
                 return None  # artifact now empty -> drop the event
-            logger.info(
-                "A2UI-DIAG response ARTIFACT parts=%s",
-                [_describe_part(p) for p in (artifact.parts or [])],
-            )
             return a2a_event
 
         status = getattr(a2a_event, "status", None)
         msg = getattr(status, "message", None) if status is not None else None
         if msg is not None:
             _process_parts_container(msg)
-            logger.info(
-                "A2UI-DIAG response STATUS.msg parts=%s",
-                [_describe_part(p) for p in (msg.parts or [])],
-            )
             return a2a_event
 
         if getattr(a2a_event, "parts", None) is not None:

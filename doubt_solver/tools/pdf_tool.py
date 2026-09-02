@@ -65,7 +65,7 @@ _REPLACEMENTS = {
 def _sanitize(text: str) -> str:
     for old, new in _REPLACEMENTS.items():
         text = text.replace(old, new)
-    # Anything still outside latin-1 would crash rendering; drop it safely.
+    # Anything still outside latin-1 would crash rendering; replace it safely.
     return text.encode("latin-1", "replace").decode("latin-1")
 
 

@@ -1,7 +1,7 @@
 """Identity guard and best-effort persistence to Memory Bank.
 
-Both behaviours are lifted from the Resume Maker / Job Helper agents for the same
-reasons that proved out there in production:
+Both behaviours are proven in production on our other Gemini Enterprise agents,
+for the same reasons:
 
 * Gemini Enterprise passes the signed-in user's email as ``user_id``. When
   that field is absent the Agent Engine template silently falls back to a
