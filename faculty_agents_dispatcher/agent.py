@@ -365,9 +365,21 @@ def _publish_and_confirm(callback_context: CallbackContext, name: str):
         return _reply('Type a name for the agent first.',
                       section_ui.name_card(state))
 
+    state[tools.PICKED_NAME] = name
+
     result = tools.publish_agent(link, name, labels, callback_context)
+    if result.get('status') == 'not_shared':
+        # Plain text, no card. The steps were tried as four Text lines and
+        # then as a List; both render with paragraph spacing between items, so
+        # four short steps filled a phone screen either way. In the message
+        # body they are four consecutive lines.
+        return _reply(result['message'], section_ui.main_menu(state))
     if result.get('status') != 'success':
-        return _reply(result.get('error_message', 'Publishing failed.'))
+        return _reply(
+            result.get('error_message')
+            or result.get('message')
+            or 'Publishing failed.'
+        )
     if result.get('warning'):
         # Zero or unknown reach. Never offer a Yes button for a send that
         # would message nobody.
@@ -494,6 +506,12 @@ def _before_agent(callback_context: CallbackContext):
         context = action.get('context') or {}
         name = action['name']
 
+        # Every tap, not just the greeting. A professor who reopens an old
+        # conversation never says hello again, so the greeting was the one
+        # moment a sync could fire — and it had already fired, days ago. The
+        # call itself is rate-limited to one per ten minutes per conversation.
+        tools.request_agent_sync(callback_context)
+
         # A link typed into the card arrives with whichever button was pressed.
         link = (context.get('agent_link') or '').strip()
         if link:
@@ -526,6 +544,11 @@ def _before_agent(callback_context: CallbackContext):
             if not state.get(tools.PENDING_LINK):
                 return _reply('I still need the agent link — paste it here.',
                               section_ui.link_card(state))
+            refusal = tools.readiness_refusal(state[tools.PENDING_LINK])
+            if refusal:
+                state[tools.PENDING_LINK] = None
+                return _reply(refusal['message'],
+                              section_ui.main_menu(state))
             if not state.get(tools.CHOSEN_SECTIONS):
                 return _reply('Link saved. Now choose who it goes to.',
                               section_ui.send_agent_card(state))
@@ -549,6 +572,8 @@ def _before_agent(callback_context: CallbackContext):
             result = tools.send_agent_to_sections(agent_id, callback_context)
             if result.get('status') == 'already_sent':
                 return _finish(state, result['message'])
+            if result.get('status') == 'not_shared':
+                return _reply(result['message'], section_ui.main_menu(state))
             if result.get('status') != 'success':
                 # Keep the send state either way: they may want to retry once
                 # the reason is fixed, and clearing it would lose the sections.
@@ -662,6 +687,10 @@ def _before_agent(callback_context: CallbackContext):
                     'Pick the agent you want to send.',
                     section_ui.agent_picker_card(state, found['agents']),
                 )
+            if found.get('status') == 'signed_out':
+                # Not an empty list. Offering the paste-a-link card here sent
+                # professors hunting for a link that would have failed too.
+                return _reply(found['message'], section_ui.main_menu(state))
             return _reply(
                 'Paste the agent link, then choose who it goes to.',
                 section_ui.send_agent_card(state),
@@ -685,6 +714,17 @@ def _before_agent(callback_context: CallbackContext):
                     section_ui.agent_picker_card(
                         state, list(state.get(tools.AGENT_CHOICES) or [])),
                 )
+            # Checked here rather than at publish. Naming the agent and
+            # picking sections sit between the two, and finding out the agent
+            # was private only after all that is the frustrating order.
+            refusal = tools.readiness_refusal(chosen['link'], chosen['name'])
+            if refusal:
+                # Nothing is committed to state: they will come back through
+                # Send Agent once it is shared, and a half-set send left
+                # behind would collide with that.
+                return _reply(refusal['message'],
+                              section_ui.main_menu(state))
+
             state[tools.PENDING_LINK] = chosen['link']
             state[tools.PICKED_NAME] = chosen['name']
             state[tools.CHOSEN_SECTIONS] = None
@@ -794,6 +834,21 @@ def _after_model(callback_context=None, llm_response=None):
         parts = list(getattr(content, 'parts', None) or [])
         if not any(getattr(p, 'text', None) for p in parts):
             return None  # A tool call, not the reply to the professor.
+
+        # Text sitting alongside a function call is preamble — the model
+        # saying "Hi Abhishek! What can I do for you today?" on its way to
+        # calling show_main_menu. It is not the answer, and the answer that
+        # follows says the same thing again. Left alone it produced two
+        # greetings and two menus in one turn (measured 2026-08-24, 12:40:13
+        # and 12:40:14). The call is kept; only the chatter goes.
+        calls = [p for p in parts if getattr(p, 'function_call', None)]
+        if calls:
+            llm_response.content = types.Content(
+                role=getattr(content, 'role', 'model') or 'model',
+                parts=calls,
+            )
+            logger.info('dropped preamble text ahead of a tool call')
+            return llm_response
 
         staged = state.get(tools.PENDING_UI)
         roster = state.get(tools.ROSTER_CACHE) or []

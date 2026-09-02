@@ -30,6 +30,8 @@ to render logs nothing at all. The numbers are identical either way.
 
 import json
 
+from datetime import datetime, timedelta
+
 from . import a2ui, config
 
 # Which cut of the agent list is on screen. Held in session state rather than
@@ -144,28 +146,44 @@ _MONTHS = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
 
 
-def _stamp(synced_at) -> str:
-    """A timestamp a professor reads, e.g. "as of 11 Aug, 06:00"."""
+def _local(synced_at) -> tuple:
+    """A UTC timestamp as (day, month name, "HH:MM") in the reader's zone.
+
+    Sethu stamps these in UTC. Slicing the characters out of the string, as
+    this did, showed a professor 05:38 for a sync they had just watched happen
+    at 11:08. Returns None if the timestamp cannot be read at all.
+    """
     text = str(synced_at)
     try:
-        return (f'as of {int(text[8:10])} {_MONTHS[int(text[5:7]) - 1]}, '
-                f'{text[11:16]}')
+        moment = datetime(
+            int(text[0:4]), int(text[5:7]), int(text[8:10]),
+            int(text[11:13]), int(text[14:16]),
+        ) + timedelta(minutes=config.DISPLAY_UTC_OFFSET_MINUTES)
     except (ValueError, IndexError):
-        return f'as of {text[:16].replace("T", " ")}'
+        return None
+    return moment.day, _MONTHS[moment.month - 1], moment.strftime('%H:%M')
+
+
+def _stamp(synced_at) -> str:
+    """A timestamp a professor reads, e.g. "as of 11 Aug, 11:30 IST"."""
+    local = _local(synced_at)
+    if not local:
+        return f'as of {str(synced_at)[:16].replace("T", " ")}'
+    day, month, clock = local
+    return f'as of {day} {month}, {clock} {config.DISPLAY_TZ_LABEL}'
 
 
 def _synced_line(synced_at) -> str:
     """Say how fresh the numbers are, or that they have never been fresh."""
     if not synced_at:
         return 'These figures have never synced.'
-    stamp = str(synced_at)
-    try:
-        month = _MONTHS[int(stamp[5:7]) - 1]
-        return f'Updated {int(stamp[8:10])} {month}, {stamp[11:16]}'
-    except (ValueError, IndexError):
+    local = _local(synced_at)
+    if not local:
         # An unparseable timestamp is not worth failing a card over, and a raw
         # one still tells a professor something.
-        return f'Updated {stamp[:16].replace("T", " ")}'
+        return f'Updated {str(synced_at)[:16].replace("T", " ")}'
+    day, month, clock = local
+    return f'Updated {day} {month}, {clock} {config.DISPLAY_TZ_LABEL}'
 
 
 def _paged(state, base: str, header: list, rows: list, footer: str | None,
@@ -631,8 +649,16 @@ def agent_usage(state, agents: list, offset: int = 0) -> list:
         title, empty = 'Not Sent Yet', 'Every agent has been sent.'
     else:
         chosen = FILTER_ALL
-        # Ranked by activation, which is also what the bar measures.
-        shown = sorted(sent, key=lambda a: (-_signins(a), _agent_name(a)))
+        # Ranked by conversations, which is also what the bar measures. Sends
+        # of the same agent are kept together so their shared chat total reads
+        # as one group.
+        shown = sorted(
+            sent,
+            key=lambda a: (-(_chats(a) or 0),
+                           a.get('agentName') or _agent_name(a),
+                           -_signins(a),
+                           _agent_name(a)),
+        )
         title, empty = 'Your agents', 'No agent has been sent to a section yet.'
 
     def volume(agent):
@@ -663,18 +689,45 @@ def agent_usage(state, agents: list, offset: int = 0) -> list:
             rows.append([f'·  {_agent_name(a)}' + (
                 f'  —  {_plural(chats, "chat")} this week' if chats else '')])
     else:
-        # Bar measures activation, the same thing this list is ordered by.
-        # With nothing activated there is no scale, so no bar is drawn.
-        top = max((_signins(a) for a in shown), default=0)
+        # The bar measures conversations, which is what the list is ordered by.
+        # With nothing measured anywhere there is no scale, so no bar is drawn.
+        top = max((_chats(a) or 0 for a in shown), default=0)
+        # A conversation total belongs to the Gemini Enterprise agent, not to
+        # any one send of it, so it is printed once per agent rather than
+        # repeated beside every send as if each had earned it.
+        seen_chats = set()
         for a in shown:
-            detail = f'{_plural(_signins(a), "activation")} · {volume(a)}'
-            if top:
-                detail = f'{_bar(_signins(a), top)}  {detail}'
-            rows.append([_agent_name(a), detail])
+            chats = _chats(a)
+            detail = _plural(_signins(a), 'activation')
+            key = a.get('agentName') or _agent_name(a)
+            shared = (a.get('sendCount') or 0) > 1
+            # The bar is drawn once per agent, beside the figure it measures.
+            # Repeated on every send it read as each send having earned the
+            # whole agent's conversations.
+            first = key not in seen_chats
+            if top and first:
+                detail = f'{_bar(chats or 0, top)}  {detail}'
+            line = [_agent_name(a), detail]
+
+            if first:
+                seen_chats.add(key)
+                if shared:
+                    line.append(
+                        f'   {key} · {volume(a)} across '
+                        f'{_plural(a["sendCount"], "send")}'
+                    )
+                else:
+                    line[1] = f'{detail} · {volume(a)}'
+            rows.append(line)
 
     header = [title]
     if chosen == FILTER_ALL:
-        summary = f'{_plural(len(sent), "agent")} sent'
+        # Sends, then how many distinct agents they came from. Counting rows
+        # would say "3 agents sent" for one agent sent to three departments.
+        names = {a.get('agentName') or _agent_name(a) for a in sent}
+        summary = f'{_plural(len(names), "agent")} sent'
+        if len(sent) > len(names):
+            summary = f'{summary} · {_plural(len(sent), "send")}'
         if unsent:
             summary += f', {len(unsent)} not sent yet'
         header.append(summary)

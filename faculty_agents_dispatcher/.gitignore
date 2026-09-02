@@ -6,3 +6,5 @@
 __pycache__/
 *.pyc
 .adk/
+oauth_client.txt
+client_secret_*.json

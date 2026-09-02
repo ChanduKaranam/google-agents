@@ -120,6 +120,7 @@ def name_card(state, already_published: bool = False,
     return messages
 
 
+
 def result_card(state, title: str, lines: list) -> list:
     """The outcome of a send, in a card of its own.
 

@@ -7,12 +7,13 @@ share link and the sections together, and a separate `notify` does the send.
 """
 
 import logging
+import time
 import uuid
 from urllib.parse import parse_qsl, urlsplit, urlunsplit
 
 from google.adk.tools import ToolContext
 
-from . import auth, config, progress_ui, sethu_client
+from . import auth, config, ge_sharing, progress_ui, sethu_client
 from .sethu_client import SethuError
 
 # Set by `show_section_picker`, read by the after-agent callback that draws the
@@ -101,6 +102,18 @@ ALREADY_SENT_MESSAGE = (
 STALE_CONFIRMATION_MESSAGE = (
     'That confirmation is no longer current, so nothing was sent just now. If '
     'this agent has not gone out yet, start again from Send Agent.'
+)
+
+# Said when the professor's Gemini Enterprise sign-in has lapsed. Every view
+# in this agent reads from Sethu, so an expired token takes the picker, the
+# department dashboards and My Agents down together — and the old fallback
+# ("paste the agent link") made that look like an empty agent list rather than
+# a sign-in problem, sending professors hunting for a link that would not have
+# worked either.
+SIGNED_OUT_MESSAGE = (
+    'Your Gemini Enterprise sign-in has expired, so I cannot reach your '
+    'agents right now. Reload this page and Gemini Enterprise will ask you to '
+    'authorise again — everything works straight after that.'
 )
 
 # Sethu stores the Gemini Enterprise share link on the agent record as `geUrl`.
@@ -703,8 +716,13 @@ def show_agent_usage(tool_context: ToolContext) -> dict:
     """
     try:
         agents = _call(tool_context, sethu_client.list_faculty_agents)
+    except sethu_client.NoIdentityError:
+        # Distinct from an empty list: nothing the professor types can fix a
+        # token that has expired.
+        return {'status': 'signed_out', 'message': SIGNED_OUT_MESSAGE}
     except SethuError as exc:
         return _error(str(exc))
+    agents = collapse_agents(in_current_app(agents))
     if not agents:
         return _error('This professor has no published agents yet.')
 
@@ -801,6 +819,128 @@ def ge_agent_id(link: str) -> str:
     return ''
 
 
+
+
+def collapse_agents(agents: list) -> list:
+    """One row per *send*, named as the professor named it when publishing.
+
+    Sethu returns a row per send plus a row its sync created, both pointing at
+    the same Gemini Enterprise agent. The two measure different halves: the
+    send row counts activations — students arriving through its WhatsApp
+    link — while the sync row counts conversations, keyed on the GE agent and
+    therefore shared by every send of it.
+
+    So sends stay separate, under their own names, each keeping its own
+    activation count. The chat figure is copied onto all of them and marked
+    with `sendCount`, because it belongs to the agent rather than to any one
+    send: sending Hackashop v2 to MECH and to CSE gives two activation counts
+    and one conversation total that cannot be divided between them. Gemini
+    Enterprise exposes no per-user or per-send attribution, so neither Sethu
+    nor we can split it — the card says so rather than implying a split.
+
+    An agent that has never been sent keeps its Gemini Enterprise name and
+    lands in "Not Sent Yet". Our own dispatchers are dropped entirely.
+    """
+    groups: dict = {}
+    order: list = []
+    for agent in hide_dispatchers(agents):
+        ge_id = ge_agent_id(
+            agent.get(_OPEN_LINK_FIELD) or agent.get(_LINK_FIELD) or '')
+        key = ge_id or f'row:{agent.get("id")}'
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(agent)
+
+    def _highest(rows, field):
+        values = [(r.get('stats') or {}).get(field) for r in rows]
+        values = [v for v in values if isinstance(v, (int, float))]
+        return max(values) if values else None
+
+    out = []
+    for key in order:
+        rows = groups[key]
+        synced = next((r for r in rows if r.get('unclaimed')), None)
+        # The synced row knows the agent's real name in Gemini Enterprise.
+        agent_name = str((synced or rows[0]).get('name') or 'Untitled agent')
+        chats = _highest(rows, 'questionsThisWeek')
+        used = _highest(rows, 'usedBy')
+        stamps = [r.get('statsSyncedAt') for r in rows if r.get('statsSyncedAt')]
+        stamp = max(stamps) if stamps else None
+
+        sends = [r for r in rows if r.get('sections')]
+        if not sends:
+            row = dict(synced or rows[0])
+            row['name'] = agent_name
+            row['sections'] = []
+            row['agentName'] = agent_name
+            row['sendCount'] = 0
+            out.append(row)
+            continue
+
+        for send in sends:
+            row = dict(send)
+            row['agentName'] = agent_name
+            row['sendCount'] = len(sends)
+            stats = dict(send.get('stats') or {})
+            # This send's own arrivals. A send that nobody opened reports
+            # nothing rather than zero, and a blank is not the same claim.
+            if stats.get('signInsCaused') is None:
+                stats['signInsCaused'] = 0
+            stats['questionsThisWeek'] = chats
+            stats['usedBy'] = used
+            row['stats'] = stats
+            row['statsSyncedAt'] = send.get('statsSyncedAt') or stamp
+            out.append(row)
+
+    return out
+
+def hide_dispatchers(agents: list) -> list:
+    """Drop Champion Faculty and Campus Ambassador from a professor's list."""
+    kept = []
+    for agent in agents or []:
+        ge_id = ge_agent_id(
+            agent.get(_OPEN_LINK_FIELD) or agent.get(_LINK_FIELD) or '')
+        if ge_id and ge_id in config.HIDDEN_GE_AGENT_IDS:
+            continue
+        kept.append(agent)
+    return kept
+
+
+def in_current_app(agents: list) -> list:
+    """Drop rows whose agent no longer lives in this Gemini Enterprise app.
+
+    Sethu's records outlast the project. Every agent published before the move
+    to `ge-standard-trail` still has a row, and its link points at the old
+    app — a link that renders for a student as "this conversation is read-only
+    as the agent used is no longer available". The same goes for an agent
+    somebody has since deleted.
+
+    Filtering on what the app actually holds covers both, and needs no list of
+    dead ids to maintain. If the app cannot be listed the professor sees
+    everything, exactly as before: hiding a professor's whole history because
+    one API call timed out is the worse failure.
+    """
+    live = ge_sharing.known_agent_ids()
+    if live is None:
+        return list(agents or [])
+
+    kept, dropped = [], 0
+    for agent in agents or []:
+        link = agent.get(_OPEN_LINK_FIELD) or agent.get(_LINK_FIELD) or ''
+        ge_id = ge_agent_id(link)
+        # No id in the link means nothing to match on. Kept, rather than
+        # guessed at.
+        if ge_id and ge_id not in live:
+            dropped += 1
+            continue
+        kept.append(agent)
+
+    if dropped:
+        logger.info('hid %d agent(s) not in this app', dropped)
+    return kept
+
+
 def choosable_agents(agents: list) -> list:
     """The agents worth offering a professor, newest first.
 
@@ -821,7 +961,7 @@ def choosable_agents(agents: list) -> list:
     sync ingests as if a professor had made them.
     """
     best = {}
-    for agent in agents or []:
+    for agent in in_current_app(agents):
         link = agent.get(_OPEN_LINK_FIELD) or agent.get(_LINK_FIELD)
         if not link:
             continue
@@ -852,21 +992,38 @@ def choosable_agents(agents: list) -> list:
     return offered
 
 
-# Set once a sync has been asked for in this session, so a professor typing
-# "hi" five times does not queue five enumerations of the whole engine.
+# When a sync was last asked for, as epoch seconds. Time rather than a flag:
+# a once-per-session flag meant a professor reopening yesterday's conversation
+# never triggered one, because the session state came back with the flag still
+# set and no sync ever ran again for that chat.
 SYNC_REQUESTED = 'sync_requested'
+
+
+def sync_is_due(state) -> bool:
+    """Whether enough time has passed to ask Sethu for a fresh read."""
+    last = state.get(SYNC_REQUESTED)
+    # Sessions written before this was a timestamp hold `True`. Treat those as
+    # infinitely old rather than as "just synced" — the flag may be a day old.
+    if not isinstance(last, (int, float)):
+        return True
+    return (time.time() - last) >= config.SYNC_MIN_INTERVAL_SECONDS
 
 
 def request_agent_sync(tool_context: ToolContext) -> bool:
     """Ask Sethu to re-read Gemini Enterprise. Best effort, never raises.
 
+    Rate-limited to one request per SYNC_MIN_INTERVAL_SECONDS per conversation,
+    so it can be called from every button press without queueing a job per tap.
+
     Returns True if Sethu accepted the request. A failure is logged and
-    swallowed: the greeting must not fail because a background job could not be
+    swallowed: a tap must not fail because a background job could not be
     started, and the professor is told the list may lag regardless.
     """
-    if tool_context.state.get(SYNC_REQUESTED):
+    if not sync_is_due(tool_context.state):
         return False
-    tool_context.state[SYNC_REQUESTED] = True
+    # Stamped before the call, not after: a request that times out has still
+    # been made, and retrying it on the next tap helps nobody.
+    tool_context.state[SYNC_REQUESTED] = time.time()
     try:
         result = _call(tool_context, sethu_client.trigger_agent_sync)
         logger.info('agent sync requested: %s', result)
@@ -887,6 +1044,10 @@ def list_agent_choices(tool_context: ToolContext) -> dict:
     """
     try:
         agents = _call(tool_context, sethu_client.list_faculty_agents)
+    except sethu_client.NoIdentityError:
+        # Distinct from an empty list: nothing the professor types can fix a
+        # token that has expired.
+        return {'status': 'signed_out', 'message': SIGNED_OUT_MESSAGE}
     except SethuError as exc:
         return _error(str(exc))
     offered = choosable_agents(agents)
@@ -975,6 +1136,10 @@ def find_agent_by_link(agent_link: str, tool_context: ToolContext) -> dict:
 
     try:
         agents = _call(tool_context, sethu_client.list_faculty_agents)
+    except sethu_client.NoIdentityError:
+        # Distinct from an empty list: nothing the professor types can fix a
+        # token that has expired.
+        return {'status': 'signed_out', 'message': SIGNED_OUT_MESSAGE}
     except SethuError as exc:
         return _error(str(exc))
 
@@ -1012,6 +1177,9 @@ def publish_agent(
     Returns:
         A dict with 'status'. On success, 'agent_id' identifies it and 'count'
         is the number of students it would reach.
+        'not_shared' means the agent is private, so nothing was done —
+        show the professor 'message' exactly as written, keeping its numbered
+        steps, and add no steps of your own.
     """
     # Normalised before anything is written. Publishing is irreversible, so a
     # link carrying someone's account index and chat session would be stored
@@ -1023,6 +1191,12 @@ def publish_agent(
         return _error('That is not a valid https:// share link.')
     if not sections:
         return _error('No sections were given, so there is nobody to send to.')
+
+    # Before Sethu is written to. A published record cannot be deleted, so an
+    # agent students cannot open must be stopped here rather than unpicked.
+    refusal = readiness_refusal(link, name)
+    if refusal:
+        return refusal
 
     # Check the sections against the roster first. Sethu publishes an
     # unrecognised section to zero students instead of rejecting it, and the
@@ -1098,6 +1272,9 @@ def prepare_send(agent_id: str, tool_context: ToolContext) -> dict:
     Returns:
         A dict with 'status'. On success, 'count' is the number of students
         and 'sections' the sections it goes to.
+        'not_shared' means the agent is private, so nothing was done —
+        show the professor 'message' exactly as written, keeping its numbered
+        steps, and add no steps of your own.
     """
     try:
         agent = _call(
@@ -1112,6 +1289,12 @@ def prepare_send(agent_id: str, tool_context: ToolContext) -> dict:
             'This agent has no share link in Sethu, so students would get a '
             'message with nothing to open.'
         )
+
+    # Already in Sethu, so the publish-time check either never ran or ran
+    # before the professor changed something. Re-read it.
+    refusal = readiness_refusal(agent.get(_LINK_FIELD), agent.get('name') or '')
+    if refusal:
+        return refusal
 
     sethu_count = agent.get('studentCount')
     sections = agent.get('sections') or []
@@ -1209,7 +1392,11 @@ def send_agent_to_sections(agent_id: str, tool_context: ToolContext) -> dict:
                     'error_message': SEND_UNCONFIRMED_MESSAGE}
         return _error(str(exc))
 
-    logger.info('notify: agent %s accepted by Sethu', agent_id)
+    # Sethu's own answer: how many it will message, how many it skipped, and
+    # whether it actually queued anything. "Accepted" is not "delivered" — the
+    # WhatsApp send happens in Sethu's worker afterwards, so this is the only
+    # record of what it undertook to do.
+    logger.info('notify: agent %s accepted by Sethu — result=%s', agent_id, result)
     # A send must not be replayable on a stray second "yes".
     tool_context.state[SENT_AGENTS] = already + [agent_id]
     tool_context.state[_QUOTED_SEND] = None
@@ -1277,3 +1464,69 @@ def diagnose_identity(tool_context: ToolContext) -> dict:
         result['sethu_identity_error'] = str(exc)
 
     return result
+
+
+def readiness_refusal(link: str, name: str = '') -> dict | None:
+    """Refuse the send when students could not open this agent.
+
+    None when the agent is fine, or when the check could not be run — see
+    ge_sharing.readiness, which fails open.
+
+    One set of steps covers both failure modes. Sharing the agent with a single
+    user is what flips it to ENABLED and ALL_USERS in the same action, so a
+    professor who has published but not shared, and one who has done neither,
+    are told to do exactly the same thing. Splitting the advice would only make
+    them work out which case they are in.
+
+    The returned 'message' is professor-facing and is relayed as written. No
+    instruction to the model goes in it: an earlier version ended with "tell
+    the professor exactly this", and the model duly showed that to the
+    professor too.
+    """
+    ge_id = ge_agent_id(link)
+    status = ge_sharing.readiness(ge_id)
+    if status['ok']:
+        return None
+
+    # Published, not queued, but visible only to the people it was shared
+    # with. That is every agent a professor makes, because the Share dialog
+    # has no way to say "everyone". Widen it rather than refusing a send the
+    # professor has no means of fixing.
+    if (status.get('known') and status['state'] == 'ENABLED'
+            and not status.get('pending')):
+        if ge_sharing.make_available(ge_id):
+            return None
+        return _error(
+            'This agent is published but I could not open it up to your '
+            'students, so nothing was sent. Try again in a moment — if it '
+            'keeps failing, the Sethu team needs to look at it.'
+        )
+
+    label = f'**{name}**' if name else 'This agent'
+
+    if status.get('pending'):
+        return {
+            'status': 'not_shared',
+            'message': (
+                f'{label} has been shared, but the request is waiting for an '
+                'administrator to approve it — Gemini Enterprise shows it as '
+                '"In review". Nothing has been sent.\n\n'
+                'Sharing it again will not move this along. Ask your Gemini '
+                'Enterprise administrator to open the agent in the admin '
+                'console and approve the share request, then tap Send Agent.'
+            ),
+        }
+
+    return {
+        'status': 'not_shared',
+        'message': (
+            f'{label} is private, so students would open the link and be told '
+            'the agent is not available. Nothing has been sent.\n\n'
+            'To make it available:\n'
+            '1. Open the agent in Gemini Enterprise\n'
+            '2. Click Share\n'
+            '3. Give access to anyone — one person is enough\n'
+            '4. Click Done\n\n'
+            'Then tap Send Agent and I will take it from there.'
+        ),
+    }

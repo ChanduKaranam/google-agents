@@ -75,8 +75,12 @@ DEPARTMENT_SWITCH_ENABLED = (
 HIDDEN_GE_AGENT_IDS = frozenset(
     part.strip() for part in os.environ.get(
         'FACULTY_HIDDEN_GE_AGENTS',
-        # Champion Faculty (A2UI), the retired Champion Faculty (ADK).
-        '5115760108249648706,12220860024771704401',
+        # Our own dispatchers in the ge-standard-trail GE app: Champion
+        # Faculty and Campus Ambassador. Sethu's sync ingests them like any
+        # other agent, so without this a professor is offered the very agent
+        # they are talking to. Ids are per-app, so this list is rebuilt
+        # whenever the project moves.
+        '18101167715781202478,6010108904994977742',
     ).split(',') if part.strip()
 )
 
@@ -122,3 +126,58 @@ SYNC_TRIGGER_TIMEOUT_SECONDS = float(
 # Re-exchange a Sethu token once it is within this many days of expiring,
 # rather than letting a long conversation fail mid-flight.
 TOKEN_REFRESH_MARGIN_DAYS = 1
+
+
+# --- Gemini Enterprise agent readiness -------------------------------------
+#
+# A professor can publish an agent through us while that agent is still
+# PRIVATE, or ENABLED but shared with nobody. Sethu accepts it, we message the
+# students, and every one of them opens a link that says "this conversation is
+# read-only as the agent used is no longer available" — measured 2026-08-19 on
+# Hackashop v2. Nothing in our own flow can prevent that, because publishing
+# here writes to Sethu and never touches Discovery Engine.
+#
+# So we read the agent's own state before publishing and before sending, and
+# refuse rather than send a dead link. Two fields have to be right:
+#   state = ENABLED      the agent has been published in the console
+#   scope = ALL_USERS    it is shared, not restricted to its creator
+#
+# Publishing in the console sets ENABLED *and resets scope to RESTRICTED*, so
+# the two are genuinely independent and both need checking.
+GE_READINESS_CHECK = os.environ.get('FACULTY_GE_READINESS_CHECK', '1') == '1'
+
+# The Gemini Enterprise app the professors' agents live in. Ids are per-app, so
+# these move with the project — the same rebuild as HIDDEN_GE_AGENT_IDS.
+GE_PROJECT_ID = os.environ.get('GE_PROJECT_ID', 'ge-standard-trail')
+GE_ENGINE_ID = os.environ.get(
+    'GE_ENGINE_ID', 'tl-ge-standard-aug-2026_1786977983132'
+)
+
+# Seconds to wait on the Discovery Engine read. Kept short: this sits in front
+# of a professor waiting for a reply, and an unanswered check fails open.
+GE_READINESS_TIMEOUT_SECONDS = float(
+    os.environ.get('FACULTY_GE_READINESS_TIMEOUT', '6')
+)
+
+
+# --- how timestamps are shown ----------------------------------------------
+#
+# Sethu sends UTC ("2026-08-20T05:38:28.289Z") and the cards used to print the
+# characters straight out of that string, so a sync at 11:08 in the morning
+# read as "05:38" to the professor who had just watched it happen.
+#
+# A fixed offset rather than a named zone: the container has no tzdata, so
+# zoneinfo('Asia/Kolkata') raises there while working fine on a laptop. India
+# has no daylight saving, so the offset is the whole truth.
+DISPLAY_UTC_OFFSET_MINUTES = int(
+    os.environ.get('FACULTY_DISPLAY_UTC_OFFSET_MINUTES', '330')
+)
+DISPLAY_TZ_LABEL = os.environ.get('FACULTY_DISPLAY_TZ_LABEL', 'IST')
+
+
+# How long a requested Sethu sync is considered fresh enough. A professor who
+# reopens yesterday's conversation should get current figures, but five taps in
+# a row should not queue five enumerations of the whole engine.
+SYNC_MIN_INTERVAL_SECONDS = float(
+    os.environ.get('FACULTY_SYNC_MIN_INTERVAL_SECONDS', '600')
+)
