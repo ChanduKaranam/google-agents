@@ -1,0 +1,211 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Sethu Faculty API",
+    "version": "1.0.0",
+    "description": "Endpoints for Gemini Enterprise Faculty Agents to manage course agents and notify students."
+  },
+  "servers": [
+    {
+      "url": "https://sethu-dev-api.onrender.com/api/v1"
+    }
+  ],
+  "paths": {
+    "/auth/agent-tokens/exchange": {
+      "post": {
+        "summary": "Exchange Google ID token for Sethu agent token",
+        "operationId": "exchangeToken",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "googleIdToken": {
+                    "type": "string",
+                    "description": "The Google ID token of the faculty member"
+                  }
+                },
+                "required": ["googleIdToken"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful exchange",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "token": { "type": "string" },
+                        "tenantId": { "type": "string" },
+                        "userId": { "type": "string" },
+                        "role": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/faculty/sections": {
+      "get": {
+        "summary": "List faculty's own sections",
+        "operationId": "getFacultySections",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Bearer token received from the exchange endpoint. Format MUST be: Bearer <token>"
+          }
+        ],
+        "responses": {
+          "200": { "description": "List of sections returned successfully." }
+        }
+      }
+    },
+    "/faculty/agents": {
+      "post": {
+        "summary": "Create a new GE agent",
+        "operationId": "createAgent",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Bearer token received from the exchange endpoint. Format MUST be: Bearer <token>"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "description": "Name of the AI Agent" },
+                  "description": { "type": "string", "description": "Short description of what the agent does" },
+                  "whoCanUse": { "type": "string", "description": "ID of the section or group that can use it" }
+                },
+                "required": ["name", "whoCanUse"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Agent created successfully." }
+        }
+      },
+      "get": {
+        "summary": "List faculty's GE agents",
+        "operationId": "listAgents",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Bearer token received from the exchange endpoint. Format MUST be: Bearer <token>"
+          }
+        ],
+        "responses": {
+          "200": { "description": "List of agents returned." }
+        }
+      }
+    },
+    "/faculty/agents/{id}/sections": {
+      "put": {
+        "summary": "Assign sections to an agent",
+        "operationId": "assignSections",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The ID of the newly created agent"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Bearer token received from the exchange endpoint. Format MUST be: Bearer <token>"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sectionIds": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Array of section IDs to assign"
+                  }
+                },
+                "required": ["sectionIds"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Sections assigned successfully." }
+        }
+      }
+    },
+    "/faculty/agents/{id}/notify": {
+      "post": {
+        "summary": "Send WhatsApp notification about the agent",
+        "operationId": "notifySections",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The ID of the agent to notify about"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Bearer token received from the exchange endpoint. Format MUST be: Bearer <token>"
+          }
+        ],
+        "responses": {
+          "200": { "description": "WhatsApp and Email notifications sent successfully." }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "AgentSecretAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Agent-Secret"
+      }
+    }
+  },
+  "security": [
+    {
+      "AgentSecretAuth": []
+    }
+  ]
+}

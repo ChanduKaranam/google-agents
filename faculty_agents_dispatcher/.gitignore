@@ -1,0 +1,10 @@
+.env
+
+# adk reads this file for deploy-packaging exclusions too, so keep local-only
+# artefacts here — stale bytecode from another Python version and a local
+# session database have no business in the deployed image.
+__pycache__/
+*.pyc
+.adk/
+oauth_client.txt
+client_secret_*.json
