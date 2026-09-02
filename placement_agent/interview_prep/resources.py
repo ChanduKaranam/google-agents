@@ -77,11 +77,11 @@ _RESOURCES: dict[str, dict] = {
                 "Find the median of a data stream in O(log n).",
             ],
             "behavioral": [
-                "Tell me about a time you had to debug a critical production issue under pressure.",
+                "Walk me through a project you built — what was the hardest bug and how did you fix it?",
                 "Describe a project where you had to learn a new technology quickly.",
                 "How do you handle disagreements with teammates about technical decisions?",
-                "Tell me about a time you improved a process or system significantly.",
-                "Describe a situation where you had to meet a tight deadline.",
+                "Tell me about a time you improved something — code, a process, or a system.",
+                "Describe a situation where you had to meet a tight deadline (a hackathon or submission counts).",
             ],
             "system_design": [
                 "Design Twitter's newsfeed.",
@@ -305,6 +305,256 @@ _RESOURCES: dict[str, dict] = {
         },
     },
 
+    "qa_testing": {
+        "description": "QA / Software Testing / SDET / Automation",
+        "skill_areas": [
+            "Manual Testing Fundamentals (SDLC, STLC, test cases, bug lifecycle)",
+            "Automation with Selenium / Playwright",
+            "API Testing (Postman, REST basics)",
+            "SQL for Test Data Validation",
+            "One programming language (Java or Python)",
+            "Agile & Defect Tracking (JIRA)",
+        ],
+        "interview_formats": [
+            "Aptitude / online assessment round",
+            "Manual testing concepts round (write test cases for X)",
+            "Automation / coding round (Selenium scenarios, basic programs)",
+            "HR / behavioral round",
+        ],
+        "resources": {
+            "platforms": [
+                {"name": "Guru99 Software Testing", "url": "https://guru99.com/software-testing.html", "focus": "Manual testing concepts from scratch"},
+                {"name": "GeeksforGeeks Software Testing", "url": "https://geeksforgeeks.org/software-testing-basics", "focus": "Testing theory + interview questions"},
+                {"name": "Ministry of Testing", "url": "https://ministryoftesting.com", "focus": "Community, exercises, real-world practices"},
+                {"name": "ISTQB Foundation Syllabus", "url": "https://istqb.org", "focus": "The certification most Indian QA JDs mention"},
+            ],
+            "youtube": [
+                {"name": "SDET- QA Automation", "url": "https://youtube.com/@sdetpavan", "focus": "Selenium, API testing, full QA courses"},
+                {"name": "Software Testing Mentor", "url": "https://youtube.com/@softwaretestingmentor", "focus": "Manual testing and ISTQB prep"},
+            ],
+            "books_blogs": [
+                {"name": "Software Testing Help", "url": "https://softwaretestinghelp.com", "focus": "Test case examples and interview Q&A"},
+            ],
+        },
+        "question_bank": {
+            "technical_easy": [
+                "What is the difference between verification and validation?",
+                "Explain the bug life cycle from New to Closed.",
+                "Write 5 test cases for a login page.",
+                "What is the difference between smoke testing and sanity testing?",
+                "What is a test case vs a test scenario? Give an example of each.",
+            ],
+            "technical_medium": [
+                "Write test cases for an ATM cash withdrawal flow, including negative cases.",
+                "What is boundary value analysis? Apply it to an age field accepting 18-60.",
+                "How would you test a REST API endpoint without a UI? What would you check?",
+                "Explain how you would locate a dynamic element in Selenium.",
+                "A bug is not reproducible on the developer's machine. What do you do?",
+            ],
+            "technical_hard": [
+                "Design an automation framework structure for a web app from scratch — what layers and why?",
+                "How would you decide what to automate and what to leave manual in a 2-week release cycle?",
+                "Explain how you would set up data-driven tests for a checkout flow with 30 input combinations.",
+                "Write SQL to find orders present in the orders table but missing from the payments table.",
+                "How would you performance-test a college results portal that crashes every results day?",
+            ],
+            "behavioral": [
+                "Tell me about a bug you found in a college project or app you use — how did you notice it?",
+                "Describe a time you had to be extremely detail-oriented. What was the outcome?",
+                "A developer teammate says your reported bug is 'not a bug'. How do you handle it?",
+                "Tell me about a time you had to test or check something with very little time.",
+                "Why QA and not development?",
+            ],
+        },
+    },
+
+    "it_support": {
+        "description": "IT Support / Technical Support / Service Desk / System Admin",
+        "skill_areas": [
+            "Operating Systems (Windows troubleshooting, Linux basics)",
+            "Networking Fundamentals (IP, DNS, DHCP, VPN)",
+            "Hardware & Peripherals Troubleshooting",
+            "Ticketing Tools & ITIL Basics (ServiceNow concepts)",
+            "Active Directory & Office 365 Basics",
+            "Customer Communication",
+        ],
+        "interview_formats": [
+            "Aptitude / communication assessment",
+            "Technical troubleshooting round (scenario-based)",
+            "Customer-handling roleplay (mock support call)",
+            "HR round",
+        ],
+        "resources": {
+            "platforms": [
+                {"name": "Google IT Support Certificate (Coursera)", "url": "https://coursera.org/professional-certificates/google-it-support", "focus": "The strongest entry-level IT support credential"},
+                {"name": "CompTIA A+ Objectives", "url": "https://comptia.org/certifications/a", "focus": "The standard support-role syllabus"},
+                {"name": "Professor Messer", "url": "https://professormesser.com", "focus": "Free full A+/Network+ video courses"},
+            ],
+            "youtube": [
+                {"name": "Professor Messer", "url": "https://youtube.com/@professormesser", "focus": "A+, Network+, Security+ free training"},
+                {"name": "NetworkChuck", "url": "https://youtube.com/@NetworkChuck", "focus": "Networking made engaging"},
+            ],
+            "books_blogs": [
+                {"name": "ITIL Foundation overview", "url": "https://axelos.com/certifications/itil-service-management", "focus": "Service desk process vocabulary JDs expect"},
+            ],
+        },
+        "question_bank": {
+            "technical_easy": [
+                "A user says 'the internet is not working'. Walk me through your first 5 checks.",
+                "What is an IP address, and what is the difference between IPv4 and IPv6?",
+                "What does DNS do? What happens when it fails?",
+                "A laptop is very slow. What would you check first?",
+                "What is the difference between RAM and storage?",
+            ],
+            "technical_medium": [
+                "A user can reach websites by IP but not by name. What is broken and how do you fix it?",
+                "Explain what DHCP does and what an APIPA (169.254.x.x) address tells you.",
+                "How would you recover files from a laptop that won't boot into Windows?",
+                "A printer works for some users but not others on the same network. Diagnose it.",
+                "What is Active Directory and what would you use it for day to day?",
+            ],
+            "technical_hard": [
+                "Design the escalation path for a company-wide email outage — who does what in the first hour?",
+                "An office VPN disconnects every 30 minutes for all users. How do you isolate the cause?",
+                "How would you roll out a Windows update to 500 machines with minimal disruption?",
+                "Explain how you'd set up a new employee's accounts and hardware end-to-end (Day 1 readiness).",
+                "A ransomware popup appears on one machine on the office network. Your first 10 minutes?",
+            ],
+            "behavioral": [
+                "Tell me about a time you explained something technical to a non-technical person (family counts!).",
+                "Describe a time you stayed patient with someone who was frustrated or angry.",
+                "You have 10 open tickets and a VIP calls with an urgent issue. How do you prioritize?",
+                "Tell me about a time you fixed something by systematically eliminating causes.",
+                "Why do you want to start your career in IT support?",
+            ],
+        },
+    },
+
+    "core_engineering": {
+        "description": "Core Engineering — ECE / EEE / Mechanical / Civil / Embedded",
+        "skill_areas": [
+            "Branch Fundamentals (the 4-5 subjects your JD names)",
+            "Engineering Drawing & CAD Tools (AutoCAD / SolidWorks / MATLAB as relevant)",
+            "Final-Year Project Depth (you WILL be asked to defend it)",
+            "Basic Aptitude & Reasoning (most core companies screen with it)",
+            "Industry Awareness (what the company builds, current projects)",
+            "C Programming Basics (asked even in core interviews)",
+        ],
+        "interview_formats": [
+            "Written test (aptitude + branch technical)",
+            "Technical interview (fundamentals + final-year project deep-dive)",
+            "Group discussion (common in core PSU/manufacturing hiring)",
+            "HR round",
+        ],
+        "resources": {
+            "platforms": [
+                {"name": "NPTEL", "url": "https://nptel.ac.in", "focus": "IIT/IISc courses to repair weak fundamentals"},
+                {"name": "GATE previous papers", "url": "https://gate.iitk.ac.in", "focus": "The best question bank for branch fundamentals"},
+                {"name": "IndiaBix", "url": "https://indiabix.com", "focus": "Aptitude + branch-wise technical MCQs"},
+            ],
+            "youtube": [
+                {"name": "Gate Smashers", "url": "https://youtube.com/@GateSmashers", "focus": "Core subjects crash courses"},
+                {"name": "Neso Academy", "url": "https://youtube.com/@nesoacademy", "focus": "Electronics, signals, networks fundamentals"},
+            ],
+            "books_blogs": [
+                {"name": "Made Easy handbooks", "url": "https://madeeasypublications.org", "focus": "Branch-wise formula and concept refreshers"},
+            ],
+        },
+        "question_bank": {
+            "technical_easy": [
+                "Explain your final-year project in 2 minutes: problem, your role, and result.",
+                "Name the core subjects you are strongest in — and expect questions from them.",
+                "ECE/EEE: State and explain Kirchhoff's laws with a simple circuit.",
+                "Mechanical: Explain the four strokes of an IC engine.",
+                "Civil: What is the difference between one-way and two-way slabs?",
+            ],
+            "technical_medium": [
+                "Defend a design choice in your final-year project — what alternatives did you reject and why?",
+                "ECE: Explain the difference between microprocessor and microcontroller with use cases.",
+                "EEE: Why is power transmitted at high voltage? Walk through the losses math.",
+                "Mechanical: Explain stress vs strain and draw the curve for mild steel.",
+                "Civil: How would you check the quality of concrete on site without a lab?",
+            ],
+            "technical_hard": [
+                "Your project's approach fails at 10x scale/load — redesign it and justify the changes.",
+                "ECE: Design a simple embedded system for a given sensor + alert requirement, block by block.",
+                "EEE: A motor is overheating in service. List causes in the order you would eliminate them.",
+                "Mechanical: Select a material for a given part and justify against 3 alternatives.",
+                "Civil: Plan the construction sequence for a small bridge — dependencies and risks.",
+            ],
+            "behavioral": [
+                "Tell me about a problem in your project where the first approach failed. What did you do?",
+                "Describe a time your team disagreed on a design decision in a project or lab.",
+                "Core jobs involve site/shop-floor work. How do you feel about non-desk roles?",
+                "Tell me about something practical you built, repaired, or improved outside coursework.",
+                "Why core engineering and not an IT role?",
+            ],
+        },
+    },
+
+    "campus_placement": {
+        "description": "India Campus Drives — TCS NQT / Infosys / Wipro / Mass Recruiters",
+        "skill_areas": [
+            "Quantitative Aptitude (speed matters more than depth)",
+            "Logical Reasoning & Verbal Ability",
+            "Basic Coding (patterns, arrays, strings — one language well)",
+            "Email / Essay Writing (Wipro & TCS test it)",
+            "Communication for the HR round",
+            "Company Basics (services model, values, recent news)",
+        ],
+        "interview_formats": [
+            "Online assessment: aptitude + verbal + reasoning + 1-2 coding questions",
+            "Technical interview: basics of your branch + your projects + simple code",
+            "Managerial round (TCS): pressure questions, situational judgement",
+            "HR round: relocation, bond, shift flexibility, 'tell me about yourself'",
+        ],
+        "resources": {
+            "platforms": [
+                {"name": "PrepInsta", "url": "https://prepinsta.com", "focus": "Company-wise patterns: TCS NQT, Infosys, Wipro, Accenture"},
+                {"name": "IndiaBix", "url": "https://indiabix.com", "focus": "Aptitude + reasoning practice by topic"},
+                {"name": "Freshersworld", "url": "https://freshersworld.com", "focus": "Off-campus drive listings and papers"},
+                {"name": "HackerRank", "url": "https://hackerrank.com", "focus": "The platform many drives actually run on — practice there"},
+            ],
+            "youtube": [
+                {"name": "Feel Free to Learn", "url": "https://youtube.com/@FeelFreetoLearn", "focus": "Aptitude shortcuts in exam style"},
+                {"name": "CareerRide", "url": "https://youtube.com/@CareerRideOfficial", "focus": "HR answers and GD topics"},
+            ],
+            "books_blogs": [
+                {"name": "R.S. Aggarwal Quantitative Aptitude", "url": "", "focus": "The standard aptitude book — solve topic-wise, timed"},
+            ],
+        },
+        "question_bank": {
+            "technical_easy": [
+                "Write a program to check whether a number is prime.",
+                "Reverse a string without using built-in reverse functions.",
+                "Find the largest and smallest element in an array.",
+                "Print the Fibonacci series up to n terms.",
+                "Swap two numbers without a third variable.",
+            ],
+            "technical_medium": [
+                "Check whether two strings are anagrams.",
+                "Find the second largest element in an array in one pass.",
+                "Count the frequency of each character in a string.",
+                "Explain your final-year project and the exact part YOU built.",
+                "What is the difference between C and Java? (asked constantly in service-company rounds)",
+            ],
+            "technical_hard": [
+                "Rotate an array by k positions without extra space.",
+                "Given a sentence, reverse the words but not the letters.",
+                "Write code to find all pairs in an array summing to a target, then optimize it.",
+                "Design the database tables for a college attendance system and write 2 queries on them.",
+                "You know Java but the interviewer asks Python basics. How do you handle it live?",
+            ],
+            "behavioral": [
+                "Tell me about yourself. (Prepare a tight 90-second college-to-now answer.)",
+                "Are you willing to relocate anywhere in India and work in any technology?",
+                "Why should we hire you when 500 students applied from your campus?",
+                "You have a backlog/gap — walk me through it honestly. (Only if applicable.)",
+                "Describe a group project where you took the lead or fixed a failing situation.",
+            ],
+        },
+    },
+
     "generic": {
         "description": "General / Any Role",
         "skill_areas": [
@@ -347,7 +597,7 @@ _RESOURCES: dict[str, dict] = {
                 "Describe a time you worked with a difficult colleague.",
                 "Tell me about a time you failed and what you learned.",
                 "How do you prioritize tasks when you have multiple deadlines?",
-                "Why are you leaving your current role?",
+                "Tell me about a group project — what was your specific contribution?",
             ],
         },
     },
@@ -356,8 +606,30 @@ _RESOURCES: dict[str, dict] = {
 # Difficulty progression order
 _DIFFICULTY_LEVELS = ["easy", "medium", "hard"]
 
-# Role keyword mapping for fuzzy matching
+# Role keyword mapping for fuzzy matching.
+# Order matters: matching is first-hit substring search, so the specific
+# categories (qa, support, core branches, campus drives) must be checked
+# BEFORE software_engineer or "mechanical engineer" would match "engineer".
 _ROLE_KEYWORDS: dict[str, list[str]] = {
+    "qa_testing": [
+        "qa", "tester", "testing", "sdet", "quality assurance",
+        "test engineer", "automation test", "selenium", "manual testing",
+    ],
+    "it_support": [
+        "it support", "tech support", "technical support", "service desk",
+        "help desk", "desktop support", "system administrator", "sysadmin",
+        "support engineer", "bpo", "customer support",
+    ],
+    "core_engineering": [
+        "mechanical", "civil", "electrical", "electronics", "ece", "eee",
+        "embedded", "vlsi", "iot", "instrumentation", "core company",
+        "core job", "core engineering", "design engineer", "autocad",
+    ],
+    "campus_placement": [
+        "nqt", "campus placement", "placement drive", "off campus",
+        "on campus", "aptitude", "service based", "mass recruiter",
+        "hackwithinfy", "infytq", "nlth", "elevate wingspan",
+    ],
     "software_engineer": [
         "software", "engineer", "developer", "swe", "backend", "frontend",
         "fullstack", "full-stack", "full stack", "coding", "programmer",

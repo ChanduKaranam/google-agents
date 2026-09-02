@@ -10,10 +10,13 @@ dashboard work would have rendered either. Delete this module once real views
 ship -- it exists to be a control, not a feature.
 """
 
+from google.adk.tools.tool_context import ToolContext
+
 from . import Surface
+from .emit import queue_surface
 
 
-def show_a2ui_probe_card() -> dict:
+def show_a2ui_probe_card(tool_context: ToolContext) -> dict:
     """
     Render a small interactive test card to check that rich UI works here.
 
@@ -21,8 +24,10 @@ def show_a2ui_probe_card() -> dict:
     interactive card rendering. It is a diagnostic, not part of any resume or
     interview workflow.
 
+    The card renders itself -- do not repeat, quote or describe its JSON.
+
     Returns:
-        dict with 'a2ui_block' (emit this verbatim) and a plain-text fallback.
+        dict confirming the card was queued, plus a plain-text fallback.
     """
     surface = Surface()
 
@@ -45,9 +50,17 @@ def show_a2ui_probe_card() -> dict:
     )
     root = surface.card("probe_card", body)
 
+    block = surface.block(root)
+    queue_surface(tool_context, block)
+
     return {
         "success": True,
-        "a2ui_block": surface.block(root),
+        "rendered": "A2UI probe card has been sent to the screen.",
+        "say_next": (
+            "Tell the user the card is on screen and ask them to press the "
+            "button. Do NOT print or describe any JSON."
+        ),
+        "a2ui_block": block,
         "fallback_text": (
             "A2UI probe card (rich UI not rendering here — falling back to text): "
             "title 'A2UI is live', with a 'Confirm you can see this' button."
