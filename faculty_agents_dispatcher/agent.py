@@ -180,6 +180,13 @@ def _menu_parts(state, messages: list | None = None) -> list:
     """
     if state is None or not config.A2UI_ENABLED or _is_menu(messages):
         return []
+    # A card with its own buttons is already somewhere to go. Stacking the
+    # menu under it doubled every reply's height, and Gemini Enterprise
+    # scrolls to the top of a new message — so each tap threw the conversation
+    # upwards. Replies with no card, or a card that only reports something
+    # (the send result), still get it.
+    if a2ui.has_button(messages):
+        return []
     # Someone Sethu will not act for gets the refusal and nothing else. The
     # menu is a list of things they cannot do; offering it invites them to
     # press buttons that can only fail.
@@ -280,10 +287,13 @@ def _scope_or_sections(callback_context: CallbackContext, action: str, link: str
         )
         return _reply(prompt, section_ui.department_card(state, roster))
 
-    # Plain "Section List" — browsing, not sending.
+    # Plain "Section List" — browsing, not sending. No question is being
+    # asked here, so the card does not ask one.
     state[tools.SEND_SCOPE] = None
-    return _reply('Here are the sections.',
-                  section_ui.department_card(state, roster))
+    return _reply(
+        'Here are your departments — tap one to see its sections.',
+        section_ui.department_card(state, roster, heading='Your departments'),
+    )
 
 
 def _plural(n, noun: str) -> str:

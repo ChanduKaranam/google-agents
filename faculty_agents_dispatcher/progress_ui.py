@@ -649,17 +649,24 @@ def agent_usage(state, agents: list, offset: int = 0) -> list:
         title, empty = 'Not Sent Yet', 'Every agent has been sent.'
     else:
         chosen = FILTER_ALL
+        # Only sends that have an activation. A send nobody has opened has
+        # nothing to compare, and listing it beside the ones that do pushes
+        # them down the card — it belongs behind "No Activation", which is a
+        # to-do list rather than a measurement.
         # Ranked by conversations, which is also what the bar measures. Sends
         # of the same agent are kept together so their shared chat total reads
         # as one group.
         shown = sorted(
-            sent,
+            [a for a in sent if _signins(a) > 0],
             key=lambda a: (-(_chats(a) or 0),
                            a.get('agentName') or _agent_name(a),
                            -_signins(a),
                            _agent_name(a)),
         )
-        title, empty = 'Your agents', 'No agent has been sent to a section yet.'
+        title = 'Your agents'
+        empty = ('No sent agent has an activation yet — they are under '
+                 '"No Activation".' if sent
+                 else 'No agent has been sent to a section yet.')
 
     def volume(agent):
         chats = _chats(agent)
@@ -680,14 +687,11 @@ def agent_usage(state, agents: list, offset: int = 0) -> list:
     elif chosen == FILTER_NOT_SENT:
         rows = [[f'·  {_agent_name(a)}'] for a in shown]
     elif chosen == FILTER_NO_ACTIVATION:
-        # Every row here has zero activations, so printing that is a column of
-        # identical noise. Conversations are the one thing that varies — an
-        # agent used without a single activation is worth seeing — so it is
-        # shown when there is one and left off entirely when there is not.
-        for a in shown:
-            chats = _chats(a) or 0
-            rows.append([f'·  {_agent_name(a)}' + (
-                f'  —  {_plural(chats, "chat")} this week' if chats else '')])
+        # Names only. Every row here has zero activations by definition, and
+        # the conversation figure belongs to the agent rather than to this
+        # send — printing it next to "no activation" invites reading it as
+        # this send's own usage.
+        rows = [[f'·  {_agent_name(a)}'] for a in shown]
     else:
         # The bar measures conversations, which is what the list is ordered by.
         # With nothing measured anywhere there is no scale, so no bar is drawn.

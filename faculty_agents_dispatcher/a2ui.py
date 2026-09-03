@@ -27,6 +27,7 @@ Usage:
 """
 
 import json
+import uuid
 import re
 
 from google.genai import types
@@ -256,11 +257,34 @@ def uid(state, base: str) -> str:
     transcript and leaves the NEW turn blank. This is a property of every
     surface, not of paging, and it is the single most common A2UI bug.
     """
+    # The random suffix is belt and braces. The counter alone is correct only
+    # while `surface_seq` survives the turn; if session state is ever dropped
+    # or reset the counter restarts at 1 and every reply reuses the same id,
+    # which silently turns new cards into edits of old ones. Four hex digits
+    # make that impossible to hit, and cost nothing.
+    salt = uuid.uuid4().hex[:4]
     if state is None:
-        return base
+        return f"{base}{salt}"
     sequence = int(state.get("surface_seq", 0) or 0) + 1
     state["surface_seq"] = sequence
-    return f"{base}{sequence}"
+    return f"{base}{sequence}{salt}"
+
+
+
+def has_button(messages: list | None) -> bool:
+    """Whether these surface messages already offer somewhere to go.
+
+    A card carrying its own buttons does not need the main menu stacked under
+    it. Appending it anyway doubled the height of every reply, and Gemini
+    Enterprise scrolls to the top of a new message — so each button press threw
+    the conversation upwards.
+    """
+    for message in messages or []:
+        update = message.get("surfaceUpdate") or {}
+        for component in update.get("components") or []:
+            if "Button" in (component.get("component") or {}):
+                return True
+    return False
 
 
 def build_card(surface_id: str, lines: list[str],

@@ -492,8 +492,15 @@ def departments(roster: list) -> list:
     return seen
 
 
-def department_card(state, roster: list) -> list:
-    """Step one: which department."""
+def department_card(state, roster: list,
+                    heading: str = 'Which department?') -> list:
+    """The departments, with their student counts, as buttons.
+
+    `heading` because this card serves two callers. Choosing where a send goes
+    is a question — "Which department?" — but the Section List is a professor
+    browsing, and asking them a question there reads as though something is
+    required of them before they can look.
+    """
     names = departments(roster)
     counts = {
         d: sum(s.get('students') or 0 for s in roster if s.get('department') == d)
@@ -501,7 +508,7 @@ def department_card(state, roster: list) -> list:
     }
     return a2ui.build_card(
         a2ui.uid(state, 'depts'),
-        ['Which department?',
+        [heading,
          'The number in brackets is how many students that department has.'],
         [
             (f'{d} ({counts[d]})', PICK_DEPARTMENT, {'department': d})
