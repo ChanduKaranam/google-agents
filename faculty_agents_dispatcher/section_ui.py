@@ -153,8 +153,11 @@ def agent_picker_card(state, agents: list) -> list:
 
     components = [
         a2ui.text(f'{prefix}-title', 'Which agent do you want to send?', 'h3'),
-        a2ui.text(f'{prefix}-hint',
-                  'These are the agents Sethu can see in Gemini Enterprise.'),
+        # "Pick one agent", not a description of the list. Gemini Enterprise
+        # draws MultipleChoice with checkboxes whatever the limit — the v0.8
+        # catalog has no radio button — so a single-select list looks like a
+        # multi-select one and professors tried to tick several.
+        a2ui.text(f'{prefix}-hint', 'Pick one agent.'),
         a2ui.multiple_choice(f'{prefix}-choice', AGENT_PATH, options,
                              max_selections=1),
     ]
