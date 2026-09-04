@@ -177,15 +177,15 @@ def _menu_parts(state, messages: list | None = None) -> list:
     Every reply ends with it so a professor always has somewhere to go next,
     rather than having to know what to type. Skipped when the reply already is
     the menu, which would otherwise draw it twice.
+
+    Unconditional on purpose. It was briefly limited to replies whose card had
+    no buttons of its own, to make each message shorter — Gemini Enterprise
+    scrolls to the top of a new message, so tall replies throw the
+    conversation upwards. But that left a professor mid-flow with no way back
+    to Send Agent or My Agents without typing, which costs more than the
+    scrolling does.
     """
     if state is None or not config.A2UI_ENABLED or _is_menu(messages):
-        return []
-    # A card with its own buttons is already somewhere to go. Stacking the
-    # menu under it doubled every reply's height, and Gemini Enterprise
-    # scrolls to the top of a new message — so each tap threw the conversation
-    # upwards. Replies with no card, or a card that only reports something
-    # (the send result), still get it.
-    if a2ui.has_button(messages):
         return []
     # Someone Sethu will not act for gets the refusal and nothing else. The
     # menu is a list of things they cannot do; offering it invites them to

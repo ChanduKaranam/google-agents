@@ -271,22 +271,6 @@ def uid(state, base: str) -> str:
 
 
 
-def has_button(messages: list | None) -> bool:
-    """Whether these surface messages already offer somewhere to go.
-
-    A card carrying its own buttons does not need the main menu stacked under
-    it. Appending it anyway doubled the height of every reply, and Gemini
-    Enterprise scrolls to the top of a new message — so each button press threw
-    the conversation upwards.
-    """
-    for message in messages or []:
-        update = message.get("surfaceUpdate") or {}
-        for component in update.get("components") or []:
-            if "Button" in (component.get("component") or {}):
-                return True
-    return False
-
-
 def build_card(surface_id: str, lines: list[str],
                buttons: list[tuple] = (), seed: dict | None = None,
                row_budget: int | None = None, row_cap: int | None = None
