@@ -139,7 +139,11 @@ Probed on 2026-08-03 with a FACULTY token against
   `shareToken`, `sections[]`, `studentCount`, `status`, `attention`.
 - `POST /faculty/agents` → publishes link and sections in one call, comes back
   `status: "live"`. `sections` must be plain strings; a list of objects is
-  rejected with "Expected string, received object".
+  rejected with "Expected string, received object". We also send
+  `geAgentId`, the Gemini Enterprise agent id — Sethu has no field for it
+  yet (records read back on 2026-08-14 carry the id only inside `geUrl` /
+  `openUrl`), so the call falls back to publishing without it if their
+  validator refuses the key.
 - `GET /faculty/sections` → **200**, but only for a token carrying an `email`
   claim. A token without one gets 403 while every other `/faculty/*` route
   still accepts it. Returns 55 sections across 7 departments — CSE, AI&DS,

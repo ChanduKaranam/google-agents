@@ -10,11 +10,14 @@ reuse/revocation endpoints from the Agentic Team Guide, which the OpenAPI
 document does not cover.
 """
 
+import logging
 from urllib.parse import quote
 
 import requests
 
 from . import config
+
+logger = logging.getLogger(__name__)
 
 
 class SethuError(RuntimeError):
@@ -343,7 +346,12 @@ def list_faculty_agents(token: str) -> list:
 
 
 def publish_faculty_agent(
-    token: str, ge_url: str, name: str, sections: list, semester: str = ''
+    token: str,
+    ge_url: str,
+    name: str,
+    sections: list,
+    semester: str = '',
+    ge_agent_id: str = '',
 ) -> dict:
     """Publish a GE agent to sections. The only write path Sethu implements.
 
@@ -368,18 +376,59 @@ def publish_faculty_agent(
     number would be indistinguishable from a real one on the record.
 
     Publishing does not message anyone. Only `notify_agent_sections` does.
+
+    `ge_agent_id` is the Gemini Enterprise agent id, sent as `geAgentId`
+    alongside the link. The id is already inside `geUrl`, but only as a path
+    segment Sethu would have to parse, and the same GE agent published twice
+    gives two records with no field tying them together. Sending it explicitly
+    means Sethu can group sends of one agent without string-splitting a URL
+    whose shape is Google's to change.
+
+    Sethu does not store it yet — records read back on 2026-08-14 carry no such
+    field — so today this is a field their API can start reading whenever they
+    add it, not one that does anything. If their validator rejects the unknown
+    key, the call is retried without it: publishing is the professor's whole
+    task, and it must not fail over a field nobody consumes.
     """
-    return _request(
-        'POST',
-        '/faculty/agents',
-        headers=_bearer_headers(token),
-        json={
-            'geUrl': ge_url,
-            'name': name,
-            'sections': sections,
-            'semester': semester or 'NA',
-        },
+    payload = {
+        'geUrl': ge_url,
+        'name': name,
+        'sections': sections,
+        'semester': semester or 'NA',
+    }
+    if not ge_agent_id:
+        return _request(
+            'POST', '/faculty/agents',
+            headers=_bearer_headers(token), json=payload,
+        )
+
+    try:
+        record = _request(
+            'POST', '/faculty/agents',
+            headers=_bearer_headers(token),
+            json={**payload, 'geAgentId': ge_agent_id},
+        )
+    except SethuError as exc:
+        # 400 is the only status a rejected field produces, and it is raised
+        # before any record exists, so repeating the call is safe. Any other
+        # failure is about the publish itself and must surface unchanged.
+        if exc.status_code != 400:
+            raise
+        logger.warning(
+            'Sethu rejected geAgentId (%s); publishing without it: %s',
+            exc.status_code, exc,
+        )
+        return _request(
+            'POST', '/faculty/agents',
+            headers=_bearer_headers(token), json=payload,
+        )
+
+    logger.info(
+        'published with geAgentId=%s; Sethu %s it back',
+        ge_agent_id,
+        'echoed' if (record or {}).get('geAgentId') else 'did not echo',
     )
+    return record
 
 
 def get_faculty_agent(token: str, agent_id: str) -> dict:

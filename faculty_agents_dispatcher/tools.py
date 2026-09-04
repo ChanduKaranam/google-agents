@@ -1224,7 +1224,8 @@ def publish_agent(
         agent = _call(
             tool_context,
             lambda token: sethu_client.publish_faculty_agent(
-                token, link, name, sections
+                token, link, name, sections,
+                ge_agent_id=ge_agent_id(link),
             ),
         )
     except SethuError as exc:
