@@ -96,7 +96,9 @@ How to handle a request:
 3. Call `publish_agent`. This messages nobody — it registers the agent against
    those sections and tells you how many students that reaches.
    Sethu cannot delete or re-point a published agent, so be sure of the
-   sections before this step.
+   sections before this step. If it comes back with `reused`, that agent was
+   already published to those sections and no second record was made: say so,
+   and carry on to step 4 with the id it returned.
 
 4. CRITICAL: You must then ask the professor for confirmation. Reply with
    exactly this sentence and nothing else:
@@ -395,8 +397,16 @@ def _publish_and_confirm(callback_context: CallbackContext, name: str):
         # would message nobody.
         return _reply(result['warning'])
 
+    # A reused record was published earlier, under whatever it was called
+    # then. Saying "Published" would be a lie the professor can check.
+    headline = (
+        f'"{result.get("published_name") or name}" is already published to '
+        'those sections.'
+        if result.get('reused')
+        else f'Published "{name}".'
+    )
     return _reply(
-        f'Published "{name}".',
+        headline,
         section_ui.confirm_send_card(
             state,
             result.get('sections') or labels,

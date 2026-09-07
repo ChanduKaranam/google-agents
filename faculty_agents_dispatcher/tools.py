@@ -1143,11 +1143,100 @@ def find_agent_by_link(agent_link: str, tool_context: ToolContext) -> dict:
     except SethuError as exc:
         return _error(str(exc))
 
+    # Only rows that are actual sends. Sethu's sync also creates a row per
+    # agent it finds in Gemini Enterprise, but those carry no sections and no
+    # `geUrl`, so calling one "already published" would send the model to
+    # `prepare_send`, which has nothing to send.
     for agent in agents:
-        if _same_link(agent.get(_LINK_FIELD) or '', link):
+        if agent.get('sections') and _same_agent(agent, link):
             return {'status': 'success', 'agent': _summarise(agent)}
 
     return {'status': 'not_published'}
+
+
+def _reuse(record: dict, asked_for: list, roster: list,
+           tool_context: ToolContext) -> dict:
+    """Answer a publish request with the record that already satisfies it."""
+    agent_id = str(record.get('id') or '')
+    sections = record.get('sections') or list(asked_for)
+    count = _roster_count(sections, roster)
+    if count is None:
+        count = record.get('studentCount')
+
+    tool_context.state[_QUOTED_SEND] = agent_id
+    tool_context.state[_QUOTED_COUNT] = count
+
+    stored_name = str(record.get('name') or '')
+    note = (
+        f'This agent is already published to those sections as '
+        f'"{stored_name}", so no second record was made. Say it is already '
+        'published under that name and offer to send it — do not say you have '
+        'just published it, and do not offer to publish it again.'
+    )
+    extra = [s for s in sections if s not in set(asked_for)]
+    if extra:
+        note += (
+            f' The existing record also reaches {", ".join(extra)}, which '
+            'sending it would include.'
+        )
+
+    result = {
+        'status': 'success',
+        'agent_id': agent_id,
+        'count': count,
+        'sections': sections,
+        'reused': True,
+        'published_name': stored_name,
+        'note': note,
+    }
+    warning = _count_warning(count)
+    if warning:
+        result['warning'] = warning
+    return result
+
+
+def _same_agent(row: dict, link: str) -> bool:
+    """Whether a Sethu record points at the same Gemini Enterprise agent.
+
+    The id inside the link is the identity, not the URL string. Sethu stores
+    two different addresses for the same agent — `geUrl` on rows a professor
+    published, `openUrl` on rows its own sync created — and the two can carry
+    different `cid` segments for the same id. Comparing whole URLs missed
+    that, so an agent already published looked new and was published again.
+    """
+    stored = row.get(_LINK_FIELD) or row.get(_OPEN_LINK_FIELD) or ''
+    wanted_id, stored_id = ge_agent_id(link), ge_agent_id(stored)
+    if wanted_id and stored_id:
+        return wanted_id == stored_id
+    return _same_link(stored, link)
+
+
+def _already_published(agents: list, link: str, sections: list) -> dict | None:
+    """A live record for this agent that already reaches all these sections.
+
+    Sethu creates a record per POST and cannot delete one, so the duplicate
+    has to be stopped before the write. A professor who publishes the same
+    agent to the same sections twice — two runs through the picker, or a
+    tapped button that did not look like it worked — should land back on the
+    record they already have.
+
+    Coverage, not equality: a record that goes to more sections than were
+    asked for already reaches everyone in the request, and re-publishing the
+    subset would only message those students a second time. A request that
+    reaches *beyond* an existing record is a genuinely new audience and needs
+    its own record, because Sethu has no way to add sections to one.
+    """
+    wanted = {s for s in sections if s}
+    if not wanted:
+        return None
+    for row in agents or []:
+        if not row.get('sections') or row.get('unclaimed'):
+            continue
+        if not _same_agent(row, link):
+            continue
+        if wanted <= {s for s in row.get('sections') or [] if s}:
+            return row
+    return None
 
 
 def publish_agent(
@@ -1219,6 +1308,28 @@ def publish_agent(
             )
         if not sections:
             return _error('None of those sections could be resolved.')
+
+    # Last stop before a record that cannot be unmade. The button flow reaches
+    # here directly — it never calls `find_agent_by_link` — so a professor who
+    # walked the picker twice used to get a second Sethu row for the same
+    # agent and the same students. Checked here rather than left to the model,
+    # because the duplicate is permanent and a missed tool call is not.
+    try:
+        existing = _already_published(
+            _call(tool_context, sethu_client.list_faculty_agents),
+            link,
+            sections,
+        )
+    except SethuError as exc:
+        # Fail open. A read that failed is not evidence of a duplicate, and
+        # refusing to publish would block the professor's whole task.
+        logger.warning('could not check for an existing publication: %s', exc)
+        existing = None
+
+    if existing:
+        logger.info('reusing published agent %s rather than duplicating it',
+                    existing.get('id'))
+        return _reuse(existing, sections, roster, tool_context)
 
     try:
         agent = _call(

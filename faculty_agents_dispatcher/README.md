@@ -140,10 +140,18 @@ Probed on 2026-08-03 with a FACULTY token against
 - `POST /faculty/agents` → publishes link and sections in one call, comes back
   `status: "live"`. `sections` must be plain strings; a list of objects is
   rejected with "Expected string, received object". We also send
-  `geAgentId`, the Gemini Enterprise agent id — Sethu has no field for it
-  yet (records read back on 2026-08-14 carry the id only inside `geUrl` /
-  `openUrl`), so the call falls back to publishing without it if their
-  validator refuses the key.
+  `geAgentId`, the Gemini Enterprise agent id. Probed 2026-09-07: the schema
+  ignores the unknown key rather than refusing it — a body carrying only
+  `geAgentId` comes back with exactly the same three "Required" complaints
+  (`geUrl`, `name`, `sections`) as an empty body — so it reaches Sethu on
+  every publish, but nothing stores it. Records read back the same day carry
+  the id only inside `geUrl` / `openUrl`. Publishing falls back to omitting
+  the key if that ever changes.
+- **One POST, one record.** Sethu creates a row per call and can delete none,
+  and nothing on their side deduplicates on `geUrl`. Read 2026-09-07, one GE
+  agent (`2861219582911440587`) held three rows: the sync's own row plus two
+  sends. `publish_agent` therefore checks the professor's existing rows before
+  writing and reuses one that already covers the requested sections.
 - `GET /faculty/sections` → **200**, but only for a token carrying an `email`
   claim. A token without one gets 403 while every other `/faculty/*` route
   still accepts it. Returns 55 sections across 7 departments — CSE, AI&DS,
