@@ -99,6 +99,44 @@ every tool fails at the first call.
 
 ## Deployed
 
+**Production is the Cloud Run service in `ge-standard-trail`.** Deploy there,
+from the `google-agents` directory so the Dockerfile is used:
+
+```bash
+gcloud run deploy champion-faculty-a2a --source . \
+  --region=us-central1 --project=ge-standard-trail
+```
+
+| | |
+| --- | --- |
+| Project | `ge-standard-trail` (`318133471646`) |
+| Service URL | `https://champion-faculty-a2a-gkbrnu6o5a-uc.a.run.app` |
+| GE agent | `18101167715781202478`, `a2aAgentDefinition` pointing at that URL |
+
+Check the URL against the agent card before assuming a deploy went live:
+
+```bash
+gcloud run services describe champion-faculty-a2a \
+  --project=ge-standard-trail --region=us-central1 --format='value(status.url)'
+```
+
+A same-named `champion-faculty-a2a` also exists in `supadha-dev`, on a
+different host (`qeldmdspka`, not `gkbrnu6o5a`). Nothing calls it. Omitting
+`--project` picks it up as the gcloud default and deploys into a void: two
+changes shipped there on 2026-09-07 and neither reached a professor, while the
+live revision sat a month behind. The host hash in the agent card is the only
+thing that distinguishes them — the service name does not.
+
+Run from `google-agents`, not from `faculty_agents_dispatcher`. The Dockerfile
+is in the parent; from the package directory gcloud falls back to Buildpacks,
+which build an entrypoint that never binds `PORT` and fail the health check.
+Recovering from that needs `--clear-base-image` on the next Dockerfile deploy,
+because the Buildpacks attempt pins a base image on the service.
+
+The Agent Engine registration below is the older, card-less deployment, kept
+for session and memory storage (`AGENT_ENGINE_ID` on the Cloud Run service is
+`8284047708373647360`). It is not what Gemini Enterprise calls.
+
 Verified 2026-08-03 against the live project:
 
 | | |
