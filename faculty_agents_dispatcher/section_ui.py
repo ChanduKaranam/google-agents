@@ -242,6 +242,14 @@ def confirm_send_card(state, sections: list, count, agent_id: str) -> list:
     A Yes button rather than typed text: the professor is confirming something
     that cannot be recalled, and a button carries the exact agent id, so a
     confirmation can never be applied to a different agent than the one quoted.
+
+    It also carries this card's own id as `send`. What must not happen twice is
+    a tap on *this card* — it stays on screen for the rest of the conversation
+    with nothing about it saying it has been spent. Sending the same agent
+    again from a fresh trip through Send Agent is a different thing entirely,
+    and a professor is allowed to do it: to another section, to another
+    department, or to the same students a second time. Keying the guard to the
+    card tells those two apart; keying it to the agent refused both.
     """
     labels = [str(label) for label in (sections or [])]
     students = f'{count} student' + ('' if count == 1 else 's')
@@ -258,16 +266,19 @@ def confirm_send_card(state, sections: list, count, agent_id: str) -> list:
              'Going to:', a2ui.bullets(shown), a2ui.DIVIDER,
              'WhatsApp messages cannot be recalled.']
 
+    prefix = a2ui.uid(state, 'confirm')
     return a2ui.build_card(
-        a2ui.uid(state, 'confirm'),
+        prefix,
         lines,
         [
-            ('Yes, send it', CONFIRM_SEND, {'agent_id': agent_id}),
+            ('Yes, send it', CONFIRM_SEND,
+             {'agent_id': agent_id, 'send': prefix}),
             # Cancel carries the id too. The card stays on screen after the
             # send, so a professor can scroll back and press Cancel on a send
             # that already went out — and without the id there is no way to
             # tell that from a genuine cancellation.
-            ('Cancel', CANCEL_SEND, {'agent_id': agent_id}),
+            ('Cancel', CANCEL_SEND,
+             {'agent_id': agent_id, 'send': prefix}),
         ],
     )
 

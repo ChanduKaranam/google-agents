@@ -581,15 +581,21 @@ def _before_agent(callback_context: CallbackContext):
 
         if name == section_ui.CONFIRM_SEND:
             agent_id = context.get('agent_id')
+            # This card's own id. The guard is per card, not per agent, so a
+            # professor can send the same agent again — to another section, to
+            # another department, or to the same students on purpose — while a
+            # second tap on the card in front of them still does nothing.
+            send_token = context.get('send') or ''
             # The card stays on screen after the send, so this button can be
             # tapped again — and the tool's refusals are written for the model,
             # not for a professor. Classify the tap first and answer it here.
-            status = tools.confirmation_status(state, agent_id)
+            status = tools.confirmation_status(state, agent_id, send_token)
             if status == 'sent':
                 return _finish(state, tools.ALREADY_SENT_MESSAGE)
             if status == 'stale':
                 return _finish(state, tools.STALE_CONFIRMATION_MESSAGE)
-            result = tools.send_agent_to_sections(agent_id, callback_context)
+            result = tools.send_agent_to_sections(
+                agent_id, callback_context, send_token)
             if result.get('status') == 'already_sent':
                 return _finish(state, result['message'])
             if result.get('status') == 'not_shared':
@@ -623,7 +629,9 @@ def _before_agent(callback_context: CallbackContext):
         if name == section_ui.CANCEL_SEND:
             agent_id = context.get('agent_id')
             # Cancelling a send that already happened is not a cancellation.
-            if agent_id and tools.confirmation_status(state, agent_id) == 'sent':
+            spent = tools.confirmation_status(
+                state, agent_id, context.get('send') or '')
+            if agent_id and spent == 'sent':
                 return _outcome(
                     state,
                     '✅  Already sent',

@@ -55,16 +55,27 @@ _QUOTED_SEND = 'quoted_send'
 # code, where no amount of prompt drift can get past it.
 _QUOTED_COUNT = 'quoted_send_count'
 
-# Agents this session has already sent. The confirmation card stays on screen
-# after the send, so a professor can tap "Yes, send it" a second time — and
-# nothing about the card says it has been spent. Sending again would put a
-# duplicate WhatsApp message in front of every student, so a repeat tap is
-# answered rather than acted on.
+# Confirmations this session has already spent. The confirmation card stays on
+# screen after the send, so a professor can tap "Yes, send it" a second time —
+# and nothing about the card says it has been spent. That tap is answered
+# rather than acted on.
+#
+# It holds one card's id per send, not the agent's. Keyed on the agent, this
+# refused every later send of the same agent — to another section, to another
+# department, or deliberately to the same students again — none of which is a
+# stray double tap, and all of which a professor is entitled to do. Entries
+# from cards drawn before this change are Sethu record ids instead; both are
+# opaque strings and an old card still cannot be replayed.
 SENT_AGENTS = 'sent_agents'
 
-# The Idempotency-Key for the send in flight, kept per agent so a retry, a
-# re-click, or a second attempt after a timeout is the SAME send to Sethu
-# rather than a second blast at the same students.
+# The Idempotency-Key for the send in flight, kept per confirmation card so a
+# retry, a re-click, or a second attempt after a timeout is the SAME send to
+# Sethu rather than a second blast at the same students.
+#
+# Per card, not per agent, for the same reason as SENT_AGENTS — and here
+# getting it wrong fails silently: a deliberate second send to the same
+# sections would carry the first send's key, Sethu would deduplicate it, and
+# the professor would be told it went out while nobody was messaged.
 SEND_KEY = 'send_idempotency_key'
 
 # Said when Sethu stops answering mid-send. It deliberately does not claim the
@@ -120,19 +131,24 @@ SIGNED_OUT_MESSAGE = (
 _LINK_FIELD = 'geUrl'
 
 
-def confirmation_status(state, agent_id: str) -> str:
+def confirmation_status(state, agent_id: str, send_token: str = '') -> str:
     """Whether a tapped "Yes, send it" can still be acted on.
 
     The card stays on screen for the rest of the conversation, long after the
     state that produced it is gone, so a tap has to be classified before it is
     obeyed.
 
-        'sent'  this agent already went out in this session.
+        'sent'  THIS card was already acted on. Not "this agent has been
+                sent" — a later card for the same agent is a new send and must
+                go through.
         'stale' the quoted count no longer belongs to this agent — the send was
                 spent, the session was cleared, or a later publish replaced it.
         'live'  the count the professor is looking at is still this agent's.
+
+    `send_token` is absent on cards drawn before it existed; those fall back to
+    the agent id, which is what guarded them when they were drawn.
     """
-    if agent_id in (state.get(SENT_AGENTS) or []):
+    if (send_token or agent_id) in (state.get(SENT_AGENTS) or []):
         return 'sent'
     if state.get(_QUOTED_SEND) != agent_id:
         return 'stale'
@@ -1166,19 +1182,17 @@ def _reuse(record: dict, asked_for: list, roster: list,
     tool_context.state[_QUOTED_SEND] = agent_id
     tool_context.state[_QUOTED_COUNT] = count
 
+    # The record matched on exactly these sections, so there is no wider
+    # audience to warn about — reuse cannot change who the send reaches.
     stored_name = str(record.get('name') or '')
     note = (
         f'This agent is already published to those sections as '
         f'"{stored_name}", so no second record was made. Say it is already '
         'published under that name and offer to send it — do not say you have '
-        'just published it, and do not offer to publish it again.'
+        'just published it, and do not offer to publish it again. Sending it '
+        'is still allowed: the professor may be sending to these students '
+        'again on purpose.'
     )
-    extra = [s for s in sections if s not in set(asked_for)]
-    if extra:
-        note += (
-            f' The existing record also reaches {", ".join(extra)}, which '
-            'sending it would include.'
-        )
 
     result = {
         'status': 'success',
@@ -1220,11 +1234,13 @@ def _already_published(agents: list, link: str, sections: list) -> dict | None:
     tapped button that did not look like it worked — should land back on the
     record they already have.
 
-    Coverage, not equality: a record that goes to more sections than were
-    asked for already reaches everyone in the request, and re-publishing the
-    subset would only message those students a second time. A request that
-    reaches *beyond* an existing record is a genuinely new audience and needs
-    its own record, because Sethu has no way to add sections to one.
+    Equality, not coverage. This reused any record that reached at least the
+    sections asked for, on the reasoning that re-publishing a subset would only
+    message those students twice — but sending twice is now something a
+    professor may deliberately do, and reuse decides who the send reaches. A
+    record covering the whole college would then have been reused for a
+    request naming one section, and the send would have gone to everyone.
+    Matching the exact set keeps the audience the professor chose.
     """
     wanted = {s for s in sections if s}
     if not wanted:
@@ -1234,7 +1250,7 @@ def _already_published(agents: list, link: str, sections: list) -> dict | None:
             continue
         if not _same_agent(row, link):
             continue
-        if wanted <= {s for s in row.get('sections') or [] if s}:
+        if wanted == {s for s in row.get('sections') or [] if s}:
             return row
     return None
 
@@ -1440,7 +1456,8 @@ def prepare_send(agent_id: str, tool_context: ToolContext) -> dict:
     return result
 
 
-def send_agent_to_sections(agent_id: str, tool_context: ToolContext) -> dict:
+def send_agent_to_sections(agent_id: str, tool_context: ToolContext,
+                           send_token: str = '') -> dict:
     """Send the agent link to its sections over WhatsApp.
 
     Only call this after the professor has explicitly confirmed. WhatsApp
@@ -1455,10 +1472,12 @@ def send_agent_to_sections(agent_id: str, tool_context: ToolContext) -> dict:
         done — tell the professor exactly what 'message' says.
     """
     already = list(tool_context.state.get(SENT_AGENTS) or [])
-    if agent_id in already:
-        # Checked before the quoted-count guard: both refuse the send, but only
-        # this one knows why, and the other's wording would send the model
-        # hunting for a count that is not the problem.
+    spent = send_token or agent_id
+    if spent in already:
+        # This confirmation, not this agent. Checked before the quoted-count
+        # guard: both refuse the send, but only this one knows why, and the
+        # other's wording would send the model hunting for a count that is not
+        # the problem.
         return {'status': 'already_sent', 'message': ALREADY_SENT_MESSAGE}
 
     if tool_context.state.get(_QUOTED_SEND) != agent_id:
@@ -1478,12 +1497,14 @@ def send_agent_to_sections(agent_id: str, tool_context: ToolContext) -> dict:
             'send.'
         )
 
-    # One key per send, minted on the first attempt and reused afterwards.
+    # One key per confirmation, minted on the first attempt and reused
+    # afterwards. A second deliberate send gets its own card and therefore its
+    # own key, or Sethu would recognise the first send and message nobody.
     keys = dict(tool_context.state.get(SEND_KEY) or {})
-    key = keys.get(agent_id)
+    key = keys.get(spent)
     if not key:
         key = str(uuid.uuid4())
-        keys[agent_id] = key
+        keys[spent] = key
         tool_context.state[SEND_KEY] = keys
 
     logger.info('notify: agent %s, %s students, key %s', agent_id, quoted, key)
@@ -1509,8 +1530,8 @@ def send_agent_to_sections(agent_id: str, tool_context: ToolContext) -> dict:
     # WhatsApp send happens in Sethu's worker afterwards, so this is the only
     # record of what it undertook to do.
     logger.info('notify: agent %s accepted by Sethu — result=%s', agent_id, result)
-    # A send must not be replayable on a stray second "yes".
-    tool_context.state[SENT_AGENTS] = already + [agent_id]
+    # A send must not be replayable on a stray second "yes" on this card.
+    tool_context.state[SENT_AGENTS] = already + [spent]
     tool_context.state[_QUOTED_SEND] = None
     tool_context.state[_QUOTED_COUNT] = None
     return {'status': 'success', 'result': result}
