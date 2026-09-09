@@ -65,6 +65,7 @@ SECTIONS_PATH = '/sections'
 # Choosing an agent instead of pasting its link.
 PICK_AGENT = 'pick_agent'
 PASTE_INSTEAD = 'paste_link_instead'
+AGENT_PATH = '/agent'
 
 
 if SHOW_SECTIONS != progress_ui.SECTION_LIST:  # pragma: no cover
@@ -143,38 +144,41 @@ def agent_picker_card(state, agents: list) -> list:
     nothing stops them copying the wrong page entirely — two live records point
     at an agent nobody meant to send.
 
-    One button per agent, not a `MultipleChoice` and a Continue. The tick-list
-    was reported on 2026-09-09 as staying open after a choice with its collapse
-    control dead, and neither is ours to fix: the v0.8 catalog gives
-    MultipleChoice `selections`, `options` and `maxAllowedSelections` and
-    nothing about disclosure, so Gemini Enterprise owns the dropdown and its
-    chevron. We are not even told a choice was made — only a Button dispatches,
-    which is why the list needed a Continue beside it in the first place.
-
-    A button is the primitive that does fit the question. Tapping one both
-    chooses and advances, so there is no open list to close, no second tap, and
-    no way to arrive at Continue having ticked nothing.
+    Single-select: one agent goes to one set of sections.
     """
     prefix = a2ui.uid(state, 'agentpick')
+    # Just the agent's name. What it was called on a previous send is a
+    # property of that send, not of the agent being chosen now.
+    options = [(agent['name'], agent['id']) for agent in agents]
 
-    def card(shown: list, note: str = '') -> list:
-        return a2ui.build_card(
-            prefix,
-            ['Which agent do you want to send?'] + ([note] if note else []),
-            [(agent['name'], PICK_AGENT, {'agent': agent['id']})
-             for agent in shown]
-            + [('Paste a link instead', PASTE_INSTEAD, None)],
-        )
+    components = [
+        a2ui.text(f'{prefix}-title', 'Which agent do you want to send?', 'h3'),
+        # "Pick one agent", not a description of the list. Gemini Enterprise
+        # draws MultipleChoice with checkboxes whatever the limit — the v0.8
+        # catalog has no radio button — so a single-select list looks like a
+        # multi-select one and professors tried to tick several.
+        a2ui.text(f'{prefix}-hint', 'Pick one agent.'),
+        a2ui.multiple_choice(f'{prefix}-choice', AGENT_PATH, options,
+                             max_selections=1),
+    ]
+    for suffix, label, action in (
+        ('go', 'Continue', PICK_AGENT),
+        ('paste', 'Paste a link instead', PASTE_INSTEAD),
+    ):
+        components.append(a2ui.text(f'{prefix}-{suffix}-label', label))
+        components.append(a2ui.button_with_values(
+            f'{prefix}-{suffix}', f'{prefix}-{suffix}-label', action,
+            {'agent': {'path': AGENT_PATH}}))
+    components.append(a2ui.row(f'{prefix}-buttons',
+                               [f'{prefix}-go', f'{prefix}-paste']))
+    components.append(a2ui.column(
+        f'{prefix}-main-column',
+        [f'{prefix}-title', f'{prefix}-hint', f'{prefix}-choice',
+         f'{prefix}-buttons']))
+    components.append(a2ui.card(f'{prefix}-card', f'{prefix}-main-column'))
 
-    # Agents arrive newest first, so trimming from the end drops the ones least
-    # likely to be wanted. A card over the ceiling is dropped in silence, and a
-    # professor left with no buttons has no way on at all.
-    shown = list(agents)
-    messages = card(shown)
-    while not _fits(messages) and len(shown) > 1:
-        shown.pop()
-        messages = card(shown, f'Showing your {len(shown)} most recent. '
-                               'Paste a link for an older one.')
+    messages = a2ui.surface(prefix, components, f'{prefix}-card')
+    messages.insert(1, a2ui.data_model(prefix, {'agent': []}))
     return messages
 
 
