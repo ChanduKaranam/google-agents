@@ -30,7 +30,7 @@ to render logs nothing at all. The numbers are identical either way.
 
 import json
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from . import a2ui, config
 
@@ -162,6 +162,39 @@ def _local(synced_at) -> tuple:
     except (ValueError, IndexError):
         return None
     return moment.day, _MONTHS[moment.month - 1], moment.strftime('%H:%M')
+
+
+def _local_date(stamp):
+    """A UTC timestamp as a date in the reader's zone, or None."""
+    text = str(stamp)
+    try:
+        return (datetime(int(text[0:4]), int(text[5:7]), int(text[8:10]),
+                         int(text[11:13]), int(text[14:16]))
+                + timedelta(minutes=config.DISPLAY_UTC_OFFSET_MINUTES)).date()
+    except (ValueError, IndexError):
+        return None
+
+
+def _days_since(stamp):
+    """Whole days between a timestamp and now, both read in the reader's zone.
+
+    Calendar days, not elapsed hours. Sethu's own `idleDays` is the second
+    kind: measured 2026-09-09, an activity at 11:00 on 7 Sep came back as
+    `idleDays: 1` two calendar days later, and one on 31 Aug came back as 8 on
+    the 9th. Rendering that as "yesterday" or "for 8 days" is wrong by a full
+    day, and at `0` it claims something happened today when it happened up to
+    24 hours ago — which is what a professor checking today's activations
+    notices first. So `idleDays` is not used; this is derived from
+    `lastActivityAt`, which is an absolute timestamp and cannot drift.
+
+    Returns None if the timestamp cannot be read.
+    """
+    then = _local_date(stamp)
+    if then is None:
+        return None
+    now = (datetime.now(timezone.utc).replace(tzinfo=None)
+           + timedelta(minutes=config.DISPLAY_UTC_OFFSET_MINUTES)).date()
+    return (now - then).days
 
 
 def _stamp(synced_at) -> str:
@@ -408,18 +441,41 @@ def leaderboard(state, data: dict, offset: int = 0) -> list:
 def _idle_phrase(ambassador: dict) -> str:
     """Always about the section, never about the person.
 
-    `idleDays` counts days since the last *student* activation in their cohort.
-    Rendering it as "Rohit did nothing for 6 days" would be an accusation the
-    data cannot support.
+    `lastActivityAt` describes the most recent student event in their cohort,
+    not anything the ambassador did. Rendering it as "Rohit did nothing for 6
+    days" would be an accusation the data cannot support.
+
+    "Activity", not "activation". Sethu's field is named for the first and we
+    have no confirmation it excludes the second: a student who opened their
+    `/go` link without finishing would be activity that activated nobody.
+    The weaker word is true either way.
+
+    A section where nobody has activated is answered from `activated` alone.
+    No timestamp can make "someone activated" true when the count beside it on
+    the same row reads 0 — that self-contradicting line is what was reported.
     """
-    days = ambassador.get('idleDays')
+    if not ambassador.get('activated'):
+        return 'no student has activated in their section yet'
     if ambassador.get('lastActivityAt') is None:
-        return 'no activation recorded in their section'
-    if days == 0:
-        return 'someone in their section activated today'
+        return 'no activity recorded in their section'
+    days = _days_since(ambassador.get('lastActivityAt'))
+    if days is None:
+        return 'their section has activations'
+    if days <= 0:
+        return 'activity in their section today'
     if days == 1:
-        return 'last activation in their section yesterday'
-    return f'no activation in their section for {days} days'
+        return 'last activity in their section yesterday'
+    return f'no activity in their section for {days} days'
+
+
+def _is_quiet(ambassador: dict) -> bool:
+    """No student activity in that section for three days or more."""
+    if not ambassador.get('activated'):
+        return True
+    if ambassador.get('lastActivityAt') is None:
+        return True
+    days = _days_since(ambassador.get('lastActivityAt'))
+    return days is not None and days >= 3
 
 
 def ambassador_summary(data: dict) -> str:
@@ -430,17 +486,19 @@ def ambassador_summary(data: dict) -> str:
     authoritative.
     """
     people = list(data.get('ambassadors') or [])
-    quiet = [a for a in people
-             if a.get('lastActivityAt') is None or (a.get('idleDays') or 0) >= 3]
+    # Read from the same computed day count as the rows, or the summary can
+    # call a section quiet while its own row underneath says activity
+    # yesterday.
+    quiet = [a for a in people if _is_quiet(a)]
     uncovered = list(data.get('sectionsWithoutAmbassador') or [])
 
     if not people:
         parts = ['No ambassadors are listed for your department.']
     elif not quiet:
         parts = [
-            'Every section with an ambassador has activated someone in the '
+            'Every section with an ambassador has had activity in the '
             'last 3 days.' if len(people) > 1 else
-            'Their section has activated someone in the last 3 days.'
+            'Their section has had activity in the last 3 days.'
         ]
     elif len(people) == 1:
         # With one ambassador the row below says who and how long. Repeating it
@@ -531,7 +589,7 @@ def ambassador_roster(state, data: dict, offset: int = 0) -> list:
             for a in people
         ]
         footer = [
-            'Quiet means no student activations in that section, not the '
+            'Quiet means no student activity in that section, not the '
             "ambassador's own activity."
         ]
 
