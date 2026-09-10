@@ -495,7 +495,38 @@ def _departments_roster(tool_context: ToolContext) -> list:
         tool_context.state[OWN_DEPARTMENT] = department
         logger.info('scope: Sethu resolves this caller to department %r',
                     department or '(none — admin or non-roster)')
+        # One call answers both halves, and they can disagree: measured
+        # 2026-09-10, Sethu named a caller's department as one the roster it
+        # returned in the same response did not contain. Logged loudly because
+        # nothing downstream can repair it — the sections simply are not there.
+        if department and department not in {
+                s.get('department') for s in (roster or [])}:
+            logger.warning(
+                'scope: MISMATCH — Sethu resolves this caller to %r but the '
+                'roster it returned holds no %r sections, only %s',
+                department, department,
+                sorted({str(s.get('department')) for s in (roster or [])}),
+            )
     return roster or []
+
+
+def missing_own_department(tool_context: ToolContext) -> str:
+    """The caller's department, when the roster does not contain it.
+
+    Returns "" when there is nothing wrong: no department resolved (an admin,
+    who is meant to see everything), or a roster that does have theirs.
+
+    A professor in CS shown "Your departments: ECE, EEE" reads it as this agent
+    having lost their department. The truthful version is that Sethu names
+    their department and then returns no sections under it, which only Sethu
+    can put right — but saying so beats presenting other people's departments
+    as theirs.
+    """
+    roster = _departments_roster(tool_context)
+    own = tool_context.state.get(OWN_DEPARTMENT) or ''
+    if not own or not roster:
+        return ''
+    return '' if own in {s.get('department') for s in roster} else own
 
 
 def _own_department(tool_context: ToolContext) -> str:

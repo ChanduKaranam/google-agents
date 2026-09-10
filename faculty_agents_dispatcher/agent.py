@@ -292,9 +292,22 @@ def _scope_or_sections(callback_context: CallbackContext, action: str, link: str
     # Plain "Section List" — browsing, not sending. No question is being
     # asked here, so the card does not ask one.
     state[tools.SEND_SCOPE] = None
+    # Their own department can be absent from the roster Sethu returns. Calling
+    # what is left "your departments" then tells a professor in CS that they
+    # belong to ECE and EEE.
+    missing = tools.missing_own_department(callback_context)
+    lead = (
+        f'Sethu has you in {missing}, but it is not returning any {missing} '
+        'sections, so I cannot show them. These are the departments it does '
+        'return — ask Sethu to check which sections your account covers.'
+        if missing else
+        'Here are your departments — tap one to see its sections.'
+    )
     return _reply(
-        'Here are your departments — tap one to see its sections.',
-        section_ui.department_card(state, roster, heading='Your departments'),
+        lead,
+        section_ui.department_card(
+            state, roster,
+            heading='Departments' if missing else 'Your departments'),
     )
 
 
