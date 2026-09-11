@@ -752,34 +752,6 @@ def _before_agent(callback_context: CallbackContext):
                 section_ui.send_agent_card(state),
             )
 
-        if name == section_ui.LOGOUT:
-            auth.forget(callback_context)
-            # Everything read from Sethu goes with the identity. The roster
-            # and the resolved department are the two that actually strand a
-            # professor: they survive a new conversation, so a correction on
-            # Sethu's side would otherwise take until their TTL to appear.
-            for key in (tools.ROSTER_CACHE, tools.ROSTER_FETCHED,
-                        tools.OWN_DEPARTMENT, tools.AGENT_CHOICES,
-                        tools.VIEW_DATA, tools.VIEW_NAME, tools.PENDING_UI,
-                        tools.SYNC_REQUESTED):
-                state[key] = None
-            # SENT_AGENTS and SEND_KEY are deliberately kept. They record which
-            # confirmation cards have been acted on, and clearing them would
-            # re-arm a card still on screen — a second WhatsApp blast at
-            # students who already have the link.
-            logger.info('logout: cleared cached identity and Sethu data')
-            return _reply(
-                'Done — I have cleared everything I had stored about you: '
-                'your Sethu sign-in, your name and role, your department and '
-                'the section list. The next thing you tap is read fresh.\n\n'
-                'Your Google sign-in to Gemini Enterprise is separate and '
-                'stays as it is — no agent can remove it. To sign out of that '
-                'too, remove Champion Faculty at '
-                'myaccount.google.com/permissions, then open this agent again '
-                'and it will ask you to authorise.',
-                section_ui.main_menu(state),
-            )
-
         if name == section_ui.PASTE_INSTEAD:
             return _reply(
                 'Paste the agent link, then choose who it goes to.',

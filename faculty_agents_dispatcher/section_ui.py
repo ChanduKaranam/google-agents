@@ -64,13 +64,6 @@ SECTIONS_PATH = '/sections'
 
 # Choosing an agent instead of pasting its link.
 PICK_AGENT = 'pick_agent'
-
-# Labelled "Logout" at the professor's request. It cannot sign anyone out —
-# the Google grant belongs to Gemini Enterprise and no agent can drop it — so
-# what it does is clear everything cached about the caller and re-read it. The
-# reply says exactly that, and says where a real sign-out is done, rather than
-# claiming one has happened.
-LOGOUT = 'logout'
 PASTE_INSTEAD = 'paste_link_instead'
 AGENT_PATH = '/agent'
 
@@ -377,13 +370,12 @@ def main_menu(state) -> list:
         if action == progress_ui.MENU_LEADERBOARD:
             continue
         buttons.append((label, action, None))
-    buttons.append(('Logout', LOGOUT, None))
-    # One straight row. These five labels total 49 characters, still inside
-    # the ~63 measured before Gemini Enterprise clipped a button, so this card
-    # gets a wider budget than the conservative default.
+    # One straight row. These four labels total 43 characters, comfortably
+    # inside the ~63 measured before Gemini Enterprise clipped a button, so
+    # this card gets a wider budget than the conservative default.
     return a2ui.build_card(
         a2ui.uid(state, 'menu'), [heading], buttons,
-        row_budget=60, row_cap=5,
+        row_budget=60, row_cap=4,
     )
 
 
