@@ -127,6 +127,19 @@ SIGNED_OUT_MESSAGE = (
     'authorise again — everything works straight after that.'
 )
 
+# Said when a professor's own department narrows to nothing. Their department
+# is the right scope for these two views — they must not be shown another
+# department's figures — so the answer is to say the department is empty and
+# name it, rather than to widen the card until it has something on it.
+def _empty_department(department: str) -> dict:
+    return _error(
+        f'Sethu has you in {department}, but returns no {department} sections, '
+        f'so there is nothing to show here. Ask Sethu to check which sections '
+        f'your account covers. Sending an agent still works — that can go to '
+        f'any department.'
+    )
+
+
 # Sethu stores the Gemini Enterprise share link on the agent record as `geUrl`.
 _LINK_FIELD = 'geUrl'
 
@@ -440,7 +453,10 @@ def show_department_progress(tool_context: ToolContext,
     if not progress or not progress.get('sections'):
         return _error('Sethu returned no activation data for this department.')
     _log_scope(tool_context, progress)
-    progress = _narrow_progress(progress, _own_department(tool_context))
+    own = _own_department(tool_context)
+    progress = _narrow_progress(progress, own)
+    if own and not progress.get('sections'):
+        return _empty_department(own)
 
     # The idle-sections figure lives on a different endpoint. It is worth one
     # extra call on an already-woken API, but not worth failing the whole card
@@ -572,6 +588,13 @@ def _narrow_progress(progress: dict, department: str) -> dict:
     department. Faculty are meant to see their own progress, while still being
     able to send an agent anywhere in the college.
 
+    A department with nothing in it narrows to nothing. This used to fall back
+    to the whole college on the reasoning that an empty card helps nobody, but
+    the card it produced was every other department's figures under this
+    professor's heading — which is worse than empty, because it reads as
+    theirs. Measured 2026-09-10: a professor Sethu places in CSE, whose own
+    data holds only ECE and EEE, was shown ECE and EEE.
+
     The server's ordering is kept exactly as given — pooling included — and
     only the printed positions are renumbered, so a filtered list still reads
     #1, #2, #3 without this code ever deciding who outranks whom.
@@ -579,9 +602,7 @@ def _narrow_progress(progress: dict, department: str) -> dict:
     if not department or (progress.get('department') or ''):
         return progress
     sections = [s for s in (progress.get('sections') or [])
-                if s.get('department') == department]
-    if not sections:
-        return progress
+                if _department_of(s) == department]
 
     sections = sorted(sections,
                       key=lambda s: (s.get('rank') is None, s.get('rank') or 0))
@@ -597,26 +618,42 @@ def _narrow_progress(progress: dict, department: str) -> dict:
     }
 
 
+def _department_of(entry: dict) -> str:
+    """Which department a section or ambassador row belongs to.
+
+    Its own `department` field when it has one, and otherwise the first
+    segment of the label — "CSE · Year 1 · Sec A" is CSE, and the separator is
+    there precisely so the parts can be told apart.
+
+    Read from the row rather than looked up in the roster because the roster
+    can be missing the department entirely. A professor whose department is
+    absent from it must still be narrowed to their own sections; the old
+    lookup found nothing for them and fell back to the whole college.
+    """
+    named = str(entry.get('department') or '').strip()
+    if named:
+        return named
+    label = str(entry.get('label') or entry.get('section') or '')
+    return label.split('·')[0].strip()
+
+
 def _narrow_ambassadors(data: dict, department: str, roster: list) -> dict:
     """The same narrowing for the ambassador roster.
 
-    Ambassadors carry a section label rather than a department, so the roster
-    supplies which labels belong to this department.
+    `roster` is no longer read. It is kept in the signature because callers
+    pass it, and because what it used to do — say which labels belong to this
+    department — is now read off each row.
     """
     if not department or (data.get('department') or ''):
-        return data
-    labels = {str(s.get('label')) for s in roster
-              if s.get('department') == department and s.get('label')}
-    if not labels:
         return data
     return {
         **data,
         'department': department,
         'ambassadors': [a for a in (data.get('ambassadors') or [])
-                        if str(a.get('section')) in labels],
+                        if _department_of(a) == department],
         'sectionsWithoutAmbassador': [
             s for s in (data.get('sectionsWithoutAmbassador') or [])
-            if str(s.get('section')) in labels
+            if _department_of(s) == department
         ],
     }
 
@@ -713,7 +750,10 @@ def show_leaderboard(tool_context: ToolContext,
     if not progress or not progress.get('sections'):
         return _error('Sethu returned no activation data for this department.')
     _log_scope(tool_context, progress)
-    progress = _narrow_progress(progress, _own_department(tool_context))
+    own = _own_department(tool_context)
+    progress = _narrow_progress(progress, own)
+    if own and not progress.get('sections'):
+        return _empty_department(own)
 
     _staged(tool_context, progress_ui.VIEW_LEADERBOARD, {
         'progress': progress,
