@@ -298,22 +298,31 @@ def _scope_or_sections(callback_context: CallbackContext, action: str, link: str
     # Plain "Section List" — browsing, not sending. No question is being
     # asked here, so the card does not ask one.
     state[tools.SEND_SCOPE] = None
-    # Their own department can be absent from the roster Sethu returns. Calling
-    # what is left "your departments" then tells a professor in CS that they
-    # belong to ECE and EEE.
-    missing = tools.missing_own_department(callback_context)
-    lead = (
-        f'Sethu has you in {missing}, but it is not returning any {missing} '
-        'sections, so I cannot show them. These are the departments it does '
-        'return — ask Sethu to check which sections your account covers.'
-        if missing else
-        'Here are your departments — tap one to see its sections.'
-    )
+
+    # A professor has one department, so there is nothing to ask. Going
+    # through a department picker to reach the only answer they wanted is a
+    # tap that can only be answered one way.
+    own = tools.own_department(callback_context)
+    if own:
+        card = section_ui.section_list_card(
+            state, roster, own, others_too=False)
+        if card:
+            return _reply(f'Here are your {own} sections.', card)
+        # Named a department and returned no sections for it. The same fault
+        # the dashboards report, and the same answer.
+        return _reply(
+            f'Sethu has you in {own}, but returns no {own} sections, so there '
+            f'is nothing to list. Ask Sethu to check which sections your '
+            f'account covers. Sending an agent still works — that can go to '
+            f'any department.',
+            section_ui.main_menu(state),
+        )
+
+    # No department of their own: an admin. They are the only caller for whom
+    # "which department?" is a real question.
     return _reply(
-        lead,
-        section_ui.department_card(
-            state, roster,
-            heading='Departments' if missing else 'Your departments'),
+        'Here are the departments — tap one to see its sections.',
+        section_ui.department_card(state, roster, heading='Departments'),
     )
 
 

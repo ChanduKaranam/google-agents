@@ -439,13 +439,19 @@ def send_agent_card(state) -> list:
     return messages
 
 
-def section_list_card(state, roster: list, department: str) -> list:
+def section_list_card(state, roster: list, department: str,
+                      others_too: bool = True) -> list:
     """The department's sections as a list, with nothing to press.
 
     Browsing is not the first step of a send. Offering the same tappable
     buttons here starts recording sections for a send the professor never
     asked to make — which is what "Selected CIVIL · Year 4 · Sec A (1 so far)"
     was, after a plain look at the section list.
+
+    `others_too` draws the way into the other departments. Off when the card
+    is a professor's own department: this is their section list, and the rest
+    of the college is not something they asked to see. On for an admin, who
+    has no department of their own and reaches this card by choosing one.
     """
     rows = [s for s in roster if s.get('department') == department]
     if not rows:
@@ -462,7 +468,8 @@ def section_list_card(state, roster: list, department: str) -> list:
     # The other departments, on the card itself. Browsing the roster means
     # comparing departments, and going back to the department list between
     # every one of them makes that a round trip each time.
-    others = [d for d in departments(roster) if d != department]
+    others = ([d for d in departments(roster) if d != department]
+              if others_too else [])
     counts = {
         d: sum(s.get('students') or 0 for s in roster
                if s.get('department') == d)

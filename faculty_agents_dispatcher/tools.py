@@ -453,7 +453,7 @@ def show_department_progress(tool_context: ToolContext,
     if not progress or not progress.get('sections'):
         return _error('Sethu returned no activation data for this department.')
     _log_scope(tool_context, progress)
-    own = _own_department(tool_context)
+    own = own_department(tool_context)
     progress = _narrow_progress(progress, own)
     if own and not progress.get('sections'):
         return _empty_department(own)
@@ -466,7 +466,7 @@ def show_department_progress(tool_context: ToolContext,
         try:
             ambassadors = _narrow_ambassadors(
                 _call(tool_context, sethu_client.get_ambassadors),
-                _own_department(tool_context),
+                own_department(tool_context),
                 _departments_roster(tool_context),
             )
         except SethuError:
@@ -595,26 +595,7 @@ def _log_scope_decision(tool_context: ToolContext, roster: list,
     )
 
 
-def missing_own_department(tool_context: ToolContext) -> str:
-    """The caller's department, when the roster does not contain it.
-
-    Returns "" when there is nothing wrong: no department resolved (an admin,
-    who is meant to see everything), or a roster that does have theirs.
-
-    A professor in CS shown "Your departments: ECE, EEE" reads it as this agent
-    having lost their department. The truthful version is that Sethu names
-    their department and then returns no sections under it, which only Sethu
-    can put right — but saying so beats presenting other people's departments
-    as theirs.
-    """
-    roster = _departments_roster(tool_context)
-    own = tool_context.state.get(OWN_DEPARTMENT) or ''
-    if not own or not roster:
-        return ''
-    return '' if own in {s.get('department') for s in roster} else own
-
-
-def _own_department(tool_context: ToolContext) -> str:
+def own_department(tool_context: ToolContext) -> str:
     """This professor's department, or "" if Sethu does not give them one."""
     if tool_context.state.get(OWN_DEPARTMENT) is None:
         _departments_roster(tool_context)
@@ -791,7 +772,7 @@ def show_leaderboard(tool_context: ToolContext,
     if not progress or not progress.get('sections'):
         return _error('Sethu returned no activation data for this department.')
     _log_scope(tool_context, progress)
-    own = _own_department(tool_context)
+    own = own_department(tool_context)
     progress = _narrow_progress(progress, own)
     if own and not progress.get('sections'):
         return _empty_department(own)
@@ -837,7 +818,7 @@ def show_ambassadors(tool_context: ToolContext) -> dict:
     if not data:
         return _error('Sethu returned no ambassador data for this department.')
     data = _narrow_ambassadors(
-        data, _own_department(tool_context), _departments_roster(tool_context)
+        data, own_department(tool_context), _departments_roster(tool_context)
     )
 
     logger.info(
