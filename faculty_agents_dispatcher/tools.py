@@ -537,21 +537,62 @@ def _departments_roster(tool_context: ToolContext) -> list:
             # lose a roster that still works.
             return tool_context.state.get(ROSTER_CACHE) or []
         cache_roster(tool_context.state, roster, department)
-        logger.info('scope: Sethu resolves this caller to department %r',
-                    department or '(none — admin or non-roster)')
-        # One call answers both halves, and they can disagree: measured
-        # 2026-09-10, Sethu named a caller's department as one the roster it
-        # returned in the same response did not contain. Logged loudly because
-        # nothing downstream can repair it — the sections simply are not there.
-        if department and department not in {
-                s.get('department') for s in (roster or [])}:
-            logger.warning(
-                'scope: MISMATCH — Sethu resolves this caller to %r but the '
-                'roster it returned holds no %r sections, only %s',
-                department, department,
-                sorted({str(s.get('department')) for s in (roster or [])}),
-            )
+        _log_scope_decision(tool_context, roster, department)
     return tool_context.state.get(ROSTER_CACHE) or []
+
+
+def _log_scope_decision(tool_context: ToolContext, roster: list,
+                        department: str) -> None:
+    """One line saying what this account will be shown, and why.
+
+    Written because the answer differs per professor and nothing else reveals
+    it. What the dashboards scope to is decided entirely by the `department`
+    Sethu returns on /faculty/sections — it names one for some accounts and
+    not for others, and an account it names none for is shown the whole
+    college. Checking that used to mean asking each professor what they saw.
+    Now one query over these lines answers it for everyone who has opened the
+    agent:
+
+        textPayload:"scope:" — every account and its scope
+        severity=WARNING     — only the accounts that are not scoped to one
+                               department
+
+    Logged once per roster fetch rather than per tap, so a busy conversation
+    does not bury it.
+    """
+    departments = sorted({str(s.get('department')) for s in (roster or [])
+                          if s.get('department')})
+    who = auth.who(tool_context)
+    role = auth.sethu_role(tool_context) or '(unknown)'
+
+    if not department:
+        logger.warning(
+            'scope: %s role=%s department=(none) -> dashboards show THE WHOLE '
+            'COLLEGE. Sethu returns no department for this account on '
+            '/faculty/sections, so there is nothing to narrow to. Sends offer '
+            'all %d departments %s',
+            who, role, len(departments), departments,
+        )
+        return
+
+    mine = [s for s in (roster or []) if s.get('department') == department]
+    if not mine:
+        # Nothing downstream can repair this — the sections are not in the
+        # payload. The dashboards now say so rather than widening.
+        logger.warning(
+            'scope: %s role=%s department=%r -> dashboards show NOTHING. '
+            'Sethu names this department and then returns no %r sections, '
+            'only %s. Sends offer all %d departments',
+            who, role, department, department, departments, len(departments),
+        )
+        return
+
+    logger.info(
+        'scope: %s role=%s department=%r -> dashboards show %s (%d of %d '
+        'sections); sends offer all %d departments %s',
+        who, role, department, department, len(mine), len(roster or []),
+        len(departments), departments,
+    )
 
 
 def missing_own_department(tool_context: ToolContext) -> str:

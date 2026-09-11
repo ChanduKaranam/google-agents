@@ -35,6 +35,7 @@ from . import config, sethu_client
 from .sethu_client import NoIdentityError, NotRegisteredError, SethuError
 
 _NAME_KEY = 'user:sethu_name'
+_EMAIL_KEY = 'user:sethu_email'
 _TOKEN_KEY = 'user:sethu_token'
 _TOKEN_ID_KEY = 'user:sethu_token_id'
 _EXPIRES_KEY = 'user:sethu_token_expires_at'
@@ -209,7 +210,27 @@ def resolve_identity(ctx) -> str | None:
     name = (me or {}).get('name')
     if name:
         ctx.state[_NAME_KEY] = name
+    # Kept for the scope log. Which professor an account belongs to is the one
+    # thing a log of "who sees what" cannot be read without, and /auth/me is
+    # the only place this agent is told.
+    if (me or {}).get('email'):
+        ctx.state[_EMAIL_KEY] = me['email']
     return name
+
+
+def who(ctx) -> str:
+    """The caller, named for a log line: "abhishek <a@x.in>", or "unknown"."""
+    state = getattr(ctx, 'state', {})
+    name = state.get(_NAME_KEY)
+    email = state.get(_EMAIL_KEY)
+    if name and email:
+        return f'{name} <{email}>'
+    return str(name or email or 'unknown caller')
+
+
+def sethu_role(ctx) -> str:
+    """The role Sethu reports for the caller, or "" if not established yet."""
+    return str(getattr(ctx, 'state', {}).get(_ROLE_KEY) or '')
 
 
 def is_known_non_faculty(ctx) -> bool:
