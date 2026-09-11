@@ -151,6 +151,26 @@ def _store(tool_context: ToolContext, data: dict) -> dict:
     return data
 
 
+def forget(ctx) -> None:
+    """Drop everything cached about the caller, identity included.
+
+    Stronger than `invalidate`, which drops only the token. These keys are
+    `user:`-scoped, so they outlive the conversation: a professor whose Sethu
+    record is corrected keeps being served the old name, role and department
+    in every chat they open, and starting a new one does not clear it. This is
+    the way back to a clean read.
+
+    It deliberately leaves the send guards alone. Those record which
+    confirmation cards have already been acted on, and a card still on screen
+    would become tappable again — a second WhatsApp blast at students who have
+    already been messaged.
+    """
+    for key in (_NAME_KEY, _EMAIL_KEY, _TOKEN_KEY, _TOKEN_ID_KEY,
+                _EXPIRES_KEY, _USER_ID_KEY, _TENANT_KEY, _ROLE_KEY,
+                IS_FACULTY_KEY):
+        ctx.state[key] = None
+
+
 def invalidate(tool_context: ToolContext) -> None:
     """Drop the cached token so the next call re-exchanges."""
     tool_context.state[_TOKEN_KEY] = None
