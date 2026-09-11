@@ -175,6 +175,19 @@ DISPLAY_UTC_OFFSET_MINUTES = int(
 DISPLAY_TZ_LABEL = os.environ.get('FACULTY_DISPLAY_TZ_LABEL', 'IST')
 
 
+# How long the college roster cached on a conversation stays usable.
+#
+# Time, not "once per session". Sections and whole departments are added in
+# Sethu while professors are using this, and a session that cached the roster
+# on its first tap kept that snapshot for the life of the conversation — a
+# professor whose own department was created afterwards never saw it, however
+# many times they reopened the chat. The same mistake the sync flag made
+# before it was given a clock.
+ROSTER_TTL_SECONDS = float(
+    os.environ.get('FACULTY_ROSTER_TTL_SECONDS', '600')
+)
+
+
 # How long a requested Sethu sync is considered fresh enough. A professor who
 # reopens yesterday's conversation should get current figures, but five taps in
 # a row should not queue five enumerations of the whole engine.

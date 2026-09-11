@@ -211,13 +211,19 @@ def _reply(text: str, messages: list | None = None) -> types.Content:
 
 
 def _roster(callback_context: CallbackContext) -> list:
-    """The college roster, cached on the session after the first fetch."""
+    """The college roster, re-fetched once the cached one goes stale.
+
+    Not cached for the life of the conversation. Departments and sections are
+    created in Sethu while professors are using this, and a session that
+    cached the roster on its first tap went on offering that snapshot for
+    ever — a professor whose own department was added afterwards could not
+    find it in the picker no matter how often they reopened the chat.
+    """
     state = callback_context.state
-    roster = state.get(tools.ROSTER_CACHE)
-    if roster:
-        return roster
+    if tools.roster_is_fresh(state):
+        return state[tools.ROSTER_CACHE]
     roster = tools._call(callback_context, sethu_client.list_faculty_sections)
-    state[tools.ROSTER_CACHE] = roster
+    tools.cache_roster(state, roster)
     return roster
 
 

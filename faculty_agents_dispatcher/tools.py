@@ -382,7 +382,7 @@ def show_section_picker(tool_context: ToolContext) -> dict:
     if not roster:
         return _error('Sethu lists no sections for this college.')
 
-    tool_context.state[ROSTER_CACHE] = roster
+    cache_roster(tool_context.state, roster)
     tool_context.state[PENDING_UI] = 'departments'
     logger.info('show_section_picker: staged %d sections', len(roster))
     return {
@@ -481,18 +481,46 @@ def show_department_progress(tool_context: ToolContext,
 OWN_DEPARTMENT = 'own_department'
 
 
+# When the cached roster was fetched, as epoch seconds.
+ROSTER_FETCHED = 'roster_fetched_at'
+
+
+def roster_is_fresh(state) -> bool:
+    """Whether the cached roster is recent enough to answer from.
+
+    Sessions written before this was stamped hold a roster and no time. Those
+    are treated as stale rather than as just-fetched: the snapshot may be days
+    old, and it is the conversation a professor reopens that most needs a
+    fresh one.
+    """
+    if not state.get(ROSTER_CACHE):
+        return False
+    at = state.get(ROSTER_FETCHED)
+    if not isinstance(at, (int, float)):
+        return False
+    return (time.time() - at) < config.ROSTER_TTL_SECONDS
+
+
+def cache_roster(state, roster: list, department=None) -> None:
+    """Store the roster with the time it arrived."""
+    state[ROSTER_CACHE] = roster
+    state[ROSTER_FETCHED] = time.time()
+    if department is not None:
+        state[OWN_DEPARTMENT] = department
+
+
 def _departments_roster(tool_context: ToolContext) -> list:
-    """The full college roster, fetched once per session."""
-    roster = tool_context.state.get(ROSTER_CACHE)
-    if not roster:
+    """The full college roster, re-fetched once it goes stale."""
+    if not roster_is_fresh(tool_context.state):
         try:
             department, roster = _call(
                 tool_context, sethu_client.list_faculty_scope
             )
         except SethuError:
-            return []
-        tool_context.state[ROSTER_CACHE] = roster
-        tool_context.state[OWN_DEPARTMENT] = department
+            # Keep whatever is cached. A failed refresh is not a reason to
+            # lose a roster that still works.
+            return tool_context.state.get(ROSTER_CACHE) or []
+        cache_roster(tool_context.state, roster, department)
         logger.info('scope: Sethu resolves this caller to department %r',
                     department or '(none — admin or non-roster)')
         # One call answers both halves, and they can disagree: measured
@@ -507,7 +535,7 @@ def _departments_roster(tool_context: ToolContext) -> list:
                 department, department,
                 sorted({str(s.get('department')) for s in (roster or [])}),
             )
-    return roster or []
+    return tool_context.state.get(ROSTER_CACHE) or []
 
 
 def missing_own_department(tool_context: ToolContext) -> str:
