@@ -555,13 +555,27 @@ def ambassador_roster(state, data: dict, offset: int = 0) -> list:
             header.append('Ranked on % of their section activated.')
         top = _amb_rate(shown[0]) if shown else 0.0
         rows = []
+        rank, tied_on = 0, None
         for position, a in enumerate(shown, 1):
             activated, total = a.get('activated'), a.get('total')
+            # Equal standing, equal rank. This numbered the rows instead, so
+            # two ambassadors on 75.0% read as #1 and #2 — the card asserting
+            # a winner between them that its own figures deny, in front of the
+            # two people concerned.
+            #
+            # Tied on the printed percentage, not the raw rate, so the rank
+            # can never disagree with the number beside it: 3 of 4 and 6 of 8
+            # both print 75.0% and both place first. Standard competition
+            # ranking, so a tie for first is #1, #1, #3 — the skipped #2 is
+            # what says two people hold the place.
+            printed = _pct(activated, total)
+            if printed != tied_on:
+                rank, tied_on = position, printed
             bar = (_bar(round(_amb_rate(a) * 100), round(top * 100))
                    if top else _bar(0, 0))
             rows.append([
-                f'#{position}  {a.get("name")} — {a.get("section")}',
-                f'{bar}  {_pct(activated, total)} · {_ratio(activated, total)}',
+                f'#{rank}  {a.get("name")} — {a.get("section")}',
+                f'{bar}  {printed} · {_ratio(activated, total)}',
             ])
         footer = ['No ambassadors are listed for this department.'] if not shown else []
 
